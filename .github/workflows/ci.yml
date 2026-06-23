@@ -1,0 +1,78 @@
+name: DeepExplor OS Regression Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run All Regression Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            gdal-bin \
+            libgdal-dev \
+            libproj-dev \
+            proj-bin \
+            libspatialindex-dev \
+            libgeos-dev
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          fi
+          # Install per-subsystem requirements
+          for req in $(find . -path ./venv -prune -o -name 'requirements.txt' -print 2>/dev/null | grep -v node_modules); do
+            echo "Installing: $req"
+            pip install -r "$req" || echo "Warning: partial failure in $req, continuing..."
+          done
+
+      - name: Run regression tests
+        id: run_tests
+        continue-on-error: true
+        run: |
+          python test/testcase/run_all_tests.py \
+            --junit-xml=junit-report.xml \
+            2>&1 | tee test-run.log
+
+      - name: Publish JUnit test report
+        uses: dorny/test-reporter@v2
+        if: always() && steps.run_tests.outcome != 'skipped'
+        with:
+          name: DeepExplor OS Regression Tests
+          path: junit-report.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            junit-report.xml
+            test-run.log
+          retention-days: 30
