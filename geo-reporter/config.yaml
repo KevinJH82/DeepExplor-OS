@@ -1,0 +1,20 @@
+# Geo-Reporter Configuration
+# 地质勘探综合报告生成平台配置文件
+
+report:
+  output_dir: ./reports
+  client_name: ""      # 委托单位，出现在封面页
+  author: ""           # 编制单位，出现在封面页
+  language: zh-CN
+
+search:
+  model: haiku
+  max_workers: 4
+  timeout_seconds: 120
+  retry_count: 1
+
+# P0 双阶段架构配置
+tavily_api_key: "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"
+extraction:
+  tavily_max_results: 5   # 每个类别最多返回几条搜索结果
+  tavily_search_depth: advanced  # basic 或 advanced

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>测试靶区 — 长江中下游铜陵矿集区</name>
+    <Placemark>
+      <name>测试ROI</name>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              117.80,30.85,0
+              117.80,31.05,0
+              118.15,31.05,0
+              118.15,30.85,0
+              117.80,30.85,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>

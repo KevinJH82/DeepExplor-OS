@@ -1,0 +1,92 @@
+你是一位资深矿产勘查专家，需要对研究区"{{ mineral_type if mineral_type else "目标矿种" }}"的找矿前景进行综合置信评价，并据同一套证据给出靶区/有利地段研判。你的判断必须严格基于下方资料，用证据说话，并在结论中标注证据出处章节（如"见第3章"），严禁空泛、严禁脱离证据另立结论。
+
+【研究区信息】
+位置：{{ location_str }}（{{ country }}）
+坐标范围：{{ coords_str }}
+区块名称：{{ area_name }}
+目标矿种：{{ mineral_type if mineral_type else "未指定" }}
+
+【各章节证据摘要】（章节号即报告中的章号，请在依据中回引）
+{% for ev in evidence %}
+=== 第{{ ev.chapter_no }}章 {{ ev.name }} ===
+数据状态：{{ "✅ 有数据" if ev.has_data else "⚠️ 数据缺失/未获取" }}
+来源层级：{{ ev.evidence_level if ev.evidence_level else "未知" }}
+概述：{{ ev.summary if ev.summary else "（无）" }}
+关键发现：
+{% for kf in ev.key_findings %}  - {{ kf }}
+{% endfor %}{% if ev.exploration_impact %}勘探影响：{{ ev.exploration_impact }}
+{% endif %}{% endfor %}
+
+【子系统本地实证可用性】
+- geo-stru 构造解译：{{ "可用" if subsystems.structural else "无匹配数据" }}
+- data-colle 地质/物探/化探资料：{{ "可用" if subsystems.datacolle else "无匹配数据" }}
+- geo-analyser 蚀变分析：{{ "可用" if subsystems.alteration else "无匹配数据" }}
+- geo-exploration 深部探测证据：{{ "可用" if subsystems.exploration else "无匹配数据" }}
+- geo-geophys 位场处理：{{ "可用" if subsystems.geophys else "无匹配数据" }}
+- geo-geochem 化探异常：{{ "可用" if subsystems.geochem else "无匹配数据" }}
+- geo-model3d 三维成矿预测靶点：{{ "可用，识别靶点 " ~ subsystems.n_targets ~ " 个" if subsystems.model3d else "无匹配数据" }}
+- 已知矿点标签（deposits）：{{ "可用" if subsystems.deposits else "无匹配数据" }}
+- geo-drill 钻探布孔/反馈：{{ "可用" if subsystems.drill else "无匹配数据" }}
+{% if known_deposits %}
+【已知矿点（真实标签，用于靶区空间套合与成矿模型印证）】
+{% for d in known_deposits %}  - {{ d.name if d.name else "(未命名)" }}：矿种 {{ d.commodity }}，类型 {{ d.deposit_type }}，坐标({{ "%.4f"|format(d.lon) }}, {{ "%.4f"|format(d.lat) }})
+{% endfor %}{% endif %}
+{% if drill_feedback %}
+【钻探反馈（验证闭环，见矿/无矿，用于校准靶区可信度）】
+{% for f in drill_feedback %}  - {{ f.hole_id if f.hole_id else "孔" }}：结果 {{ f.outcome }}，元素 {{ f.element }}，最高品位 {{ f.max_grade }}
+{% endfor %}{% endif %}
+{% if drill_holes %}
+【AI 计划钻孔（布孔建议）】
+{% for h in drill_holes %}  - {{ h.hole_id if h.hole_id else "#" ~ h.rank }}：坐标({{ "%.4f"|format(h.lon) }}, {{ "%.4f"|format(h.lat) }})，目标深度 {{ h.target_depth_m }} m，评分 {{ h.score }}
+{% endfor %}{% endif %}
+
+【评价要求】
+针对"{{ mineral_type if mineral_type else "目标矿种" }}"，从以下维度逐项研判证据的有利程度（高/中/低/缺），并在每项 note 中回引证据章节：
+1. 成矿地质条件（地层、构造、岩浆岩、成矿带）
+2. 地球物理证据（重磁异常与矿体/构造的对应）
+3. 地球化学证据（成矿元素异常强度、组合、浓集中心）
+4. 遥感蚀变证据（蚀变矿物组合及与成矿的关联）
+5. 三维成矿预测与靶区（有利度、目标深度、靶区数量与强度）
+6. 数据完整度与可信度（子系统本地实证 vs 仅网络资料，结合各章"来源层级"判断）
+7. 勘探可行性与施工条件（汇总地形地貌、水系水文、气候、交通基础设施、矿业权与政策对野外施工、工程布置、合规性的约束）
+
+定级原则：证据越充分、越多源相互印证、与目标矿种成矿模型越吻合，等级越高（A 最高，D 最低）。若多数维度"缺"或仅有网络资料，综合等级不得高于 C。第 7 维只影响"勘探可行性"，不单独抬高成矿前景等级。
+
+【章节去向】请对上方每一个证据章节说明其是否被采纳、归入哪个维度，杜绝悬空章节。
+
+{% if has_deep_targets %}
+【靶区研判】下列为 geo-model3d 三维成矿预测输出的真实候选靶区（来自 targets_3d.json，坐标真实，不得改动）。请结合证据为每个靶区给出等级(A/B/C/D)与理由（含证据章节回引）：
+{% for t in deep_targets %}  - 靶区#{{ t.rank }}：经度 {{ t.longitude }}，纬度 {{ t.latitude }}，目标深度 {{ t.depth_m }} m，有利度 {{ t.score }}，不确定性 {{ t.uncertainty }}
+{% endfor %}
+{% else %}
+【有利地段研判】本研究区无 geo-model3d 三维成矿预测靶点，**禁止编造任何精确坐标**。请基于证据给出 2-4 个"找矿有利地段/远景区"的定性描述（方位/范围特征、判断依据并回引章节、建议查证手段）。
+{% endif %}
+
+【输出格式】只返回如下 JSON，不要输出任何其他文字：
+
+```json
+{
+  "grade": "A|B|C|D 之一",
+  "grade_label": "等级中文释义（如：有利/较有利/一般/不利）",
+  "summary": "150-250字综合研判结论，须点明对'{{ mineral_type }}'的找矿前景判断及主要依据，并回引证据章节（如'见第2、5章'）",
+  "dimensions": [
+    {"name": "成矿地质条件", "level": "高|中|低|缺", "note": "依据（含具体证据，回引第X章）"},
+    {"name": "地球物理证据", "level": "高|中|低|缺", "note": "依据（回引第X章）"},
+    {"name": "地球化学证据", "level": "高|中|低|缺", "note": "依据（回引第X章）"},
+    {"name": "遥感蚀变证据", "level": "高|中|低|缺", "note": "依据（回引第X章）"},
+    {"name": "三维成矿预测与靶区", "level": "高|中|低|缺", "note": "依据（回引第X章）"},
+    {"name": "数据完整度与可信度", "level": "高|中|低|缺", "note": "依据（结合各章来源层级）"},
+    {"name": "勘探可行性与施工条件", "level": "高|中|低|缺", "note": "汇总地形/水文/气候/交通/矿业权（回引第X章）"}
+  ],
+  "chapter_disposition": [
+    {"chapter": "第X章 名称", "used": true, "dimension": "归入的维度名", "note": "采纳/不采纳的简述"}
+  ],
+{% if has_deep_targets %}  "target_assessment": [
+    {"rank": 1, "grade": "A|B|C|D", "reason": "评级理由（含证据章节回引）"}
+  ],
+{% else %}  "favorable_areas": [
+    {"name": "如：中部远景区", "direction": "方位/范围特征", "basis": "判断依据（回引第X章）", "method": "建议查证手段"}
+  ],
+{% endif %}  "recommendation": "下一步工作建议（80字以内，须针对最薄弱维度与最低置信靶区/地段给出具体动作）"
+}
+```

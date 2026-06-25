@@ -1,0 +1,51 @@
+# ============================================================
+# geo-downloader 依赖清单
+# 安装命令: pip3 install -r requirements.txt
+#
+# 注意：landsatxplore 与新版 click 存在冲突，
+#       已通过固定 click==8.1.8 解决。
+# ============================================================
+
+# ---------- 核心依赖（必须）----------
+requests>=2.28.0          # HTTP下载
+tqdm>=4.65.0              # 进度条
+pyyaml>=6.0               # credentials.yaml 读取
+shapely>=2.0.0            # 几何处理（BBox、多边形合并）
+fastkml>=1.0.0            # KML文件解析
+openpyxl>=3.1.0           # Excel .xlsx 坐标文件解析
+
+# ---------- 裁剪后处理（推荐）----------
+rasterio>=1.3.0           # 栅格裁剪
+pyproj>=3.5.0             # 坐标系转换（rasterio依赖）
+
+# ---------- 固定 click 版本（解决 landsatxplore 冲突）----------
+click>=8.0.0,<9.0.0       # landsatxplore 要求 click<8 已被 fork 版修复，此处锁定8.x
+
+# ---------- Sentinel-2（ESA Copernicus，需账号）----------
+# 仅使用 requests 直接调用 STAC/OData API，无额外库依赖
+
+# ---------- Sentinel-1 SAR（ASF DAAC，需NASA Earthdata账号）----------
+asf_search>=6.7.0         # ASF官方Python库
+
+# ---------- Landsat 8/9（USGS，需USGS账号）----------
+landsatxplore>=0.15.0     # USGS EarthExplorer Python库
+
+# ---------- EMIT 高光谱（NASA LP DAAC，需NASA Earthdata账号）----------
+earthaccess>=0.9.0        # NASA Earthdata官方Python库
+
+# ---------- 报告生成（推荐）----------
+python-docx>=0.8.11        # 自动生成 Word 下载报告（可选，未安装时跳过报告生成）
+Pillow>=10.0.0             # postprocess/satellite_overview.py 用（Google Maps 卫星底图拼接）
+scipy>=1.10.0              # postprocess/derive.py 用（OTCI/温度梯度/温度异常梯度 — ndimage.sobel/uniform_filter/zoom）
+
+# ---------- EnMAP 高光谱（DLR EOWEB，需DLR账号）----------
+# playwright 用于无头浏览器自动化（CAS登录 + EOWEB下单）
+# 安装后还需运行: playwright install chromium
+playwright>=1.40.0        # 可选：缺少时 EnMAP 下载器会给出安装提示
+
+# ---------- Google Earth Engine（GEE，需服务账号 JSON Key）----------
+# 申请步骤：
+#   1. Google Cloud Console 创建项目并启用 Earth Engine API
+#   2. 创建服务账号，下载 JSON 密钥文件
+#   3. 在 https://code.earthengine.google.com/ 注册该服务账号
+earthengine-api>=0.1.370  # 可选：缺少时 GEE 下载器会给出安装提示

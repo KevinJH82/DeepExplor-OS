@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.deepexplor.downloader</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/deepexplor-services/geo-downloader/venv/bin/python3</string>
+        <string>web/app.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/opt/deepexplor-services/geo-downloader</string>
+
+    <!-- LaunchAgent 自动继承启动它的用户 (demacmini)，不需要 UserName/GroupName 字段 -->
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>GDAL_CONFIG</key>
+        <string>/opt/homebrew/bin/gdal-config</string>
+        <key>HOME</key>
+        <string>/Users/demacmini</string>
+        <key>LANG</key>
+        <string>zh_CN.UTF-8</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- 用户域日志路径 -->
+    <key>StandardOutPath</key>
+    <string>/Users/demacmini/Library/Logs/deepexplor-downloader.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/demacmini/Library/Logs/deepexplor-downloader-error.log</string>
+
+    <!-- 只在用户登录会话中运行（继承 GUI TCC 上下文，可访问外置卷） -->
+    <key>LimitLoadToSessionType</key>
+    <string>Aqua</string>
+</dict>
+</plist>

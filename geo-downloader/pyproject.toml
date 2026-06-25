@@ -1,0 +1,9 @@
+[project]
+name = "geo-downloader"
+version = "1.0.2"
+description = "面向地质勘探的多平台遥感数据批量下载工具"
+requires-python = ">=3.9"
+readme = "README.md"
+
+[project.urls]
+Repository = "https://github.com/KevinJH82/geo-downloader"

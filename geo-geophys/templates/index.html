@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>物探处理（位场 + ANT 接入）· geo-geophys</title>
+<style>
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:#1e293b;background:#f7f9fb;margin:0;padding:24px}
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-size:22px;border-bottom:3px solid #0891b2;padding-bottom:10px}
+  .sub{color:#64748b;font-size:13px;margin-top:-6px}
+  .card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:18px 20px;margin:16px 0}
+  label{font-size:13px;font-weight:600;display:block;margin:10px 0 4px}
+  input,select{padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px}
+  .row{display:flex;gap:16px;flex-wrap:wrap}.row>div{flex:1;min-width:160px}
+  button{background:#0891b2;color:#fff;border:0;border-radius:7px;padding:10px 22px;font-size:15px;cursor:pointer;margin-top:14px}
+  button:disabled{background:#94a3b8}
+  pre{background:#0f172a;color:#e2e8f0;padding:12px;border-radius:6px;font-size:12px;max-height:260px;overflow:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}th,td{border:1px solid #e2e8f0;padding:6px 8px;text-align:left}th{background:#f1f5f9}
+  .imgs img{max-width:300px;border:1px solid #e2e8f0;border-radius:6px;margin:6px}
+  .warn{background:#fef3c7;border:1px solid #f59e0b;color:#92400e;padding:8px 12px;border-radius:6px;font-size:13px;margin-top:8px}
+  .muted{color:#64748b;font-size:12px}
+  .dlbtn{display:inline-block;font-size:13px;padding:7px 12px;margin:4px 6px 4px 0;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#0e7490;text-decoration:none}
+  .dlbtn.primary{background:#0891b2;color:#fff;border-color:#0891b2;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>物探处理系统 (geo-geophys)</h1>
+  <div class="sub">上传研究区 KML/KMZ + 选矿种 → 取 EMAG2 磁/ICGEM 重力网格 → 位场处理(化极/解析信号/倾斜角/延拓) + 欧拉磁源深度 +（可选）ANT 速度体接入</div>
+
+  <div class="card">
+    <div class="row">
+      <div><label>研究区文件 (.kml/.kmz)</label><input type="file" id="file" accept=".kml,.kmz,.ovkml"></div>
+      <div><label>矿种</label><select id="mineral">{% for m in minerals %}<option value="{{m}}">{{m}}</option>{% endfor %}</select></div>
+    </div>
+    <div class="muted" style="margin-top:6px">非专家只需 <b>上传 KML + 选矿种</b> → 点开始。其余参数会按矿种自动设置。</div>
+    <details style="margin-top:10px">
+      <summary style="cursor:pointer;color:#0e7490;font-size:13px">⚙ 高级选项（物探专家可调，非专家无需展开）</summary>
+      <div class="row" style="margin-top:8px">
+        <div><label>欧拉构造指数 SI</label><select id="euler_si">
+          <option value="auto" selected>自动（按矿种）</option>
+          <option value="0">0 接触/台阶</option><option value="1">1 岩墙/岩脉</option>
+          <option value="2">2 岩管/紧凑磁性体</option><option value="3">3 球</option></select></div>
+        <div><label>IGRF 日期(化极用)</label><input type="text" id="igrf_date" value="{{igrf_date}}"></div>
+        <div><label>ANT/地震速度体(.nc/.csv)</label><input type="file" id="velocity" accept=".nc,.csv"></div>
+      </div>
+    </details>
+    <button id="run">开始处理</button>
+    <div class="muted" style="margin-top:8px">⚠ 输入为全球区域网格(EMAG2~4km且已上延4km、ICGEM~14km)，产物为<b>区域尺度</b>：磁源深度为 km 级区域估计，非矿体尺度。矿体尺度需地面/航空实测。</div>
+  </div>
+
+  <div class="card" id="statusCard" style="display:none"><b>状态：</b><span id="status"></span> <span id="progress"></span><pre id="logs"></pre></div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <h3>结果</h3>
+    <div id="plain" style="margin-bottom:12px"></div>
+    <div id="chainBox" style="margin-bottom:12px"></div>
+    <div id="downloads" style="margin-bottom:12px"></div>
+    <div id="warns"></div>
+    <details><summary style="cursor:pointer;color:#0e7490;font-size:13px">📊 物探专业指标（专家用）</summary><div id="summary"></div></details>
+    <h4>位场处理图件</h4>
+    <div class="imgs" id="figs"></div>
+  </div>
+</div>
+<script>
+const $=s=>document.querySelector(s); let timer=null;
+$('#run').onclick=async()=>{
+  const f=$('#file').files[0]; if(!f){alert('请选择区域文件');return;}
+  const fd=new FormData(); fd.append('file',f); fd.append('mineral',$('#mineral').value);
+  fd.append('igrf_date',$('#igrf_date').value); fd.append('euler_si',$('#euler_si').value);
+  if($('#velocity').files[0]) fd.append('velocity',$('#velocity').files[0]);
+  $('#run').disabled=true; $('#statusCard').style.display='block'; $('#resultCard').style.display='none'; $('#status').textContent='提交中…';
+  const r=await fetch('/api/start',{method:'POST',body:fd}); const j=await r.json();
+  if(!j.success){alert(j.message);$('#run').disabled=false;return;} poll(j.task_id);
+};
+function poll(tid){timer=setInterval(async()=>{
+  const j=await(await fetch('/api/status/'+tid)).json(); if(!j.success)return; const t=j.task;
+  $('#status').textContent=t.status; $('#progress').textContent=(t.progress||0)+'%'; $('#logs').textContent=(t.logs||[]).join('\n');
+  if(t.status==='completed'){clearInterval(timer);$('#run').disabled=false;showResult(tid,t);}
+  if(t.status==='failed'){clearInterval(timer);$('#run').disabled=false;}
+},1200);}
+let CUR_TID=null;
+function showResult(tid,t){
+  CUR_TID=tid;
+  const res=t.results,ms=res.model_stats; $('#resultCard').style.display='block';
+  const p=res.products||{};
+  // 大白话解读（非专家看这里）
+  $('#plain').innerHTML='<div style="background:#ecfeff;border:1px solid #67e8f9;border-radius:8px;padding:12px 14px">'
+    +'<b style="color:#0e7490">📖 通俗解读</b><ul style="margin:8px 0 0;padding-left:20px;font-size:13px;line-height:1.7">'
+    +(ms.plain_summary||[]).map(s=>`<li>${s}</li>`).join('')+'</ul></div>';
+  // 一键生成三维靶点
+  $('#chainBox').innerHTML='<button class="dlbtn primary" onclick="chain3d()">▶ 一键生成三维靶点（geo-model3d）</button>'
+    +'<span id="chainMsg" class="muted" style="margin-left:8px"></span><div id="chainTargets"></div>';
+  const dl=(path,label)=>`<a class="dlbtn" href="/api/result/${tid}/${path}?download=1" download>${label}</a>`;
+  let html=`<button class="dlbtn primary" onclick="downloadZip('${tid}')">⬇ 下载全部结果 (ZIP)</button>`;
+  if(p.euler_sources) html+=dl(p.euler_sources,'磁源深度点 (GeoJSON)');
+  if(p.magnetic_rtp) html+=dl(p.magnetic_rtp,'化极 RTP (GeoTIFF)');
+  if(p.velocity_volume_nc) html+=dl(p.velocity_volume_nc,'速度体 (NetCDF)');
+  html+=dl('metadata.json','元数据');
+  $('#downloads').innerHTML=html;
+  $('#warns').innerHTML=(ms.warnings||[]).map(w=>`<div class="warn">⚠ ${w}</div>`).join('');
+  const eu=ms.euler||{}, vm=ms.velocity_model||{}, ig=ms.igrf||{};
+  $('#summary').innerHTML=`<table>
+    <tr><th>尺度说明</th><td>${ms.scale_note||''}</td></tr>
+    <tr><th>磁/重数据</th><td>磁 ${(ms.data_sources?.magnetic?.status)||'-'} ｜ 重力 ${(ms.data_sources?.gravity?.status)||'-'}</td></tr>
+    <tr><th>IGRF</th><td>倾角 ${ig.inclination_deg??'-'}° 偏角 ${ig.declination_deg??'-'}° (${ig.source||'-'})</td></tr>
+    <tr><th>欧拉磁源</th><td>${eu.n_points??0} 个点，深度中位 ${eu.depth_median_m?(eu.depth_median_m/1000).toFixed(1)+' km':'-'}（SI=${eu.si}）</td></tr>
+    <tr><th>ANT 速度体</th><td>${vm.status}${vm.coverage?('，覆盖 '+vm.coverage):''}</td></tr></table>`;
+  $('#figs').innerHTML=(p.figures||[]).map(f=>`<img src="/api/result/${tid}/${f}">`).join('');
+}
+async function chain3d(){
+  const msg=$('#chainMsg'); msg.textContent='提交到 geo-model3d…';
+  try{
+    const r=await fetch('/api/chain/'+CUR_TID,{method:'POST'}); const j=await r.json();
+    if(!j.success){msg.innerHTML='<span style="color:#b91c1c">'+j.message+'</span>';return;}
+    const mtid=j.model3d_task_id, murl=j.model3d_url;
+    msg.innerHTML=`三维建模中… <a href="${murl}" target="_blank">在 geo-model3d 打开</a>`;
+    const t=setInterval(async()=>{
+      const s=await(await fetch('/api/chain_status/'+mtid)).json();
+      if(!s.success)return; const task=s.task;
+      msg.innerHTML=`三维建模 ${task.status} ${task.progress||0}% · <a href="${murl}" target="_blank">在 geo-model3d 打开</a>`;
+      if(task.status==='completed'){clearInterval(t);renderChainTargets(task);}
+      if(task.status==='failed'){clearInterval(t);msg.innerHTML='<span style="color:#b91c1c">三维建模失败：'+(task.error||'')+'</span>';}
+    },1500);
+  }catch(e){msg.innerHTML='<span style="color:#b91c1c">'+e+'</span>';}
+}
+function renderChainTargets(task){
+  const ms=task.results.model_stats, tg=task.results.targets||[];
+  let html='<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px;margin-top:8px">'
+    +`<b style="color:#15803d">✅ 三维靶点（成因族 ${ms.family}，深度带 ${ms.depth_km_band?.[0]}–${ms.depth_km_band?.[1]}km`
+    +(ms.geophysics?.status==='ok'?'，已融合本次物探':'')+`）</b>`
+    +'<table><tr><th>#</th><th>经度</th><th>纬度</th><th>深度(m)</th><th>概率</th><th>不确定性</th></tr>'
+    +tg.slice(0,10).map(x=>`<tr><td>${x.rank}</td><td>${x.lon}</td><td>${x.lat}</td><td>${x.depth_m}</td><td>${x.score}</td><td>${x.uncertainty}</td></tr>`).join('')
+    +'</table><div class="muted">完整三维体/切片请在 geo-model3d 下载。</div></div>';
+  $('#chainTargets').innerHTML=html;
+}
+async function downloadZip(tid){
+  try{const r=await fetch('/api/download/'+tid);const ct=r.headers.get('content-type')||'';
+    if(!r.ok||ct.includes('application/json')){let m='下载失败';try{m=(await r.json()).message||m;}catch(e){}alert(m);return;}
+    const b=await r.blob();let n='geophys_result.zip';const cd=r.headers.get('content-disposition')||'';const mt=cd.match(/filename=([^;]+)/);if(mt)n=decodeURIComponent(mt[1].trim().replace(/"/g,''));
+    const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=n;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(u);
+  }catch(e){alert('下载出错: '+e);}
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}矿产深部探测系统{% endblock %}</title>
+    <script src="/static/tailwindcss.js"></script>
+    <script src="/static/iconify-icon.min.js"></script>
+    <style>
+        body { font-family: 'Inter', 'Microsoft YaHei', sans-serif; }
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .detector-checkbox.selected {
+            background-color: #2563eb !important;
+            border-color: #2563eb !important;
+        }
+        .detector-checkbox.selected span,
+        .detector-checkbox.selected iconify-icon {
+            color: white !important;
+        }
+        .file-upload-area.dragover {
+            border-color: #3b82f6 !important;
+            background-color: rgba(59, 130, 246, 0.08) !important;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-indicator.running {
+            background-color: #10b981;
+            animation: pulse 2s infinite;
+        }
+        .status-indicator.completed { background-color: #10b981; }
+        .status-indicator.failed { background-color: #ef4444; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .log-container {
+            background-color: #f8fafc;
+            border-radius: 12px;
+            padding: 16px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.8rem;
+            word-wrap: break-word;
+        }
+        .log-container::-webkit-scrollbar { width: 4px; }
+        .log-container::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .log-entry { margin-bottom: 4px; padding: 4px 8px; border-radius: 4px; }
+        .log-entry.info { color: #3b82f6; }
+        .log-entry.warning { color: #eab308; }
+        .log-entry.error { color: #ef4444; }
+        .log-entry.success { color: #10b981; }
+        .tab-btn.active {
+            color: #2563eb !important;
+            border-bottom: 2px solid #2563eb;
+            font-weight: 600;
+        }
+        .img-viewer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .img-viewer img {
+            transition: transform 0.2s ease-out;
+            cursor: zoom-in;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        .img-viewer img.zoomed { cursor: zoom-out; }
+    </style>
+</head>
+<body>
+    {% block body %}
+    {% endblock %}
+
+    <script>
+        let currentTaskId = null;
+        let progressInterval = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            initializeDragAndDrop();
+            initializeDetectorSelection();
+            initializeFileUpload();
+        }
+
+        function initializeDragAndDrop() {
+            const uploadAreas = document.querySelectorAll('.file-upload-area');
+            uploadAreas.forEach(area => {
+                area.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    this.classList.add('dragover');
+                });
+                area.addEventListener('dragleave', function(e) {
+                    e.preventDefault();
+                    this.classList.remove('dragover');
+                });
+                area.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.classList.remove('dragover');
+                    const files = e.dataTransfer.files;
+                    handleFileUpload(files, this.dataset.uploadType);
+                });
+            });
+        }
+
+        function initializeDetectorSelection() {
+        }
+
+        function initializeFileUpload() {
+            const fileInputs = document.querySelectorAll('input[type="file"]');
+            fileInputs.forEach(input => {
+                input.addEventListener('change', function(e) {
+                    const files = e.target.files;
+                    if (files.length > 0) {
+                        handleFileUpload(files, this.dataset.uploadType);
+                    }
+                });
+            });
+        }
+
+        function handleFileUpload(files, uploadType) {
+            const formData = new FormData();
+            formData.append('type', uploadType);
+            formData.append('file', files[0]);
+            const uploadArea = document.querySelector(`[data-upload-type="${uploadType}"]`);
+            uploadArea.querySelector('.upload-status').textContent = '上传中...';
+
+            fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    uploadArea.querySelector('.upload-status').textContent = '上传成功';
+                    uploadArea.querySelector('.file-info').innerHTML =
+                        `<iconify-icon icon="lucide:check-circle" style="color:#10b981"></iconify-icon> ${data.file_info.name} (${data.file_info.size})`;
+                } else {
+                    uploadArea.querySelector('.upload-status').textContent = '上传失败';
+                    alert(data.message);
+                }
+            })
+            .catch(error => {
+                uploadArea.querySelector('.upload-status').textContent = '上传失败';
+                console.error('Upload error:', error);
+            });
+        }
+
+        function startAnalysis() {
+            const config = {
+                mineral_type: document.getElementById('mineral_type').value,
+                detectors: [],
+                fusion_mode: document.getElementById('fusion_mode').checked,
+                kmz_threshold: parseFloat(document.getElementById('kmz_threshold').value),
+                task_name: document.getElementById('task_name').value,
+                // 外部系统接入开关(checkbox);仅传 enabled,其余参数后端取 Config 默认
+                alteration: { enabled: !!(document.getElementById('use_alteration') || {}).checked },
+                structural: { enabled: !!(document.getElementById('use_structural') || {}).checked }
+            };
+
+            const detectorCheckboxes = document.querySelectorAll('.detector-checkbox input[type="checkbox"]:checked');
+            detectorCheckboxes.forEach(checkbox => {
+                config.detectors.push(checkbox.value);
+            });
+
+            if (!config.mineral_type) {
+                showNotification('请选择目标矿种', 'error');
+                return;
+            }
+            if (config.detectors.length === 0) {
+                showNotification('请至少选择一个探测器', 'error');
+                return;
+            }
+
+            fetch('/api/start_analysis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentTaskId = data.task_id;
+                    showNotification('分析任务已启动', 'success');
+                    const logContainer = document.getElementById('log_container');
+                    logContainer.innerHTML = '';
+                    startProgressMonitoring();
+                    document.getElementById('run_button').disabled = true;
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Start analysis error:', error);
+                showNotification('启动失败: ' + error.message, 'error');
+            });
+        }
+
+        function startProgressMonitoring() {
+            if (progressInterval) clearInterval(progressInterval);
+            progressInterval = setInterval(() => {
+                fetch(`/api/task_status/${currentTaskId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const task = data.task;
+                        updateProgress(task.progress, task.status);
+                        if (task.logs && task.logs.length > 0) {
+                            updateLogs(task.logs);
+                        }
+                        if (task.status === 'completed' || task.status === 'failed') {
+                            clearInterval(progressInterval);
+                            if (task.status === 'completed') {
+                                showNotification('分析完成！', 'success');
+                                showResults(task.results);
+                            } else {
+                                showNotification('分析失败: ' + task.error, 'error');
+                            }
+                            document.getElementById('run_button').disabled = false;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Progress monitoring error:', error);
+                });
+            }, 2000);
+        }
+
+        function updateProgress(progress, status) {
+            const progressBar = document.getElementById('progress_bar');
+            const progressText = document.getElementById('progress_text');
+            const progressContainer = document.getElementById('progress_container');
+            const progressTextContainer = document.getElementById('progress_text_container');
+            const statusIndicator = document.getElementById('status_indicator');
+            const statusText = document.getElementById('status_text');
+
+            if (status === 'running') {
+                progressContainer.style.display = 'block';
+                progressTextContainer.style.display = 'block';
+            } else if (status === 'completed' || status === 'failed') {
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
+                    progressTextContainer.style.display = 'none';
+                }, 3000);
+            }
+
+            progressBar.style.width = `${progress}%`;
+            progressText.textContent = `${progress}%`;
+
+            statusIndicator.className = 'status-indicator';
+            if (status === 'running') {
+                statusIndicator.classList.add('running');
+                statusText.textContent = '运行中';
+            } else if (status === 'completed') {
+                statusIndicator.classList.add('completed');
+                statusText.textContent = '已完成';
+            } else if (status === 'failed') {
+                statusIndicator.classList.add('failed');
+                statusText.textContent = '失败';
+            }
+        }
+
+        function updateLogs(logs) {
+            const logContainer = document.getElementById('log_container');
+            const currentLogs = Array.from(logContainer.children).map(el => el.textContent);
+            logs.forEach(log => {
+                if (!currentLogs.includes(log)) {
+                    const match = log.match(/\[(.*?)\] \[(.*?)\] (.*)/);
+                    if (match) {
+                        const level = match[2].toLowerCase();
+                        const logEntry = document.createElement('div');
+                        logEntry.className = `log-entry ${level}`;
+                        logEntry.textContent = log;
+                        logContainer.appendChild(logEntry);
+                    }
+                }
+            });
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        function showResults(results) {
+            const resonanceTab = document.getElementById('resonance_tab');
+            if (resonanceTab) {
+                switchResultTab({currentTarget: resonanceTab}, 'resonance');
+            }
+            if (results.output_files) {
+                const imageUrl = `/api/results/${currentTaskId}`;
+                if (results.output_files.resonance_map) {
+                    document.getElementById('resonance_image').src = `${imageUrl}/${results.output_files.resonance_map}`;
+                }
+                if (results.output_files.fusion_map) {
+                    document.getElementById('fusion_image').src = `${imageUrl}/${results.output_files.fusion_map}`;
+                }
+                if (results.output_files.prediction_map) {
+                    document.getElementById('prediction_image').src = `${imageUrl}/${results.output_files.prediction_map}`;
+                }
+            }
+        }
+
+        function showNotification(message, type) {
+            const notification = document.createElement('div');
+            let bgClass = 'bg-blue-500';
+            if (type === 'error') bgClass = 'bg-red-500';
+            else if (type === 'success') bgClass = 'bg-emerald-500';
+            notification.className = `fixed top-4 right-4 m-3 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white z-[9999] ${bgClass}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => { notification.remove(); }, 5000);
+        }
+
+        function downloadResults(taskId) {
+            window.location.href = `/api/download/${taskId}`;
+        }
+
+        function downloadImage(imgId) {
+            const img = document.getElementById(imgId);
+            if (!img || !img.src || img.src.startsWith('data:')) {
+                showNotification('暂无图片可下载', 'error');
+                return;
+            }
+            const a = document.createElement('a');
+            a.href = img.src;
+            a.download = imgId.replace('_image', '') + '.png';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function clearUploads() {
+            if (confirm('确定要清除所有上传的文件吗？')) {
+                fetch('/api/clear_uploads')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showNotification('已清除所有上传文件', 'success');
+                        location.reload();
+                    }
+                })
+                .catch(error => {
+                    console.error('Clear uploads error:', error);
+                });
+            }
+        }
+
+        function switchResultTab(event, tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active', 'text-blue-600', 'font-semibold');
+                btn.classList.add('text-slate-500', 'font-medium');
+            });
+            const btn = event.currentTarget;
+            btn.classList.remove('text-slate-500', 'font-medium');
+            btn.classList.add('active', 'text-blue-600', 'font-semibold');
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+            const activeContent = document.getElementById('tab-' + tabId);
+            if (activeContent) activeContent.classList.remove('hidden');
+        }
+
+        const imageZoomLevels = {};
+        function zoomImage(imgId, factor) {
+            const img = document.getElementById(imgId);
+            if (!img) return;
+            if (!imageZoomLevels[imgId]) imageZoomLevels[imgId] = 1.0;
+            imageZoomLevels[imgId] *= factor;
+            imageZoomLevels[imgId] = Math.max(0.1, Math.min(5.0, imageZoomLevels[imgId]));
+            img.style.transform = `scale(${imageZoomLevels[imgId]})`;
+            img.style.transformOrigin = 'center center';
+            if (imageZoomLevels[imgId] > 1) img.classList.add('zoomed');
+            else img.classList.remove('zoomed');
+        }
+        function resetImage(imgId) {
+            const img = document.getElementById(imgId);
+            if (!img) return;
+            imageZoomLevels[imgId] = 1.0;
+            img.style.transform = 'scale(1)';
+            img.classList.remove('zoomed');
+        }
+        function toggleZoom(imgId) {
+            const img = document.getElementById(imgId);
+            if (!img) return;
+            if (!imageZoomLevels[imgId]) imageZoomLevels[imgId] = 1.0;
+            if (imageZoomLevels[imgId] === 1.0) {
+                imageZoomLevels[imgId] = 1.5;
+                img.style.transform = 'scale(1.5)';
+                img.classList.add('zoomed');
+            } else {
+                resetImage(imgId);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.img-viewer img').forEach(img => {
+                img.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    toggleZoom(this.id);
+                });
+            });
+        });
+    </script>
+
+    {% block scripts %}
+    {% endblock %}
+</body>
+</html>

@@ -1,0 +1,1652 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Explor OS</title>
+    <script src="/static/tailwindcss.js"></script>
+    <script src="/static/iconify-icon.min.js"></script>
+    <script src="/static/echarts.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .nav-dropdown:hover .nav-dropdown-content { display: block; }
+        .nav-dropdown-content { display: none; }
+        .thin-border { border-width: 0.5px; border-color: #f1f5f9; }
+        /* 视图/面板可见性 — 关键样式内联,避免外部 style.css 被浏览器缓存后失效导致页面无法切换 */
+        .module-panel { display: none; }
+        .module-panel.active { display: block; }
+        #dashboard-view { display: none; }
+        #dashboard-view.active { display: block; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+<!-- ═══════════════════════════════════════════
+   Navigation Bar (exact match from index.html design)
+═══════════════════════════════════════════ -->
+<nav class="fixed top-0 w-full h-16 border-b border-slate-100 bg-white/80 backdrop-blur-md z-50 flex items-center justify-between px-8">
+    <div class="flex items-center gap-8">
+        <a class="flex items-center gap-2" href="#" onclick="showDashboard(); return false;">
+            <div class="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
+                <iconify-icon class="text-white text-xl" icon="lucide:layers"></iconify-icon>
+            </div>
+            <span class="text-lg font-bold tracking-tight text-emerald-600">Deep Explor OS</span>
+        </a>
+        <div class="hidden md:flex items-center gap-6 text-sm font-medium">
+            <a data-nav="alter" class="nav-link text-slate-500 hover:text-slate-900 transition-colors" href="#" onclick="showModule('alter'); return false;">蚀变异常检测</a>
+        </div>
+    </div>
+    <div class="flex items-center gap-6">
+        <div class="flex flex-col items-end text-xs text-slate-500">
+            <span>当前日期: <span id="navDate"></span></span>
+            <span>坐标系: WGS 84 / UTM zone 50N</span>
+        </div>
+        <div class="h-8 w-[1px] bg-slate-100 mx-2"></div>
+        <button class="text-slate-600 hover:text-slate-900 transition-colors">
+            <iconify-icon class="text-xl" icon="lucide:bell"></iconify-icon>
+        </button>
+        <div class="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 overflow-hidden">
+            <img alt="User avatar" class="w-full h-full object-cover" src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect fill=%27%23059669%27 width=%2732%27 height=%2732%27/%3E%3Ctext x=%2716%27 y=%2722%27 text-anchor=%27middle%27 fill=%27%23fff%27 font-size=%2716%27%3EDE%3C/text%3E%3C/svg%3E"/>
+        </div>
+    </div>
+</nav>
+
+
+<!-- ═══════════════════════════════════════════
+   DASHBOARD VIEW (match index.html design)
+═══════════════════════════════════════════ -->
+<div id="dashboard-view" class="active">
+    <main class="pt-24 pb-12 px-8 max-w-[1600px] mx-auto">
+        <header class="mb-10 flex items-center justify-between">
+            <h1 class="text-3xl font-medium tracking-tight mb-0">数据综合处理系统</h1>
+            <a class="text-sm text-emerald-600 font-medium hover:text-emerald-700 transition-colors cursor-pointer" href="http://www.deepexplor-system.net/2nd%20Page/index.html">返回上一级</a>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+            <!-- 蚀变异常检测 -->
+            <div class="p-8 rounded-3xl border border-slate-100 hover:border-slate-300 transition-all group bg-white shadow-sm hover:shadow-md cursor-pointer" onclick="showModule('alter')">
+                <div class="flex justify-between items-start mb-6">
+                    <div class="p-4 rounded-2xl bg-amber-50 text-amber-600">
+                        <iconify-icon class="text-3xl" icon="lucide:microscope"></iconify-icon>
+                    </div>
+                </div>
+                <h3 class="text-xl font-bold mb-3">蚀变异常检测</h3>
+                <p class="text-sm text-slate-500 leading-relaxed mb-8">通过波谱特征提取与阈值分割技术，识别铁氧化物、羟基矿物及碳酸盐等关键矿物蚀变信息。</p>
+                <div class="w-full py-3 bg-white text-slate-900 border border-slate-200 rounded-xl text-sm font-bold hover:bg-emerald-600 hover:text-white hover:border-emerald-600 cursor-pointer flex items-center justify-center gap-2" style="transition: all 0.3s ease">
+                    启动蚀变分析 <iconify-icon icon="lucide:zap"></iconify-icon>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 最近活动 -->
+        <section class="grid grid-cols-1 gap-8">
+            <div class="bg-white p-8 rounded-3xl border border-slate-100">
+                <h4 class="font-bold text-lg mb-8">最近活动</h4>
+                <div class="space-y-6">
+                    <div class="flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-colors">
+                        <div class="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                            <iconify-icon class="text-xl" icon="lucide:file-check"></iconify-icon>
+                        </div>
+                        <div class="flex-1 overflow-hidden">
+                            <p class="text-sm font-bold truncate">GF5_Western_Plateau_2026.tif</p>
+                            <p class="text-xs text-slate-400">蚀变异常分析已完成 · 2小时前</p>
+                        </div>
+                        <button class="text-slate-400 hover:text-slate-900"><iconify-icon icon="lucide:download"></iconify-icon></button>
+                    </div>
+                    <div class="flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-colors">
+                        <div class="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                            <iconify-icon class="text-xl" icon="lucide:refresh-cw"></iconify-icon>
+                        </div>
+                        <div class="flex-1 overflow-hidden">
+                            <p class="text-sm font-bold truncate">Landsat8_Pre_Processing_Batch_04</p>
+                            <p class="text-xs text-slate-400">大气校正进行中 (78%) · 5小时前</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-colors">
+                        <div class="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 shrink-0">
+                            <iconify-icon class="text-xl" icon="lucide:bell"></iconify-icon>
+                        </div>
+                        <div class="flex-1 overflow-hidden">
+                            <p class="text-sm font-bold truncate">波谱库更新</p>
+                            <p class="text-xs text-slate-400">已同步 2026 年度矿物诊断波谱数据 · 昨天</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div><!-- /#dashboard-view -->
+
+
+<!-- ═══════════════════════════════════════════
+   MODULE DETAIL VIEW
+═══════════════════════════════════════════ -->
+<div id="module-view">
+
+
+    <!-- ── 蚀变异常检测模块 v2: 矿床类型驱动 + 双方法批量 ── -->
+
+    <!-- ── 蚀变异常检测模块 v3: 交付项目驱动 + 多传感器 ── -->
+    <div class="module-panel" id="panel-alter">
+        <main class="pt-24 pb-20 px-8 h-[calc(100vh-64px)] overflow-hidden">
+            <div class="flex justify-end mb-4">
+                <a class="text-sm text-emerald-600 font-medium hover:text-emerald-700 transition-colors cursor-pointer" onclick="showDashboard()">返回上一级</a>
+            </div>
+            <div class="flex gap-8 h-[calc(100%-28px)]">
+
+            <!-- ─── 左侧:参数面板 ─── -->
+            <aside class="w-96 flex flex-col gap-5 overflow-y-auto pr-4 scrollbar-hide">
+
+                <!-- 1. 上传 ROI -->
+                <section class="space-y-3">
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">① 上传 ROI 文件</h3>
+                    <div id="roiDropZone" class="p-5 border-2 border-dashed border-slate-100 rounded-2xl bg-slate-50/50 flex flex-col items-center justify-center text-center hover:border-slate-300 transition-colors cursor-pointer group" onclick="document.getElementById('roiFileInput').click()">
+                        <input type="file" id="roiFileInput" accept=".ovkml,.kml,.geojson,.json" style="display:none;">
+                        <iconify-icon id="roiDropIcon" class="text-2xl text-slate-300 mb-2 group-hover:text-slate-900 transition-colors" icon="lucide:upload-cloud"></iconify-icon>
+                        <p id="roiDropTitle" class="text-xs font-bold">拖入或点击上传 ROI 文件</p>
+                        <p id="roiDropHint" class="text-[10px] text-slate-400 mt-1">.ovkml / .kml / .geojson · 文件名须与交付目录项目名一致</p>
+                    </div>
+                    <div id="projectInfo" class="p-3 border thin-border rounded-lg bg-emerald-50/40 space-y-2" style="display:none;">
+                        <div class="flex items-start gap-2">
+                            <iconify-icon icon="lucide:folder-check" class="text-emerald-600 text-base mt-0.5"></iconify-icon>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-[11px] font-bold truncate" id="projectName">-</p>
+                                <p class="text-[10px] text-slate-500" id="projectBbox">-</p>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-500 uppercase mb-1">项目可用传感器</p>
+                            <div id="availableSensorsList" class="flex flex-wrap gap-1.5"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. 矿床类型识别 -->
+                <section class="space-y-3">
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">② 矿床类型</h3>
+                    <div id="depositTypeArea" class="p-4 border thin-border rounded-xl bg-white space-y-3 min-h-[80px]">
+                        <p id="depositTypeHint" class="text-[10px] text-slate-400 italic">上传 ROI 后,系统按地理坐标自动识别。</p>
+                        <div id="depositCandidates" class="space-y-2" style="display:none;"></div>
+                        <div id="depositManualToggle" class="text-right" style="display:none;">
+                            <a class="text-[10px] text-emerald-600 hover:underline cursor-pointer" onclick="toggleManualDepositSelect()">手动选择 →</a>
+                        </div>
+                        <div id="depositManualPanel" class="space-y-2" style="display:none;">
+                            <select id="commoditySelect" class="w-full p-2 text-xs border thin-border rounded bg-white">
+                                <option value="">-- 选择矿种 --</option>
+                            </select>
+                            <select id="depositTypeManualSelect" class="w-full p-2 text-xs border thin-border rounded bg-white">
+                                <option value="">-- 选择矿床类型 --</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. 推荐蚀变目标 -->
+                <section class="space-y-3">
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">③ 推荐蚀变目标</h3>
+                    <div id="targetsArea" class="p-4 border thin-border rounded-xl bg-white space-y-2 min-h-[60px]">
+                        <p id="targetsHint" class="text-[10px] text-slate-400 italic">选定矿床类型后展示。</p>
+                        <div id="targetsList" class="space-y-1"></div>
+                    </div>
+                </section>
+
+                <!-- 4. 分析参数 -->
+                <section class="space-y-3">
+                    <h3 class="text-xs font-bold uppercase tracking-widest text-slate-400">④ 分析参数</h3>
+                    <div class="p-4 border thin-border rounded-xl bg-white space-y-3">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">方法</label>
+                            <div class="flex gap-3 mt-1">
+                                <label class="flex items-center gap-1 text-[11px]"><input type="checkbox" id="methodRatio" checked> 波段比值</label>
+                                <label class="flex items-center gap-1 text-[11px]"><input type="checkbox" id="methodPca" checked> Crosta PCA</label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">阈值方法</label>
+                            <select id="threshold_method" class="w-full p-2 text-xs border thin-border rounded bg-white mt-1">
+                                <option value="mean_std">均值 + k · 标准差</option>
+                                <option value="median_mad">中位数 + k · MAD(稳健,抗拼接缝)</option>
+                                <option value="percentile">95% 百分位数</option>
+                            </select>
+                        </div>
+                        <div id="k_group">
+                            <div class="flex justify-between items-center">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase">k 值</label>
+                                <span class="text-xs font-bold" id="kVal">2.0</span>
+                            </div>
+                            <input id="k_value" class="w-full accent-black h-1" type="range" min="0.5" max="5" step="0.1" value="2.0">
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase">色彩方案</label>
+                            <select id="alteration_colormap" class="w-full p-2 text-xs border thin-border rounded bg-white mt-1">
+                                <option value="hot" selected>hot</option>
+                                <option value="RdYlGn_r">RdYlGn_r</option>
+                                <option value="jet">jet</option>
+                                <option value="plasma">plasma</option>
+                            </select>
+                        </div>
+                        <div class="col-span-2">
+                            <label class="flex items-center gap-2 text-[11px] cursor-pointer">
+                                <input type="checkbox" id="use_structural_prior">
+                                <span class="font-bold text-slate-600">启用构造约束(地质构造解译)</span>
+                            </label>
+                            <p class="text-[9px] text-slate-400 mt-0.5 leading-snug">叠加 geo-stru 断裂/线密度对综合评分做"近断裂优先"软加权,并在综合图与报告中叠加断裂线、交汇点与走向统计。需该研究区已有构造解译产物,否则自动跳过。</p>
+                        </div>
+                    </div>
+                </section>
+
+                <button id="analyzeBatchBtn" class="w-full py-4 bg-black text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+                    <iconify-icon icon="lucide:play"></iconify-icon> 执行批量分析
+                </button>
+            </aside>
+
+            <!-- ─── 右侧:工作区 ─── -->
+            <div class="flex-1 flex flex-col gap-4">
+                <!-- 标签页 -->
+                <div class="flex gap-1 border-b thin-border items-center">
+                    <button class="alter-tab px-4 py-2 text-xs font-bold border-b-2 border-black text-black" data-tab="roi">ROI 预览</button>
+                    <button class="alter-tab px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-900" data-tab="grid">网格视图</button>
+                    <button class="alter-tab px-4 py-2 text-xs font-bold border-b-2 border-transparent text-slate-400 hover:text-slate-900" data-tab="composite">综合判断</button>
+                    <div class="ml-auto flex gap-2 pb-1.5 pr-1">
+                        <a href="/docs/alteration-reference" target="_blank" class="text-[11px] px-3 py-1.5 border thin-border rounded-lg hover:bg-slate-50 flex items-center gap-1 text-slate-700">
+                            <iconify-icon icon="lucide:book-open"></iconify-icon> 参考手册
+                        </a>
+                        <button id="previewReportBtn" disabled class="text-[11px] px-3 py-1.5 border thin-border rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1">
+                            <iconify-icon icon="lucide:eye"></iconify-icon> 预览报告
+                        </button>
+                        <button id="downloadAllImagesBtn" disabled title="打包下载本次全部带坐标 GeoTIFF(含 crs+transform),可在 QGIS/ArcGIS 中作为栅格图层与其他影像叠加" class="text-[11px] px-3 py-1.5 border thin-border rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 text-slate-700">
+                            <iconify-icon icon="lucide:images"></iconify-icon> 下载全部影像(GeoTIFF)
+                        </button>
+                        <button id="downloadReportBtn" disabled class="text-[11px] px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1">
+                            <iconify-icon icon="lucide:download"></iconify-icon> 下载报告
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ROI 预览 panel -->
+                <div class="alter-tab-panel flex-1 min-h-0 bg-slate-50 rounded-2xl border thin-border overflow-auto relative" data-tab="roi">
+                    <div id="roiPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-300">
+                        <iconify-icon class="text-6xl mb-4" icon="lucide:map"></iconify-icon>
+                        <p class="text-sm font-medium">上传 ROI 文件后在此预览影像 + 边界</p>
+                    </div>
+                    <div id="roiCanvasWrap" class="relative w-full hidden flex justify-center items-start p-2">
+                        <img id="roiBgImage" class="block max-w-full w-full h-auto" style="object-fit:contain;" />
+                        <canvas id="roiCanvas" class="absolute top-2 left-2 pointer-events-none" style="display:none;"></canvas>
+                        <div class="absolute top-4 right-4 flex items-center gap-2 bg-white/90 backdrop-blur rounded-lg shadow px-3 py-1.5 text-[10px] z-10">
+                            <span>预览传感器:</span>
+                            <select id="previewSensorSelect" class="text-[10px] bg-transparent outline-none"></select>
+                        </div>
+                        <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur rounded-lg shadow px-3 py-1.5 text-[10px] z-10">
+                            <span id="roiStatus">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 网格视图 panel -->
+                <div class="alter-tab-panel flex-1 min-h-0 bg-white rounded-2xl border thin-border overflow-y-auto p-4 hidden" data-tab="grid">
+                    <div id="gridContainer" class="space-y-6"></div>
+                    <p id="gridEmptyHint" class="text-xs text-slate-400 italic text-center mt-10">执行分析后在此查看 矿物 × 传感器 × 方法 的结果。</p>
+                </div>
+
+                <!-- 综合判断 panel -->
+                <div class="alter-tab-panel flex-1 min-h-0 bg-white rounded-2xl border thin-border overflow-y-auto p-4 hidden" data-tab="composite">
+                    <div id="compositeContainer" class="space-y-6"></div>
+                    <p id="compositeEmptyHint" class="text-xs text-slate-400 italic text-center mt-10">执行分析后在此查看每个传感器的两方法交集和叠加评分。</p>
+                </div>
+
+                <!-- 日志 -->
+                <div class="h-32 bg-white rounded-2xl border thin-border p-4 overflow-y-auto">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase mb-2 sticky top-0 bg-white">操作日志</p>
+                    <div class="text-[10px] font-mono text-slate-500 space-y-1" id="alterationLog">
+                        <p class="text-emerald-500">[系统] 初始化完成。</p>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </main>
+    </div><!-- /#panel-alter -->
+
+
+</div><!-- /#module-view -->
+
+<!-- ═══════════════════════════════════════════
+   JavaScript — All logic preserved
+═══════════════════════════════════════════ -->
+<script>
+/* ═══════ View Navigation ═══════ */
+const MODULE_TITLES = { alter:'蚀变异常检测' };
+let _currentView = 'dashboard';
+let _previousView = 'dashboard';
+
+function hideAllViews() {
+    document.getElementById('dashboard-view').classList.remove('active');
+    document.getElementById('module-view').style.display = 'none';
+    document.querySelectorAll('.module-panel').forEach(p => p.classList.remove('active'));
+}
+
+// 顶部导航高亮跟随当前视图(本系统仅保留蚀变分析)。
+function _setActiveNav(view) {
+    const key = (view === 'alter') ? 'alter' : null;
+    document.querySelectorAll('.nav-link').forEach(a => {
+        const on = a.getAttribute('data-nav') === key;
+        a.classList.toggle('text-slate-900', on);
+        a.classList.toggle('text-slate-500', !on);
+    });
+}
+
+function showDashboard() {
+    hideAllViews();
+    document.getElementById('dashboard-view').classList.add('active');
+    _currentView = 'dashboard';
+    _previousView = 'dashboard';
+    _setActiveNav('dashboard');
+}
+
+
+function showModule(moduleId) {
+    hideAllViews();
+    document.getElementById('module-view').style.display = 'block';
+    document.getElementById('panel-' + moduleId).classList.add('active');
+    _previousView = _currentView;
+    _currentView = moduleId;
+    _setActiveNav(moduleId);
+    if (moduleId === 'alter') initAlterationCharts();
+}
+
+
+/* ═══════ Alteration v3: 交付项目驱动 + 多传感器 ═══════ */
+const AlterState = {
+    projectName: '',
+    projectBbox: null,             // [minLon, minLat, maxLon, maxLat]
+    roiGeojson: null,
+    availableSensors: [],          // [{key, label, n_bands, ...}]
+    previewSensorKey: '',
+    imageWidth: 0,
+    imageHeight: 0,
+    selectedDepositType: '',
+    depositCandidates: [],         // 自动识别返回的候选列表
+    depositManual: false,          // 是否手动选择(覆盖了自动)
+    targets: [],                   // 后端 multi-sensor 视图
+    selectedMinerals: new Set(),
+    lastBatchRequest: null,        // 上次提交分析的 body
+    lastBatchResult: null,         // 上次后端返回的 {grid, composites, high_confidence_total_pixels}
+};
+
+function pushAlterLog(msg, cls) {
+    const log = document.getElementById('alterationLog');
+    if (!log) return;
+    const p = document.createElement('p');
+    p.className = cls || 'text-slate-600';
+    p.textContent = `[${new Date().toLocaleTimeString('zh-CN', { hour12: false })}] ${msg}`;
+    log.appendChild(p);
+    log.scrollTop = log.scrollHeight;
+}
+
+function setAnalyzeButton() {
+    const btn = document.getElementById('analyzeBatchBtn');
+    if (!btn) return;
+    const hasProject = !!AlterState.projectName;
+    const hasDeposit = !!AlterState.selectedDepositType;
+    const hasMinerals = AlterState.selectedMinerals.size > 0;
+    const hasMethod = document.getElementById('methodRatio').checked ||
+                      document.getElementById('methodPca').checked;
+    btn.disabled = !(hasProject && hasDeposit && hasMinerals && hasMethod);
+}
+
+/* ═══════ Tab 切换 ═══════ */
+document.querySelectorAll('.alter-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const target = btn.dataset.tab;
+        document.querySelectorAll('.alter-tab').forEach(b => {
+            const on = b.dataset.tab === target;
+            b.classList.toggle('border-black', on);
+            b.classList.toggle('text-black', on);
+            b.classList.toggle('border-transparent', !on);
+            b.classList.toggle('text-slate-400', !on);
+        });
+        document.querySelectorAll('.alter-tab-panel').forEach(p => {
+            p.classList.toggle('hidden', p.dataset.tab !== target);
+        });
+    });
+});
+
+/* ═══════ k 滑块 / 阈值切换 ═══════ */
+document.getElementById('k_value').addEventListener('input', function() {
+    document.getElementById('kVal').innerText = parseFloat(this.value).toFixed(1);
+});
+document.getElementById('threshold_method').addEventListener('change', function() {
+    document.getElementById('k_group').style.display = this.value !== 'percentile' ? 'block' : 'none';
+});
+
+/* ═══════ ROI 文件上传 ═══════ */
+document.getElementById('roiFileInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    await handleRoiUpload(file);
+});
+
+const dz = document.getElementById('roiDropZone');
+dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('border-emerald-400'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('border-emerald-400'));
+dz.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    dz.classList.remove('border-emerald-400');
+    if (e.dataTransfer.files.length) await handleRoiUpload(e.dataTransfer.files[0]);
+});
+
+async function handleRoiUpload(file) {
+    document.getElementById('roiDropTitle').textContent = '上传中…';
+    pushAlterLog(`上传 ROI: ${file.name}`, 'text-blue-600');
+
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+        const resp = await fetch('/api/upload_roi', { method: 'POST', body: fd });
+        const data = await resp.json();
+        if (!resp.ok || data.error) {
+            document.getElementById('roiDropTitle').textContent = '上传失败';
+            document.getElementById('roiDropHint').textContent = data.error || `HTTP ${resp.status}`;
+            pushAlterLog(`上传失败: ${data.error || resp.status}`, 'text-red-500');
+            alert(data.error || '上传失败');
+            return;
+        }
+        AlterState.projectName = data.project_name;
+        AlterState.projectBbox = data.bbox || null;
+        AlterState.roiGeojson = data.roi_geojson;
+        AlterState.availableSensors = data.available_sensors || [];
+        AlterState.depositCandidates = [];
+        AlterState.depositManual = false;
+        AlterState.lastBatchRequest = null;
+        AlterState.lastBatchResult = null;
+        updateReportButtons();
+
+        document.getElementById('roiDropTitle').textContent = file.name;
+        document.getElementById('roiDropHint').textContent = '已定位到项目,继续下一步';
+        document.getElementById('projectInfo').style.display = 'block';
+        document.getElementById('projectName').textContent = data.project_name;
+        if (data.bbox) {
+            const [minLon, minLat, maxLon, maxLat] = data.bbox;
+            document.getElementById('projectBbox').textContent =
+                `BBox: ${minLon.toFixed(3)}, ${minLat.toFixed(3)} → ${maxLon.toFixed(3)}, ${maxLat.toFixed(3)}`;
+        }
+        renderAvailableSensors(AlterState.availableSensors);
+        populatePreviewSensorSelect(AlterState.availableSensors);
+
+        pushAlterLog(`项目定位成功: ${data.project_name} (${AlterState.availableSensors.length} 个传感器)`, 'text-emerald-600');
+
+        // 自动加载首选传感器的预览
+        if (AlterState.availableSensors.length) {
+            await loadProjectPreview(AlterState.availableSensors[0].key);
+        }
+        // 自动调用矿床类型识别
+        await runAutoInfer();
+        setAnalyzeButton();
+    } catch (e) {
+        pushAlterLog(`上传异常: ${e.message}`, 'text-red-500');
+        alert('上传异常: ' + e.message);
+    }
+}
+
+function renderAvailableSensors(sensors) {
+    const wrap = document.getElementById('availableSensorsList');
+    wrap.innerHTML = '';
+    if (!sensors.length) {
+        wrap.innerHTML = '<span class="text-[10px] text-red-500">该项目冬季子目录无可用传感器</span>';
+        return;
+    }
+    sensors.forEach(s => {
+        const chip = document.createElement('span');
+        chip.className = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold';
+        chip.innerHTML = `<iconify-icon icon="lucide:satellite" class="text-[10px]"></iconify-icon>${s.key} (${s.n_bands})`;
+        wrap.appendChild(chip);
+    });
+}
+
+function populatePreviewSensorSelect(sensors) {
+    const sel = document.getElementById('previewSensorSelect');
+    sel.innerHTML = '';
+    sensors.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.key;
+        opt.textContent = `${s.key} (${s.label})`;
+        sel.appendChild(opt);
+    });
+    sel.onchange = () => loadProjectPreview(sel.value);
+}
+
+/* ═══════ 项目预览(影像 + ROI 叠加) ═══════ */
+async function loadProjectPreview(sensorKey) {
+    if (!AlterState.projectName || !sensorKey) return;
+    AlterState.previewSensorKey = sensorKey;
+    document.getElementById('roiStatus').textContent = `加载 ${sensorKey} 预览…`;
+    try {
+        const resp = await fetch('/api/project_preview', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                project_name: AlterState.projectName,
+                sensor_key:   sensorKey,
+                roi_geojson:  AlterState.roiGeojson,
+            }),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
+        AlterState.imageWidth = data.width;
+        AlterState.imageHeight = data.height;
+        document.getElementById('roiPlaceholder').classList.add('hidden');
+        document.getElementById('roiCanvasWrap').classList.remove('hidden');
+        const bgImg = document.getElementById('roiBgImage');
+        bgImg.src = data.preview;
+        bgImg.onload = () => drawRoiOverlay();
+        document.getElementById('roiStatus').textContent = `${sensorKey} · ${data.width}×${data.height} px`;
+    } catch (e) {
+        document.getElementById('roiStatus').textContent = `${sensorKey} 加载失败: ${e.message}`;
+        pushAlterLog(`${sensorKey} 预览失败: ${e.message}`, 'text-red-500');
+    }
+}
+
+function drawRoiOverlay() {
+    // ROI 多边形已由后端画在卫星底图上,前端 canvas 不再叠加边框
+    const canvas = document.getElementById('roiCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+/* ═══════ 矿床类型自动识别(优先级:geo-stru 构造推理 > LLM > 手动) ═══════ */
+async function runAutoInfer() {
+    if (!AlterState.roiGeojson) return;
+    document.getElementById('depositTypeHint').textContent = '正在自动识别…';
+    document.getElementById('depositTypeHint').style.display = '';
+
+    // 优先级 1:geo-stru 构造推理
+    pushAlterLog('优先调用 geo-stru 构造推理识别矿床类型…', 'text-blue-600');
+    try {
+        const resp = await fetch('/api/structural_deposit_type', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roi_geojson: AlterState.roiGeojson, top_k: 3 }),
+        });
+        const data = await resp.json();
+        if (data.status === 'ok' && data.candidates && data.candidates.length) {
+            AlterState.depositCandidates = data.candidates;
+            renderDepositCandidates(data.candidates);
+            const aoiTag = data.aoi_name ? ' · ' + data.aoi_name : '';
+            pushAlterLog(`构造推理识别到 ${data.candidates.length} 个候选(geo-stru${aoiTag}): ${data.candidates.map(c => c.deposit_type).join(', ')}`, 'text-emerald-600');
+            return;
+        }
+        if (data.status === 'non_alteration') {
+            // geo-stru 已权威判定为油气/非蚀变靶区:不改判金属矿,也不回退 LLM,直接告知 + 提供手动兜底
+            document.getElementById('depositCandidates').style.display = 'none';
+            document.getElementById('depositTypeHint').textContent = data.hint || 'geo-stru 判定为油气/非蚀变靶区,蚀变分析不适用。';
+            document.getElementById('depositTypeHint').style.display = '';
+            document.getElementById('depositManualToggle').style.display = 'block';
+            document.getElementById('depositManualPanel').style.display = 'block';
+            await loadCommodityList();
+            pushAlterLog(`geo-stru 判定为非蚀变靶区(${data.primary_model || '油气类'}),蚀变分析不适用;如需可手动选择`, 'text-amber-600');
+            return;
+        }
+        pushAlterLog(`geo-stru 构造推理无产物: ${data.hint || '无'},回退 LLM`, 'text-amber-600');
+    } catch (e) {
+        pushAlterLog('geo-stru 构造推理请求失败,回退 LLM: ' + e.message, 'text-amber-600');
+    }
+
+    // 优先级 2:LLM 自动识别(仅在 geo-stru 无产物时;失败再回退手动)
+    await inferByLLM();
+}
+
+// LLM 自动识别 + 降级到手动两级下拉(原 runAutoInfer 逻辑,维持现状)
+async function inferByLLM() {
+    document.getElementById('depositTypeHint').textContent = '正在调用 LLM 自动识别…';
+    document.getElementById('depositTypeHint').style.display = '';
+    pushAlterLog('调用 LLM 矿床类型自动识别…', 'text-blue-600');
+    try {
+        const resp = await fetch('/api/infer_deposit_type', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roi_geojson: AlterState.roiGeojson, top_k: 3 }),
+        });
+        const data = await resp.json();
+        if (data.degraded || !data.candidates || !data.candidates.length) {
+            document.getElementById('depositTypeHint').textContent = data.hint || '自动识别失败,请手动选择。';
+            document.getElementById('depositManualPanel').style.display = 'block';
+            await loadCommodityList();
+            pushAlterLog(`自动识别降级: ${data.hint || '无候选'}`, 'text-amber-600');
+            return;
+        }
+        AlterState.depositCandidates = data.candidates || [];
+        renderDepositCandidates(data.candidates);
+        pushAlterLog(`识别到 ${data.candidates.length} 个候选: ${data.candidates.map(c => c.deposit_type).join(', ')}`, 'text-emerald-600');
+    } catch (e) {
+        document.getElementById('depositTypeHint').textContent = '识别请求失败: ' + e.message;
+        pushAlterLog('识别失败: ' + e.message, 'text-red-500');
+    }
+}
+
+function renderDepositCandidates(cands) {
+    document.getElementById('depositTypeHint').style.display = 'none';
+    const wrap = document.getElementById('depositCandidates');
+    wrap.style.display = 'block';
+    wrap.innerHTML = '';
+    cands.forEach((c, i) => {
+        const card = document.createElement('label');
+        card.className = 'block p-3 border thin-border rounded-lg cursor-pointer hover:bg-slate-50 transition-colors';
+        const pct = Math.round(c.confidence * 100);
+        card.innerHTML = `
+            <div class="flex items-start gap-2">
+                <input type="radio" name="depositTypeRadio" value="${c.deposit_type}" ${i === 0 ? 'checked' : ''} class="mt-0.5">
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-bold">${c.deposit_type}</p>
+                    <div class="flex items-center gap-2 mt-1">
+                        <div class="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-emerald-500" style="width:${pct}%"></div>
+                        </div>
+                        <span class="text-[10px] font-mono">${pct}%</span>
+                    </div>
+                    <p class="text-[10px] text-slate-500 mt-1 leading-snug">${c.evidence}</p>
+                    <p class="text-[9px] text-slate-400 mt-0.5">来源: ${c.source}</p>
+                </div>
+            </div>`;
+        card.querySelector('input').addEventListener('change', () => onDepositTypeChosen(c.deposit_type));
+        wrap.appendChild(card);
+    });
+    document.getElementById('depositManualToggle').style.display = 'block';
+    onDepositTypeChosen(cands[0].deposit_type);
+}
+
+function toggleManualDepositSelect() {
+    const p = document.getElementById('depositManualPanel');
+    p.style.display = p.style.display === 'block' ? 'none' : 'block';
+    if (p.style.display === 'block') loadCommodityList();
+}
+
+async function loadCommodityList() {
+    const sel = document.getElementById('commoditySelect');
+    if (sel.options.length > 1) return;
+    try {
+        const resp = await fetch('/api/commodity_list');
+        const data = await resp.json();
+        (data.commodities || []).forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.commodity;
+            opt.textContent = `${c.commodity} (${c.commodity_en}) - ${c.category}`;
+            sel.appendChild(opt);
+        });
+    } catch (e) { /* ignore */ }
+}
+
+document.getElementById('commoditySelect').addEventListener('change', async (e) => {
+    const commodity = e.target.value;
+    const sel = document.getElementById('depositTypeManualSelect');
+    sel.innerHTML = '<option value="">-- 选择矿床类型 --</option>';
+    if (!commodity) return;
+    const resp = await fetch('/api/deposit_types', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commodity }),
+    });
+    const data = await resp.json();
+    (data.deposit_types || []).forEach(dt => {
+        const opt = document.createElement('option');
+        opt.value = dt.type_name; opt.textContent = dt.type_name;
+        sel.appendChild(opt);
+    });
+});
+
+document.getElementById('depositTypeManualSelect').addEventListener('change', (e) => {
+    if (e.target.value) {
+        AlterState.depositManual = true;
+        onDepositTypeChosen(e.target.value);
+    }
+});
+
+/* ═══════ 矿床类型确定后加载推荐目标(多传感器视图) ═══════ */
+async function onDepositTypeChosen(depositType) {
+    AlterState.selectedDepositType = depositType;
+    pushAlterLog(`矿床类型: ${depositType}`, 'text-emerald-600');
+    document.getElementById('targetsHint').textContent = '加载推荐目标…';
+    document.getElementById('targetsList').innerHTML = '';
+    setAnalyzeButton();
+
+    const availableKeys = AlterState.availableSensors.map(s => s.key);
+    try {
+        const resp = await fetch('/api/recommend_targets', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deposit_type: depositType, available_sensors: availableKeys }),
+        });
+        const data = await resp.json();
+        AlterState.targets = data.targets || [];
+        renderTargetsList();
+    } catch (e) {
+        document.getElementById('targetsHint').textContent = '加载失败: ' + e.message;
+    }
+}
+
+function renderTargetsList() {
+    const wrap = document.getElementById('targetsList');
+    const hint = document.getElementById('targetsHint');
+    wrap.innerHTML = '';
+    if (!AlterState.targets.length) {
+        hint.textContent = '无可用蚀变目标。';
+        AlterState.selectedMinerals.clear();
+        setAnalyzeButton();
+        return;
+    }
+    hint.style.display = 'none';
+    // 默认勾选 priority=1 且有 effective_sensor 的
+    AlterState.selectedMinerals = new Set(
+        AlterState.targets.filter(t => t.priority === 1 && t.effective_sensor).map(t => t.mineral)
+    );
+
+    AlterState.targets.forEach(t => {
+        const row = document.createElement('label');
+        const ok = !!t.effective_sensor;
+        const sensorTxt = t.effective_sensor
+            ? (t.effective_sensor === t.preferred_sensor
+                ? `<span class="text-emerald-600">${t.effective_sensor}</span>`
+                : (t.preferred_sensor
+                    ? `<span class="text-amber-600">${t.effective_sensor}</span> <span class="text-[9px] text-slate-400">(回退,首选${t.preferred_sensor}无数据)</span>`
+                    : `<span class="text-emerald-600">${t.effective_sensor}</span> <span class="text-[9px] text-slate-400">(高光谱吸收深度法)</span>`))
+            : `<span class="text-red-500">${t.preferred_sensor || '?'} 数据缺失</span>`;
+        const cls = ok
+            ? 'flex items-start gap-2 p-2 border thin-border rounded hover:bg-slate-50 cursor-pointer'
+            : 'flex items-start gap-2 p-2 border border-red-100 rounded bg-red-50/40 cursor-not-allowed opacity-70';
+        row.className = cls;
+        const checked = AlterState.selectedMinerals.has(t.mineral) ? 'checked' : '';
+        const disabled = ok ? '' : 'disabled';
+        row.innerHTML = `
+            <input type="checkbox" data-mineral="${t.mineral}" ${checked} ${disabled} class="mt-0.5 target-cb">
+            <div class="flex-1 min-w-0">
+                <p class="text-xs"><span class="font-bold">${t.mineral}</span>
+                    <span class="ml-1 text-[9px] px-1 bg-slate-100 rounded">P${t.priority}</span></p>
+                <p class="text-[10px] text-slate-500">${t.zone} · ${t.anomaly_type}</p>
+                <p class="text-[10px]">${sensorTxt}</p>
+            </div>`;
+        wrap.appendChild(row);
+    });
+    wrap.querySelectorAll('.target-cb').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            const m = e.target.dataset.mineral;
+            if (e.target.checked) AlterState.selectedMinerals.add(m);
+            else AlterState.selectedMinerals.delete(m);
+            setAnalyzeButton();
+        });
+    });
+    setAnalyzeButton();
+}
+
+document.getElementById('methodRatio').addEventListener('change', setAnalyzeButton);
+document.getElementById('methodPca').addEventListener('change', setAnalyzeButton);
+
+/* ═══════ 执行批量分析 ═══════ */
+document.getElementById('analyzeBatchBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('analyzeBatchBtn');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<iconify-icon icon="lucide:loader-2" class="animate-spin"></iconify-icon> 分析中…';
+
+    const methods = [];
+    if (document.getElementById('methodRatio').checked) methods.push('ratio');
+    if (document.getElementById('methodPca').checked)   methods.push('pca');
+
+    const body = {
+        project_name:     AlterState.projectName,
+        deposit_type:     AlterState.selectedDepositType,
+        selected_minerals: Array.from(AlterState.selectedMinerals),
+        methods,
+        roi_geojson:      AlterState.roiGeojson,
+        threshold_method: document.getElementById('threshold_method').value,
+        k:                parseFloat(document.getElementById('k_value').value) || 2.0,
+        colormap:         document.getElementById('alteration_colormap').value || 'hot',
+        use_structural_prior: document.getElementById('use_structural_prior').checked || false,
+    };
+    pushAlterLog(`执行批量分析: ${body.deposit_type} · ${body.selected_minerals.length} 矿物 × ${methods.length} 方法`, 'text-blue-600');
+
+    try {
+        const resp = await fetch('/api/analyze_batch', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
+        AlterState.lastBatchRequest = body;
+        AlterState.lastBatchResult = data;
+        renderGrid(data.grid || []);
+        renderComposite(data.composites || {});
+        document.querySelector('.alter-tab[data-tab="grid"]').click();
+        updateReportButtons();
+        pushAlterLog(`完成 · 高置信像素 ${data.high_confidence_total_pixels}`, 'text-emerald-600');
+        if (body.use_structural_prior) {
+            const s = data.structural;
+            if (s && s.warning) pushAlterLog(`构造约束: ${s.warning}`, 'text-amber-600');
+            else if (s && s.aoi_name != null) pushAlterLog(`构造约束已叠加: AOI=${s.aoi_name} · 断裂 ${s.n_lineaments} 条 · 交汇点 ${s.n_intersections} 处`, 'text-emerald-600');
+        }
+        if (data.saved && data.saved.run_id) {
+            const aux = data.saved.n_aux ? ` / ${data.saved.n_aux} 元数据` : '';
+            pushAlterLog(`结果已保存: results/${data.saved.run_id} (${data.saved.n_rasters} 栅格 / ${data.saved.n_previews} 预览${aux})`, 'text-emerald-600');
+        }
+    } catch (e) {
+        pushAlterLog('分析失败: ' + e.message, 'text-red-500');
+        alert('分析失败: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        setAnalyzeButton();
+    }
+});
+
+function renderGrid(grid) {
+    const container = document.getElementById('gridContainer');
+    const hint = document.getElementById('gridEmptyHint');
+    container.innerHTML = '';
+    if (!grid.length) { hint.style.display = ''; return; }
+    hint.style.display = 'none';
+
+    grid.forEach(entry => {
+        const mineralBlock = document.createElement('div');
+        mineralBlock.className = 'border thin-border rounded-xl p-3 bg-white';
+        const head = document.createElement('div');
+        head.className = 'flex items-center gap-2 mb-3';
+        let statusBadge = '';
+        if (entry.data_status === 'no_data')
+            statusBadge = `<span class="text-[10px] text-red-500 font-bold">无可用方法</span>`;
+        else if (entry.data_status === 'no_coverage')
+            statusBadge = `<span class="text-[10px] text-red-500 font-bold">数据不覆盖 ROI</span>`;
+        else if (entry.data_status === 'fallback')
+            statusBadge = `<span class="text-[10px] text-amber-600 font-bold">${entry.effective_sensor}(回退)</span>`;
+        else
+            statusBadge = `<span class="text-[10px] text-slate-500">${entry.effective_sensor || ''}</span>`;
+        head.innerHTML = `
+            <h4 class="text-sm font-bold">${entry.mineral}</h4>
+            <span class="text-[10px] px-1.5 py-0.5 bg-slate-100 rounded">P${entry.priority}</span>
+            <span class="text-[10px] text-slate-500">${entry.zone} · ${entry.anomaly_type}</span>
+            <span class="ml-auto">${statusBadge}</span>`;
+        mineralBlock.appendChild(head);
+
+        // notes 提示条(覆盖/fallback 等)
+        const notes = entry.notes || [];
+        if (notes.length) {
+            const noteColor = entry.data_status === 'no_coverage' || entry.data_status === 'no_data'
+                ? 'bg-red-50 border-red-200 text-red-700'
+                : 'bg-amber-50 border-amber-200 text-amber-700';
+            const noteBox = document.createElement('div');
+            noteBox.className = `mb-2 p-2 border thin-border rounded text-[10px] ${noteColor}`;
+            noteBox.innerHTML = notes.map(n => `<p>${n}</p>`).join('');
+            mineralBlock.appendChild(noteBox);
+        }
+
+        const results = entry.results || {};
+        const sensorKeys = Object.keys(results);
+        if (!sensorKeys.length) {
+            const reason = entry.data_status === 'no_coverage'
+                ? '该矿物的首选传感器影像不覆盖 ROI,且其他传感器在数据库中无该矿物方法'
+                : '该矿物在项目可用传感器上均无提取方法';
+            mineralBlock.innerHTML += `<p class="text-[11px] text-red-500 italic">${reason}</p>`;
+            container.appendChild(mineralBlock);
+            return;
+        }
+        sensorKeys.forEach(sensor => {
+            const sensorRow = document.createElement('div');
+            sensorRow.className = 'mb-2';
+            sensorRow.innerHTML = `<p class="text-[11px] font-bold text-slate-600 mb-2 flex items-center gap-1"><iconify-icon icon="lucide:satellite"></iconify-icon>${sensor}</p>`;
+            // 方法标签: [长名(占位/不可用时), 短名(角标)]
+            const METHOD_LABELS = {
+                ratio:      ['波段比值', '比值'],
+                pca:        ['Crosta PCA', 'PCA'],
+                band_depth: ['高光谱吸收深度', '吸收深度'],
+            };
+            const ALL_METHODS = ['ratio', 'pca', 'band_depth'];
+            // 该传感器实际返回的方法(EnMAP/PRISMA=band_depth, 多光谱=ratio/pca)
+            let methodsForSensor = ALL_METHODS.filter(m => results[sensor][m] !== undefined);
+            if (!methodsForSensor.length) methodsForSensor = (sensor === 'EnMAP' || sensor === 'PRISMA') ? ['band_depth'] : ['ratio', 'pca'];
+            const cellGrid = document.createElement('div');
+            cellGrid.className = `grid ${methodsForSensor.length === 1 ? 'grid-cols-1' : 'grid-cols-2'} gap-3`;
+            methodsForSensor.forEach(method => {
+                const r = results[sensor][method];
+                const longName = (METHOD_LABELS[method] || [method])[0];
+                const shortName = (METHOD_LABELS[method] || [method, method])[1];
+                const cell = document.createElement('div');
+                cell.className = 'border thin-border rounded-lg p-2 bg-slate-50/40';
+                if (!r) {
+                    cell.innerHTML = `<p class="text-[10px] text-slate-400 italic text-center py-6">${longName}<br>该方法未跑</p>`;
+                } else if (r.unavailable) {
+                    cell.innerHTML = `<p class="text-[10px] text-slate-400 italic text-center py-6">${longName}<br><span class="text-[9px]">${r.reason || '不可用'}</span></p>`;
+                } else if (r.error) {
+                    cell.innerHTML = `<p class="text-[10px] text-red-500 italic text-center py-6">${method}<br>${r.error}</p>`;
+                } else {
+                    const thr = r.threshold == null ? '-' : r.threshold.toFixed(3);
+                    const meta = method === 'pca' && r.pc_used
+                        ? `PC${r.pc_used} (${r.sign > 0 ? '+' : '-'})`
+                        : (r.ratio_expr || '');
+                    cell.innerHTML = `
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] font-bold uppercase">${shortName}</span>
+                            <span class="text-[10px] text-slate-500">${meta}</span>
+                        </div>
+                        ${imgCellHTML(r.overlay, ['蚀变', AlterState.projectName, entry.mineral, sensor, method])}
+                        <div class="flex justify-between text-[10px] mt-1">
+                            <span>异常 <b>${r.anomaly_ratio}%</b></span>
+                            <span>阈值 ${thr}</span>
+                        </div>${r.warning ? `<p class="text-[9px] text-amber-600">⚠ ${r.warning}</p>` : ''}`;
+                }
+                cellGrid.appendChild(cell);
+            });
+            sensorRow.appendChild(cellGrid);
+            mineralBlock.appendChild(sensorRow);
+        });
+        container.appendChild(mineralBlock);
+    });
+}
+
+function renderComposite(composites) {
+    const container = document.getElementById('compositeContainer');
+    const hint = document.getElementById('compositeEmptyHint');
+    container.innerHTML = '';
+    const sensors = Object.keys(composites);
+    if (!sensors.length) { hint.style.display = ''; return; }
+    hint.style.display = 'none';
+    sensors.forEach(sk => {
+        const c = composites[sk];
+        const block = document.createElement('div');
+        block.className = 'border thin-border rounded-xl p-3 bg-white';
+        block.innerHTML = `
+            <h4 class="text-sm font-bold mb-3 flex items-center gap-1">
+                <iconify-icon icon="lucide:satellite"></iconify-icon>${sk}
+                <span class="text-[10px] text-slate-500 ml-2">${c.shape ? c.shape[0]+'×'+c.shape[1] : ''} · ROI ${c.roi_pixels || 0} 像素</span>
+            </h4>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div>
+                    <p class="text-[11px] font-bold mb-1">两方法交集</p>
+                    ${c.intersection_overlay ? imgCellHTML(c.intersection_overlay, ['蚀变交集', AlterState.projectName, sk]) : '<p class="text-[10px] text-slate-400">无</p>'}
+                    <p class="text-[10px] mt-1">高置信像素: <b>${c.high_confidence_pixels || 0}</b></p>
+                </div>
+                <div>
+                    <p class="text-[11px] font-bold mb-1">多蚀变叠加评分</p>
+                    ${c.score_overlay ? imgCellHTML(c.score_overlay, ['蚀变评分', AlterState.projectName, sk]) : '<p class="text-[10px] text-slate-400">无</p>'}
+                </div>
+            </div>`;
+        container.appendChild(block);
+    });
+}
+
+/* ═══════ 分析报告生成 ═══════ */
+function updateReportButtons() {
+    const ready = !!AlterState.lastBatchResult;
+    document.getElementById('previewReportBtn').disabled = !ready;
+    document.getElementById('downloadReportBtn').disabled = !ready;
+    document.getElementById('downloadAllImagesBtn').disabled = !ready;
+}
+
+function escHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/* ── 结果解读辅助:把逐方法原始结果聚合成每个矿物的信号画像 ── */
+function _mineralStats(grid) {
+    return (grid || []).map(entry => {
+        const results = entry.results || {};
+        let maxRatio = null, bestSensor = null, bestMethod = null;
+        let ratioVal = null, pcaVal = null, methodsOk = 0;
+        Object.keys(results).forEach(sk => {
+            ['ratio', 'pca'].forEach(m => {
+                const r = results[sk][m];
+                if (r && !r.unavailable && !r.error && typeof r.anomaly_ratio === 'number') {
+                    methodsOk++;
+                    if (maxRatio === null || r.anomaly_ratio > maxRatio) {
+                        maxRatio = r.anomaly_ratio; bestSensor = sk; bestMethod = m;
+                    }
+                    if (m === 'ratio' && (ratioVal === null || r.anomaly_ratio > ratioVal)) ratioVal = r.anomaly_ratio;
+                    if (m === 'pca'   && (pcaVal === null   || r.anomaly_ratio > pcaVal))   pcaVal   = r.anomaly_ratio;
+                }
+            });
+        });
+        return {
+            mineral: entry.mineral, priority: entry.priority, zone: entry.zone,
+            anomaly_type: entry.anomaly_type, data_status: entry.data_status,
+            effective_sensor: entry.effective_sensor,
+            maxRatio, bestSensor, bestMethod, ratioVal, pcaVal,
+            dual: (ratioVal !== null && pcaVal !== null), methodsOk,
+        };
+    });
+}
+
+/* 高斯误差函数(Abramowitz & Stegun 7.1.26)→ μ+kσ 单侧上尾概率 */
+function _erf(x) {
+    const s = x < 0 ? -1 : 1; x = Math.abs(x);
+    const p = 0.3275911, a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429;
+    const t = 1 / (1 + p * x);
+    const y = 1 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+    return s * y;
+}
+function _gaussianUpperTail(k) { return 0.5 * (1 - _erf(Number(k) / Math.SQRT2)); }
+
+const _NODATA_STRENGTH = { label: '无数据', rank: 0, color: '#94a3b8', detail: '传感器不覆盖 / 无可用方法' };
+
+/*
+ * 方法感知的强弱分级。就地给每个 stat 写入 s.strength。
+ *  - mean_std: 强弱 = 实测异常占比 / 该 k 值下高斯背景的期望占比(倍数)
+ *      ≥4× 显著 · ≥2× 中等 · ≥1.2× 偏弱 · 否则微弱
+ *  - percentile: 占比按构造恒≈(1-p),无判别力 → 退化为组内相对位次(前/中/后 1/3)
+ */
+function _classifyStrengths(stats, req) {
+    const method = req.threshold_method;
+    if (method !== 'percentile') {
+        // mean_std / median_mad:同为 k 驱动,正态背景下临界值近似一致,共用高斯期望占比基准
+        const expPct = _gaussianUpperTail(req.k) * 100;  // 期望异常占比(%)
+        stats.forEach(s => {
+            if (s.maxRatio === null) { s.strength = _NODATA_STRENGTH; return; }
+            const ex = expPct > 0 ? s.maxRatio / expPct : 0;
+            const detail = `${ex.toFixed(1)}× 高斯背景(期望 ${expPct.toFixed(1)}%)`;
+            if (ex >= 4)        s.strength = { label: '显著', rank: 4, color: '#dc2626', detail };
+            else if (ex >= 2)   s.strength = { label: '中等', rank: 3, color: '#d97706', detail };
+            else if (ex >= 1.2) s.strength = { label: '偏弱', rank: 2, color: '#0891b2', detail };
+            else                s.strength = { label: '微弱', rank: 1, color: '#94a3b8', detail };
+        });
+    } else {
+        // percentile(或未知方法):相对位次
+        const valid = stats.filter(s => s.maxRatio !== null).sort((a, b) => b.maxRatio - a.maxRatio);
+        const n = valid.length;
+        valid.forEach((s, i) => {
+            const detail = `组内相对第 ${i + 1}/${n}(百分位法占比恒定,按位次排)`;
+            if (i < n / 3)       s.strength = { label: '显著', rank: 4, color: '#dc2626', detail };
+            else if (i < 2 * n / 3) s.strength = { label: '中等', rank: 3, color: '#d97706', detail };
+            else                 s.strength = { label: '偏弱', rank: 2, color: '#0891b2', detail };
+        });
+        stats.forEach(s => { if (s.maxRatio === null) s.strength = _NODATA_STRENGTH; });
+    }
+    return stats;
+}
+
+function buildInterpretation(req, data, selectedDt) {
+    const grid = data.grid || [];
+    const comps = data.composites || {};
+    const stats = _classifyStrengths(_mineralStats(grid), req);
+    const k = req.k;
+
+    if (!stats.length) {
+        return `<h2>⑥ 结果解读与成矿指示</h2><p style="color:#94a3b8;">本次批量分析无矿物结果可供解读。</p>`;
+    }
+
+    const sorted = stats.slice().sort((a, b) =>
+        a.priority !== b.priority ? a.priority - b.priority : (b.maxRatio || -1) - (a.maxRatio || -1));
+
+    const detected  = stats.filter(s => s.strength.rank >= 2);
+    const strong    = stats.filter(s => s.strength.rank >= 3);
+    const noData    = stats.filter(s => s.strength.rank === 0);
+    const p1        = stats.filter(s => s.priority === 1);
+    const p1Det     = p1.filter(s => s.strength.rank >= 2);
+    const p1Missing = p1.filter(s => s.strength.rank < 2);
+
+    // 解读表
+    const rows = sorted.map(s => {
+        const st = s.strength;
+        const ratioTxt = s.ratioVal == null ? '—' : s.ratioVal.toFixed(2) + '%';
+        const pcaTxt   = s.pcaVal   == null ? '—' : s.pcaVal.toFixed(2) + '%';
+        const corro = s.dual ? '双方法' : (s.methodsOk ? '单方法' : '—');
+        return `<tr>
+            <td><b>${escHtml(s.mineral)}</b></td>
+            <td>P${s.priority}</td>
+            <td>${escHtml(s.effective_sensor || '—')}</td>
+            <td>${ratioTxt}</td>
+            <td>${pcaTxt}</td>
+            <td>${corro}</td>
+            <td style="color:${st.color};font-weight:600;">${st.label}<br><span style="font-weight:400;color:#94a3b8;font-size:10px;">${escHtml(st.detail || '')}</span></td>
+        </tr>`;
+    }).join('');
+
+    // 综合高置信像素表
+    const compRows = Object.keys(comps).map(sk => {
+        const c = comps[sk]; const roi = c.roi_pixels || 0; const hc = c.high_confidence_pixels || 0;
+        const pct = roi ? (hc / roi * 100) : 0;
+        return `<tr><td><b>${escHtml(sk)}</b></td><td>${roi.toLocaleString()}</td><td>${hc.toLocaleString()}</td><td>${pct.toFixed(2)}%</td></tr>`;
+    }).join('');
+    const totalHC = data.high_confidence_total_pixels || 0;
+
+    // 成矿指示判断(以核心 P1 指示蚀变的检出比例为依据)
+    const p1Ratio = p1.length ? p1Det.length / p1.length : 0;
+    let matchVerdict, matchColor;
+    if (p1.length === 0) {
+        matchVerdict = `当前矿床模型未定义核心(P1)指示矿物,无法据此对成矿吻合度做强弱判断,以下解读仅基于已检出蚀变的相对强弱。`;
+        matchColor = '#64748b';
+    } else if (p1Ratio >= 0.6) {
+        matchVerdict = `${p1Det.length}/${p1.length} 个核心(P1)指示蚀变被检出明显异常,蚀变组合与「${escHtml(selectedDt)}」成矿模型吻合度较高,遥感证据支持该成矿假设。`;
+        matchColor = '#059669';
+    } else if (p1Ratio > 0) {
+        matchVerdict = `仅 ${p1Det.length}/${p1.length} 个核心(P1)指示蚀变被检出明显异常,蚀变组合与「${escHtml(selectedDt)}」模型部分吻合,遥感证据偏弱,需结合野外与多源数据进一步确认。`;
+        matchColor = '#d97706';
+    } else {
+        matchVerdict = `核心(P1)指示蚀变均未检出有效异常,当前遥感数据不支持「${escHtml(selectedDt)}」成矿假设,建议复核矿床类型选择或补充数据后重跑。`;
+        matchColor = '#dc2626';
+    }
+
+    // 关键发现叙述
+    const findings = [];
+    if (strong.length)
+        findings.push(`信号<b>显著/中等</b>的蚀变为 <b>${strong.map(s => escHtml(s.mineral)).join('、')}</b>,异常占比最高达 ${Math.max(...strong.map(s => s.maxRatio)).toFixed(2)}%,是本次最值得关注的目标。`);
+    else if (detected.length)
+        findings.push(`各蚀变信号普遍偏弱(均未达"中等"级别),最强者为 <b>${escHtml(detected.sort((a,b)=>b.maxRatio-a.maxRatio)[0].mineral)}</b>(${detected[0].maxRatio.toFixed(2)}%),需谨慎对待。`);
+    else
+        findings.push(`所有纳入分析的蚀变在 ROI 内均未检出明显异常浓集,异常占比普遍低于 1%。`);
+
+    const dualNames = stats.filter(s => s.dual).map(s => s.mineral);
+    if (dualNames.length)
+        findings.push(`<b>${dualNames.map(escHtml).join('、')}</b> 同时获得波段比值法与 Crosta PCA 两种独立方法的覆盖,其异常可在"两方法交集图"上互证,可信度高于仅单方法检出者。`);
+    if (totalHC > 0)
+        findings.push(`两种方法在像素级取交集后,全项目共得到 <b>${totalHC.toLocaleString()}</b> 个高置信像素(详见下表与第⑤节交集图),代表"至少一种蚀变被双方法同时判异常"的位置,是空间上最聚焦的找矿线索。`);
+    else
+        findings.push(`两方法交集未产生任何高置信像素 —— 比值法与 PCA 法的异常区在空间上几乎不重叠,提示其中至少一种方法的异常可能由背景/噪声主导,解读时应以单方法结果为参考并优先排查数据质量。`);
+    if (noData.length)
+        findings.push(`<span style="color:#dc2626;">${noData.map(s => escHtml(s.mineral)).join('、')}</span> 因传感器不覆盖 ROI 或无可用提取方法而<b>未能分析</b>,当前蚀变填图并不完整。`);
+    if (req.threshold_method === 'percentile')
+        findings.push(`<span style="color:#64748b;">提示:本次采用 95% 百分位阈值,各图异常占比按构造接近 5%,因此"异常占比"不宜横向比强弱,应主要从交集图/叠加评分图的<b>空间浓集程度</b>判读。</span>`);
+
+    // 下一步工作建议(随结果动态生成)
+    const recs = [];
+    if (totalHC > 0)
+        recs.push(`<b>野外查证高分靶区</b>:以第⑤节"多蚀变叠加评分图"的高分像素及"两方法交集图"的 ${totalHC.toLocaleString()} 个高置信像素为优先靶区,部署野外踏勘,核实地表蚀变矿物组合与露头,圈定可验证的重点区块。`);
+    else
+        recs.push(`<b>复核异常缺失原因</b>:交集未生成高置信像素,建议先排查数据质量(云、地形阴影、波段配准、大气校正)与阈值设置是否合理,再决定野外工作部署。`);
+    if (strong.length)
+        recs.push(`<b>定点采样验证</b>:对信号显著/中等的蚀变(${strong.map(s => escHtml(s.mineral)).join('、')})的异常浓集中心开展岩石光谱实测与化探采样,建立"遥感异常—实际矿化"的对应关系。`);
+    if (noData.length)
+        recs.push(`<b>补充缺失数据</b>:${noData.map(s => escHtml(s.mineral)).join('、')} 未能分析,建议补充相应传感器影像(ASTER SWIR、Sentinel-2、Landsat、WorldView-3 或高光谱),完成完整蚀变填图。`);
+    if (p1Missing.length)
+        recs.push(`<b>提升核心蚀变识别灵敏度</b>:核心指示矿物 ${p1Missing.map(s => escHtml(s.mineral)).join('、')} 未检出明显异常,多光谱波段诊断能力有限,建议引入高光谱数据(ZY-1 AHSI、GF-5 AHSI、EnMAP)做精细矿物分异,确认是真无异常还是受光谱分辨率限制漏检。`);
+    if (req.threshold_method !== 'percentile') {
+        const k1 = (Number(k) + 0.5).toFixed(1);
+        const highRatioCnt = stats.filter(s => s.maxRatio != null && s.maxRatio > 25).length;
+        if (highRatioCnt >= Math.ceil(stats.length * 0.5))
+            recs.push(`<b>收紧阈值复核</b>:逾半数矿物异常占比偏高(>25%),当前 k=${escHtml(String(k))} 可能偏宽松、混入背景,建议提高至 k≈${k1} 重跑以突出真正的浓集区。`);
+        if (detected.length === 0)
+            recs.push(`<b>放宽阈值或换方法</b>:当前 k=${escHtml(String(k))} 下几乎无异常检出,建议降低 k 或改用 95% 百分位法重跑,避免漏检弱异常。`);
+    }
+    const _st = data && data.structural;
+    if (_st && _st.aoi_name != null) {
+        recs.push(`<b>多源证据综合(已叠加构造)</b>:本次综合评分已叠加 geo-stru 构造解译(断裂 ${_st.n_lineaments} 条、交汇点 ${_st.n_intersections} 处、优势走向 ${(_st.dominant_strikes_deg||[]).map(d=>d+'°').join('/') || '—'}),建议优先核查<b>位于断裂交汇点附近、构造关联度高</b>的蚀变浓集区;并进一步与物探(航磁/激电)及已知矿(化)点叠合,圈定多重证据靶区。`);
+    } else {
+        recs.push(`<b>多源证据综合</b>:将本次蚀变异常与区域地质图、构造线、物探(航磁/激电)及已知矿(化)点叠合,圈定兼具"蚀变 + 构造 + 物探"多重证据的综合找矿靶区,再行验证。${(_st && _st.warning) ? `<br><span style="color:#94a3b8;">(本次已尝试启用构造约束,但${escHtml(_st.warning)})</span>` : ''}`);
+    }
+
+    return `
+<h2>⑥ 结果解读与成矿指示</h2>
+<div class="verdict" style="border-left:4px solid ${matchColor};">
+  <b style="color:${matchColor};">成矿吻合度判断:</b> ${matchVerdict}
+</div>
+<h3>各蚀变信号强弱排序</h3>
+<table>
+  <thead><tr>
+    <th>蚀变矿物</th><th style="width:42px;">优先级</th><th>传感器</th>
+    <th style="width:78px;">比值法异常占比</th><th style="width:78px;">PCA法异常占比</th>
+    <th style="width:60px;">方法覆盖</th><th style="width:60px;">信号强弱</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+<p style="font-size:11px;color:#94a3b8;margin-top:4px;">${req.threshold_method !== 'percentile'
+    ? `强弱分级采用<b>方法感知统计基准</b>:以实测异常占比相对"该 k=${escHtml(String(k))} 值下高斯背景的期望占比(${(_gaussianUpperTail(k) * 100).toFixed(1)}%)"的<b>倍数</b>判定 —— 显著 ≥4× · 中等 ≥2× · 偏弱 ≥1.2× · 微弱 &lt;1.2×。这样可剔除 k 取值带来的系统性偏差:同样的占比在严格 k 下是强信号、在宽松 k 下可能只是背景。`
+    : `本次采用 <b>95% 百分位</b>阈值,各矿物异常占比按构造恒等于 ~5%、不含强弱信息,因此强弱栏退化为<b>组内相对位次</b>(占比峰值前 1/3 → 显著、中 1/3 → 中等、后 1/3 → 偏弱),仅表示本次各矿物间的相对次序,不代表绝对强弱。`}
+占比反映被判异常的像素范围,并非品位;最终强弱仍需结合空间浓集形态与野外查证。</p>
+<h3>关键发现</h3>
+<ul style="font-size:13px;line-height:1.8;margin:8px 0;padding-left:20px;">
+  ${findings.map(f => `<li>${f}</li>`).join('')}
+</ul>
+<h3>双方法高置信像素汇总(按传感器)</h3>
+<table>
+  <thead><tr><th>传感器</th><th>ROI 总像素</th><th>高置信像素</th><th style="width:80px;">占 ROI 比例</th></tr></thead>
+  <tbody>${compRows || '<tr><td colspan="4" style="color:#94a3b8;">无综合结果</td></tr>'}</tbody>
+</table>
+
+<h2>⑦ 结论与下一步工作建议</h2>
+<ol style="font-size:13px;line-height:1.9;margin:8px 0;padding-left:22px;">
+  ${recs.map(r => `<li style="margin-bottom:6px;">${r}</li>`).join('')}
+</ol>
+
+`;
+}
+
+function buildReportHTML() {
+    const req = AlterState.lastBatchRequest || {};
+    const data = AlterState.lastBatchResult || {};
+    const grid = data.grid || [];
+    const comps = data.composites || {};
+    const cands = AlterState.depositCandidates || [];
+    const bbox = AlterState.projectBbox || [];
+    const bboxStr = bbox.length === 4 ?
+        `[${bbox[0].toFixed(4)}, ${bbox[1].toFixed(4)}] → [${bbox[2].toFixed(4)}, ${bbox[3].toFixed(4)}]` : '—';
+    const ts = new Date().toLocaleString('zh-CN', { hour12: false });
+    const methods = (req.methods || []).map(m => m === 'ratio' ? '波段比值法' : 'Crosta PCA').join(' + ');
+    const thrMethodLabel = { mean_std: '均值 + k · 标准差', median_mad: '中位数 + k · MAD', percentile: '95% 百分位数' }[req.threshold_method] || req.threshold_method;
+    const sensorsAvail = (AlterState.availableSensors || []).map(s => `${s.key} (${s.label || '—'})`).join('、') || '—';
+
+    // ROI 底图(从前端 DOM 取,如果已加载)
+    const roiBg = (document.getElementById('roiBgImage') || {}).src || '';
+    const roiBgIsData = roiBg.startsWith('data:image');
+
+    // 矿床类型识别区
+    const selectedDt = req.deposit_type || AlterState.selectedDepositType || '—';
+    let depositSection = '';
+    if (cands.length) {
+        const rows = cands.map(c => {
+            const isSel = c.deposit_type === selectedDt;
+            const pct = Math.round((c.confidence || 0) * 100);
+            return `
+                <tr ${isSel ? 'style="background:#ecfdf5;"' : ''}>
+                    <td>${isSel ? '<b>✓</b>' : ''}</td>
+                    <td><b>${escHtml(c.deposit_type)}</b></td>
+                    <td>${pct}%</td>
+                    <td>${escHtml(c.source || '')}</td>
+                    <td>${escHtml(c.evidence || '')}</td>
+                </tr>`;
+        }).join('');
+        depositSection = `
+            <p>系统对该 ROI 调用矿床类型自动识别(USGS MRDS 数据库 + LLM 推理混合判断),返回 ${cands.length} 个候选。当前分析采用:<b style="color:#059669;">${escHtml(selectedDt)}</b>${AlterState.depositManual ? '(用户手动覆盖)' : '(采用自动推荐 top-1)'}。</p>
+            <table>
+                <thead><tr><th style="width:30px;">选用</th><th>矿床类型</th><th style="width:60px;">置信度</th><th style="width:90px;">来源</th><th>证据</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>`;
+    } else {
+        depositSection = `<p>系统自动识别未返回候选(网络/API 异常或 ROI 区域无足量先验)。用户在手动模式下选择了:<b>${escHtml(selectedDt)}</b>。</p>`;
+    }
+
+    // 网格结果区
+    const gridHTML = grid.map(entry => {
+        const results = entry.results || {};
+        const sensorKeys = Object.keys(results);
+        const statusTag = {
+            no_data: '<span style="color:#dc2626;">⚠ 无可用方法</span>',
+            no_coverage: '<span style="color:#dc2626;">⚠ 数据不覆盖 ROI</span>',
+            fallback: `<span style="color:#d97706;">回退到 ${escHtml(entry.effective_sensor || '')}</span>`,
+            ok: `<span style="color:#64748b;">${escHtml(entry.effective_sensor || '')}</span>`,
+        }[entry.data_status] || '';
+
+        const notesHTML = (entry.notes || []).length
+            ? `<div class="note">${(entry.notes || []).map(n => `<p>${escHtml(n)}</p>`).join('')}</div>` : '';
+
+        if (!sensorKeys.length) {
+            return `<div class="mineral">
+                <div class="mineral-head"><b>${escHtml(entry.mineral)}</b> · P${entry.priority} · ${escHtml(entry.zone || '')} · ${escHtml(entry.anomaly_type || '')} ${statusTag}</div>
+                ${notesHTML}
+                <p style="color:#dc2626;font-size:11px;">该矿物在项目可用传感器上均无可用提取方法,或首选传感器数据不覆盖 ROI。</p>
+            </div>`;
+        }
+
+        const sensorBlocks = sensorKeys.map(sk => {
+            const cells = ['ratio', 'pca'].map(m => {
+                const r = results[sk][m];
+                const methodLabel = m === 'ratio' ? '波段比值' : 'Crosta PCA';
+                if (!r) return `<div class="cell empty">${methodLabel}<br><span>该方法未跑</span></div>`;
+                if (r.unavailable) return `<div class="cell empty">${methodLabel}<br><span>${escHtml(r.reason || '不可用')}</span></div>`;
+                if (r.error) return `<div class="cell empty" style="color:#dc2626;">${methodLabel}<br><span>${escHtml(r.error)}</span></div>`;
+                const meta = m === 'pca' && r.pc_used ? `PC${r.pc_used} (${r.sign > 0 ? '+' : '-'})` : (r.ratio_expr || '');
+                const thr = r.threshold == null ? '—' : Number(r.threshold).toFixed(3);
+                const img = r.overlay ? `<img src="${r.overlay}">` : '';
+                return `<div class="cell">
+                    <div class="cell-head"><span class="tag">${methodLabel}</span><span class="meta">${escHtml(meta)}</span></div>
+                    ${img}
+                    <div class="cell-foot"><span>异常占比 <b>${r.anomaly_ratio}%</b></span><span>阈值 ${thr}</span></div>
+                    ${r.warning ? `<p class="warn">⚠ ${escHtml(r.warning)}</p>` : ''}
+                </div>`;
+            }).join('');
+            return `<div class="sensor-row"><div class="sensor-tag">${escHtml(sk)}</div><div class="cells">${cells}</div></div>`;
+        }).join('');
+
+        return `<div class="mineral">
+            <div class="mineral-head"><b>${escHtml(entry.mineral)}</b> · P${entry.priority} · ${escHtml(entry.zone || '')} · ${escHtml(entry.anomaly_type || '')} ${statusTag}</div>
+            ${notesHTML}
+            ${sensorBlocks}
+        </div>`;
+    }).join('');
+
+    // 综合判断区
+    const compHTML = Object.keys(comps).map(sk => {
+        const c = comps[sk];
+        const shape = c.shape ? `${c.shape[0]}×${c.shape[1]}` : '—';
+        return `<div class="composite">
+            <div class="composite-head"><b>${escHtml(sk)}</b> · ${shape} · ROI ${c.roi_pixels || 0} 像素</div>
+            <div class="composite-row">
+                <div class="composite-cell">
+                    <div class="composite-cell-title">两方法交集图</div>
+                    ${c.intersection_overlay ? `<img src="${c.intersection_overlay}">` : '<p>无</p>'}
+                    <p class="kv">高置信像素: <b>${c.high_confidence_pixels || 0}</b></p>
+                </div>
+                <div class="composite-cell">
+                    <div class="composite-cell-title">多蚀变叠加评分图</div>
+                    ${c.score_overlay ? `<img src="${c.score_overlay}">` : '<p>无</p>'}
+                    <p class="kv">权重: priority=1 → 1.0 · priority=2 → 0.5 · priority≥3 → 0.25</p>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+
+    return `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8">
+<title>蚀变异常分析报告 · ${escHtml(AlterState.projectName)}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1e293b; line-height: 1.7; max-width: 1100px; margin: 0 auto; padding: 32px 40px; background: #fafbfc; }
+  h1 { font-size: 28px; margin: 0 0 8px; }
+  h2 { font-size: 20px; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #059669; color: #059669; }
+  h3 { font-size: 15px; margin: 20px 0 8px; color: #334155; }
+  .meta-bar { color: #64748b; font-size: 12px; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 8px 0 16px; background: white; }
+  th, td { padding: 8px 10px; border: 1px solid #e2e8f0; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; font-weight: 600; }
+  .params { display: grid; grid-template-columns: 130px 1fr; gap: 6px 16px; background: white; padding: 16px 20px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; }
+  .params dt { color: #64748b; }
+  .params dd { margin: 0; font-weight: 500; }
+  .roi-img { max-width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; margin-top: 8px; }
+  .mineral { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin: 12px 0; }
+  .mineral-head { font-size: 13px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed #e2e8f0; }
+  .note { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 4px; padding: 6px 10px; font-size: 11px; color: #92400e; margin: 6px 0; }
+  .note p { margin: 2px 0; }
+  .sensor-row { margin-top: 10px; }
+  .sensor-tag { font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 6px; }
+  .cells { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cell { border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; background: #fafbfc; font-size: 11px; }
+  .cell-head { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .cell .tag { font-weight: 700; font-size: 10px; text-transform: uppercase; }
+  .cell .meta { color: #64748b; }
+  .cell img { width: 100%; height: auto; display: block; border-radius: 4px; }
+  .cell-foot { display: flex; justify-content: space-between; margin-top: 6px; }
+  .cell.empty { text-align: center; padding: 24px 8px; color: #94a3b8; font-style: italic; }
+  .cell.empty span { font-size: 10px; }
+  .cell .warn { color: #d97706; font-size: 10px; margin: 4px 0 0; }
+  .composite { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 18px; margin: 12px 0; }
+  .composite-head { font-size: 13px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px dashed #e2e8f0; }
+  .composite-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .composite-cell-title { font-size: 12px; font-weight: 600; margin-bottom: 6px; color: #334155; }
+  .composite-cell img { width: 100%; height: auto; display: block; border-radius: 6px; border: 1px solid #e2e8f0; }
+  .composite-cell .kv { font-size: 11px; color: #64748b; margin: 6px 0 0; }
+  .verdict { background: white; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; font-size: 13px; line-height: 1.7; margin: 8px 0 16px; }
+  ul li, ol li { margin: 2px 0; }
+  .glossary { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; font-size: 12px; }
+  .glossary dt { font-weight: 700; margin-top: 8px; color: #334155; }
+  .glossary dd { margin: 2px 0 6px 0; color: #475569; }
+</style></head><body>
+
+<h1>蚀变异常分析报告</h1>
+<div class="meta-bar">项目: <b>${escHtml(AlterState.projectName)}</b> · 生成时间: ${escHtml(ts)}</div>
+
+<h2>① 项目与 ROI 概述</h2>
+<dl class="params">
+  <dt>项目名</dt><dd>${escHtml(AlterState.projectName)}</dd>
+  <dt>ROI 经纬度边界</dt><dd><code>${escHtml(bboxStr)}</code></dd>
+  <dt>项目可用传感器</dt><dd>${escHtml(sensorsAvail)}</dd>
+</dl>
+${roiBgIsData ? `<h3>ROI 底图(已叠加 ROI 多边形描边)</h3><img class="roi-img" src="${roiBg}">` : ''}
+<p style="font-size:12px;color:#64748b;margin-top:8px;">底图由本系统在 ROI 范围内优先取项目内 Sentinel-2 / ASTER 真彩色波段合成生成;源数据像素分辨率不足时,自动降级到 Esri World Imagery 在线卫星瓦片(zoom 17-18,约 1 m GSD)以提供地理参考。</p>
+
+<h2>② 矿床类型识别</h2>
+${depositSection}
+
+<h2>③ 分析参数</h2>
+<dl class="params">
+  <dt>选用方法</dt><dd>${escHtml(methods)}</dd>
+  <dt>阈值方法</dt><dd>${escHtml(thrMethodLabel)}${req.threshold_method !== 'percentile' ? ` · k = ${req.k}` : ''}</dd>
+  <dt>异常着色方案</dt><dd>${escHtml(req.colormap || '—')}</dd>
+  <dt>纳入分析的蚀变矿物</dt><dd>${(req.selected_minerals || []).map(escHtml).join('、') || '—'}</dd>
+</dl>
+<p style="font-size:12px;color:#64748b;margin-top:8px;">阈值方法 <code>mean_std</code> 在 ROI 掩膜区域统计指数图的均值 μ 与标准差 σ,以 μ + k·σ 作为异常临界值,k 越大越严格;<code>median_mad</code> 改用中位数 μ̃ 与绝对中位差 MAD,以 μ̃ + k·1.4826·MAD 为临界值——对拼接缝、双峰背景等异常值的抗污染能力更强,正态背景下与 <code>mean_std</code> 近似等价;<code>percentile</code> 则取该区域 95% 百分位数,对异常分布形态不敏感。</p>
+
+<h2>④ 各蚀变矿物的逐方法结果(网格视图)</h2>
+<p style="font-size:12px;color:#64748b;">每个矿物给出该矿物在每个有效传感器上的"波段比值法"和"Crosta PCA 法"结果。每张缩略图为该方法的异常区(亮色)叠加在卫星底图上;异常占比是 ROI 内被判异常的像素占 ROI 总像素的比例;阈值是经上述阈值方法计算出的判异常临界值。<br>
+"P1 / P2 / P3" 是该矿物对当前矿床类型的指示优先级:P1 为该矿床类型的核心蚀变(典型指示矿物),P2 为次要伴生,P3 及以下为边缘指示。</p>
+${gridHTML || '<p style="color:#94a3b8;">无网格结果。</p>'}
+
+<h2>⑤ 综合判断(按传感器)</h2>
+<p style="font-size:12px;color:#64748b;">综合判断给出每个传感器下的两类汇总图,用于在所有矿物的结果间做"互证"和"叠加":</p>
+${compHTML || '<p style="color:#94a3b8;">无综合结果。</p>'}
+
+${buildStructuralSection(data)}
+
+${buildInterpretation(req, data, selectedDt)}
+
+<h2>⑧ 方法学说明</h2>
+<dl class="glossary">
+  <dt>波段比值法</dt>
+  <dd>利用目标蚀变矿物在不同波段的反射差异(如绢云母在 SWIR2.2μm 强吸收 → ASTER B4/B6 比值升高),用知识库给定的代数表达式 (如 B5/B6、(B5+B7)/B6) 计算指数图,数值越高代表该蚀变信号越强。</dd>
+
+  <dt>Crosta PCA(Crósta 主成分分析法)</dt>
+  <dd>选取目标矿物的"特征波段子集"(知识库 input_bands,如 ASTER 的 B1/B4/B6/B7),在 ROI 掩膜内对这些波段做主成分分析,根据各 PC 的载荷向量符号匹配预期(positive_bands 上系数为正、negative_bands 上系数为负),自动锁定与该矿物最相关的 PC,作为蚀变指数图。优势是能压制岩石本底、地形阴影等干扰。</dd>
+
+  <dt>异常阈值</dt>
+  <dd>仅在 ROI 掩膜内统计指数分布,然后按用户选定阈值方法计算临界值。这样可避免全图背景污染统计 — 这是 v3 相对 v2 的核心改进之一。</dd>
+
+  <dt>两方法交集(综合判断)</dt>
+  <dd>对每个矿物,把"波段比值法异常区"和"Crosta PCA 异常区"做像素级 AND,然后把全部矿物的交集做 OR 合并展示。亮像素 = "至少有一种蚀变同时被两种独立方法判为异常",可大幅降低单方法误报。<br>
+  <span style="color:#94a3b8;">注:当前不区分是哪种蚀变,只标记"高置信像素"位置。如需按矿物分色,后续可启用 <code>intersection_per_mineral</code> 字段。</span></dd>
+
+  <dt>多蚀变叠加评分</dt>
+  <dd>把每个矿物在该像素的"方法平均异常分"按 priority 加权累加 ── priority=1 权重 1.0 / priority=2 权重 0.5 / priority≥3 权重 0.25;同时用"用户勾选的方法总数"作为分母,单方法跑成功只贡献一半分(避免方法缺席时虚高)。分高的像素 = "多种核心蚀变在此叠合 + 双方法互证",勘探优先级最高。</dd>
+
+  <dt>数据状态标识</dt>
+  <dd><b>OK</b> = 矿物对应首选传感器数据覆盖 ROI、方法库可用;<b>回退</b> = 首选传感器不覆盖 ROI 或不支持该方法,自动换到次选传感器;<b>无可用方法 / 数据不覆盖 ROI</b> = 该矿物在所有可用传感器上都无法分析,需要补数据或换矿床类型。</dd>
+</dl>
+
+<p style="margin-top:32px;font-size:11px;color:#94a3b8;text-align:center;">DeepExplor · GeoAnalyser 蚀变模块 · 报告由前端自动生成于 ${escHtml(ts)}</p>
+
+</body></html>`;
+}
+
+function buildStructuralSection(data) {
+    const s = data && data.structural;
+    if (!s) return '';   // 未启用构造约束
+    if (s.warning) {
+        return `<h2>⑤b 构造约束(地质构造解译)</h2>
+<p style="font-size:12px;color:#d97706;">${escHtml(s.warning)}。本次综合评分未叠加构造权重。</p>`;
+    }
+    const strikes = (s.dominant_strikes_deg || []).map(d => `${d}°`).join(' / ') || '—';
+    const assoc = s.association_by_mineral || {};
+    const rows = Object.keys(assoc).map(m => {
+        const a = assoc[m] || {};
+        const md = (a.median_dist_m == null) ? '—' : `${Math.round(a.median_dist_m)} m`;
+        const fr = (a.frac_within_buffer == null) ? '—' : `${(a.frac_within_buffer * 100).toFixed(0)}%`;
+        return `<tr><td>${escHtml(m)}</td><td>${a.n_anomaly ?? '—'}</td><td>${md}</td><td>${fr}</td></tr>`;
+    }).join('');
+    const bufM = (() => { for (const k in assoc) { if (assoc[k] && assoc[k].buffer_m) return Math.round(assoc[k].buffer_m); } return 300; })();
+    const rose = s.rose_diagram
+        ? `<div style="margin-top:8px;"><img src="${s.rose_diagram}" style="max-width:320px;border:1px solid #e2e8f0;border-radius:6px;" alt="走向玫瑰图"><p style="font-size:11px;color:#94a3b8;">断裂走向玫瑰图(来自 geo-stru)</p></div>`
+        : '';
+    return `<h2>⑤b 构造约束(地质构造解译)</h2>
+<p style="font-size:12px;color:#64748b;">已叠加 geo-stru 构造解译产物对综合评分做"近断裂优先"软加权(成矿受构造控制),并在第⑤节综合图上叠加断裂线(蓝)与断裂交汇点(橙,成矿最有利部位)。</p>
+<dl class="params">
+  <dt>匹配研究区</dt><dd>${escHtml(s.aoi_name || '—')}</dd>
+  <dt>断裂(线性体)条数</dt><dd>${s.n_lineaments ?? '—'}</dd>
+  <dt>断裂交汇点</dt><dd>${s.n_intersections ?? 0} 处</dd>
+  <dt>优势走向</dt><dd>${escHtml(strikes)}</dd>
+  <dt>断裂总长</dt><dd>${s.total_lineament_length_km != null ? s.total_lineament_length_km.toFixed(2) + ' km' : '—'}</dd>
+</dl>
+${rose}
+<h3>各蚀变异常的构造关联度</h3>
+<p style="font-size:12px;color:#64748b;">"中位距断裂"= 该矿物异常像元到最近断裂的中位距离;"缓冲区内占比"= 异常像元落在断裂 ${bufM} m 缓冲区内的比例。关联度高(距离近、占比高)的异常更可能受构造控制、可信度更高。</p>
+<table>
+  <thead><tr><th>蚀变矿物</th><th style="width:90px;">异常像元数</th><th style="width:110px;">中位距断裂</th><th style="width:120px;">缓冲区内占比</th></tr></thead>
+  <tbody>${rows || '<tr><td colspan="4" style="color:#94a3b8;">无可计算的关联度(无异常或无距断裂栅格)。</td></tr>'}</tbody>
+</table>
+<p style="font-size:11px;color:#94a3b8;margin-top:6px;">注:断裂为 geo-stru 基于 DEM 提取的<b>地形线性体</b>,是断裂的代理,有定位不确定性;故只做软加权辅助判读,不作硬性取舍。</p>`;
+}
+
+function reportFilename() {
+    const proj = (AlterState.projectName || 'project').replace(/[^\w一-龥-]+/g, '_');
+    const dt = (AlterState.selectedDepositType || 'deposit').replace(/[^\w一-龥-]+/g, '_');
+    const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    return `蚀变分析报告_${proj}_${dt}_${ts}.html`;
+}
+
+document.getElementById('previewReportBtn').addEventListener('click', () => {
+    if (!AlterState.lastBatchResult) return;
+    const html = buildReportHTML();
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+});
+
+document.getElementById('downloadReportBtn').addEventListener('click', () => {
+    if (!AlterState.lastBatchResult) return;
+    const html = buildReportHTML();
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = reportFilename();
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    pushAlterLog('报告已下载: ' + a.download, 'text-emerald-600');
+});
+
+document.getElementById('downloadAllImagesBtn').addEventListener('click', () => {
+    if (!AlterState.lastBatchResult) return;
+    downloadAllImages();
+});
+
+/* ═══════ Colormap Selection ═══════ */
+function selectColormap(module, value, btn) {
+    btn.parentElement.querySelectorAll('button').forEach(b => {
+        b.className = b.className.replace('border-black bg-black text-white', 'border thin-border').replace('bg-black text-white', '');
+        b.classList.add('hover:bg-slate-50');
+    });
+    btn.className = btn.className.replace('border thin-border', 'border-2 border-black');
+    if (!btn.className.includes('bg-black')) {
+        btn.classList.add('bg-black', 'text-white');
+    }
+    btn.classList.remove('hover:bg-slate-50');
+    if (module === 'alteration') {
+        document.getElementById('alteration_colormap').value = value;
+    }
+}
+
+/* ═══════ Alteration Charts ═══════ */
+let _alterChartInit = false;
+function initAlterationCharts() {
+    if (_alterChartInit) return;
+    _alterChartInit = true;
+    setTimeout(() => {
+        const el = document.getElementById('statChart');
+        if (!el) return;
+        const chart = echarts.init(el);
+        chart.setOption({
+            animation: false,
+            grid: { top:5, right:5, bottom:20, left:20 },
+            xAxis: { type:'category', data:['0','1','2','3','4','5'], axisLabel:{fontSize:8} },
+            yAxis: { type:'value', axisLabel:{fontSize:8}, splitLine:{show:false} },
+            series: [{ data:[120,200,150,80,70,110], type:'bar', itemStyle:{color:'#000'} }]
+        });
+    }, 200);
+}
+
+
+/* ═══════ Download ═══════ */
+function downloadResult(type) {
+    alert('导出功能将在后端就绪后启用');
+}
+
+/* ── 单张影像下载:把文件名片段拼成安全文件名 ── */
+function _safeName(s) {
+    return String(s == null ? '' : s).replace(/[^\w一-龥-]+/g, '_').replace(/^_+|_+$/g, '');
+}
+function _imgFileName(parts) {
+    return (parts || []).map(_safeName).filter(Boolean).join('_') + '.png';
+}
+
+/* 触发一个 data: URL 的下载 */
+function downloadDataUrl(dataUrl, filename) {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
+
+/* 渲染一张带"下载"角标的结果影像 (overlay 为 data:image/png;base64 串) */
+function imgCellHTML(dataUrl, nameParts, imgClass) {
+    if (!dataUrl) return '<div class="bg-slate-100 h-24 rounded"></div>';
+    const fname = _imgFileName(nameParts);
+    return `<div class="relative group">
+        <img src="${dataUrl}" class="${imgClass || 'w-full rounded'}" style="height:auto;display:block;max-width:100%;">
+        <a href="${dataUrl}" download="${fname}" title="下载 ${fname}" onclick="event.stopPropagation();"
+           class="absolute top-1 right-1 bg-white/85 hover:bg-white border thin-border rounded p-1 text-slate-700 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm leading-none">
+           <iconify-icon icon="lucide:download" class="text-[12px] align-middle"></iconify-icon>
+        </a>
+    </div>`;
+}
+
+/* 收集本次结果里所有单张影像 (各矿物 × 各卫星 × 各方法 + 综合判断) */
+function collectAllImages() {
+    const data = AlterState.lastBatchResult || {};
+    const proj = AlterState.projectName || 'project';
+    const out = [];
+    (data.grid || []).forEach(entry => {
+        const results = entry.results || {};
+        Object.keys(results).forEach(sensor => {
+            ['ratio', 'pca', 'band_depth'].forEach(method => {
+                const r = results[sensor][method];
+                if (r && r.overlay) {
+                    out.push({
+                        url: r.overlay,
+                        name: _imgFileName(['蚀变', proj, entry.mineral, sensor, method]),
+                    });
+                }
+            });
+        });
+    });
+    const comps = data.composites || {};
+    Object.keys(comps).forEach(sk => {
+        const c = comps[sk];
+        if (c.intersection_overlay) out.push({ url: c.intersection_overlay, name: _imgFileName(['蚀变交集', proj, sk]) });
+        if (c.score_overlay)        out.push({ url: c.score_overlay,        name: _imgFileName(['蚀变评分', proj, sk]) });
+    });
+    return out;
+}
+
+/* 顺序触发全部影像下载 (用小延迟规避浏览器对连续下载的拦截) */
+async function downloadAllImages() {
+    const data = AlterState.lastBatchResult || {};
+    const runId = data.saved && data.saved.run_id;
+    // 优先下载带坐标的 GeoTIFF 打包(可在 QGIS/ArcGIS 中作为栅格图层叠加)
+    if (runId) {
+        try {
+            pushAlterLog('正在打包带坐标的 GeoTIFF 结果…', 'text-slate-500');
+            const resp = await fetch('/api/download_run_rasters/' + runId);
+            if (!resp.ok) {
+                let msg = resp.status;
+                try { msg = (await resp.json()).error || msg; } catch (e) {}
+                throw new Error(msg);
+            }
+            const blob = await resp.blob();
+            const cd = resp.headers.get('Content-Disposition') || '';
+            const m = cd.match(/filename\*?=(?:UTF-8'')?["']?([^"';]+)/i);
+            const fname = (m && decodeURIComponent(m[1])) || (runId.split('/').pop() + '_GeoTIFF.zip');
+            const url = URL.createObjectURL(blob);
+            downloadDataUrl(url, fname);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            pushAlterLog('已下载带坐标的 GeoTIFF 压缩包: ' + fname, 'text-emerald-600');
+            return;
+        } catch (e) {
+            pushAlterLog('GeoTIFF 打包下载失败(' + e.message + '),改为下载预览图片', 'text-amber-600');
+        }
+    } else {
+        pushAlterLog('本次结果未落盘(无带坐标栅格),改为下载预览图片', 'text-amber-600');
+    }
+    // fallback: 旧行为,逐张下载无坐标的预览 PNG
+    const imgs = collectAllImages();
+    if (!imgs.length) { pushAlterLog('当前没有可下载的影像结果', 'text-amber-600'); return; }
+    for (const im of imgs) {
+        downloadDataUrl(im.url, im.name);
+        await new Promise(res => setTimeout(res, 300));
+    }
+    pushAlterLog(`已触发 ${imgs.length} 张影像下载`, 'text-emerald-600');
+}
+
+/* ═══════ Init ═══════ */
+(function init() {
+    const now = new Date();
+    document.getElementById('navDate').textContent =
+        now.getFullYear() + '年' + String(now.getMonth()+1).padStart(2,'0') + '月' + String(now.getDate()).padStart(2,'0') + '日';
+    showDashboard();
+})();
+</script>
+
+</body>
+</html>

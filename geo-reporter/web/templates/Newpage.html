@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>地质勘探综合报告生成平台 - Deep Explor OS</title>
+<script src="/static/tailwindcss.js"></script>
+<script src="/static/iconify-icon.min.js"></script>
+<style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f8f9fa;
+            color: #0f172a;
+        }
+        .sh-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+        }
+        .sh-input {
+            border: 1px solid #cbd5e1;
+            transition: all 0.2s ease;
+        }
+        .sh-input:focus {
+            outline: none;
+            border-color: #059669;
+            box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.1);
+        }
+        .progress-bar-fill {
+            transition: width 0.5s ease-in-out;
+        }
+        .animate-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+<!-- 导航栏 -->
+<nav class="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-slate-200">
+<div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-[#059669] rounded flex items-center justify-center shadow-sm">
+<svg fill="none" height="20" viewbox="0 0 24 24" width="20" xmlns="http://www.w3.org/2000/svg">
+<rect fill="white" fill-opacity="0.9" height="6" rx="1" width="6" x="4" y="4"></rect>
+<circle cx="17" cy="7" fill="white" fill-opacity="0.9" r="3"></circle>
+<path d="M10.5 20L15 13H6L10.5 20Z" fill="white" fill-opacity="0.9"></path>
+</svg>
+</div>
+<span class="text-xl font-bold tracking-tight text-[#059669]">Deep Explor OS</span>
+</div>
+<div class="flex items-center gap-6 text-sm font-medium text-slate-600">
+<a class="flex items-center gap-1 text-[#059669] hover:text-[#047857] transition-all" href="javascript:history.back()">
+<iconify-icon class="text-base" icon="lucide:arrow-left"></iconify-icon>
+<span>返回上一级</span>
+</a>
+</div>
+</div>
+</nav>
+<main class="max-w-4xl mx-auto px-4 py-12">
+<!-- 头部标题 -->
+<header class="text-center mb-12">
+<h1 class="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">地质勘探综合报告生成平台</h1>
+<p class="text-lg text-slate-500 max-w-2xl mx-auto">
+                上传地理文件，利用 AI 与权威地质数据库自动生成专业化的地质分析报告
+            </p>
+<div class="mt-6 flex justify-center gap-4 text-xs font-medium text-slate-400">
+<span class="flex items-center gap-1"><iconify-icon icon="lucide:check-circle"></iconify-icon> 当前日期：2026年05月11日</span>
+<span class="flex items-center gap-1"><iconify-icon icon="lucide:shield-check"></iconify-icon> 数据安全保障</span>
+</div>
+</header>
+<!-- 配置表单区域 -->
+<section class="sh-card p-8 mb-8">
+<div class="space-y-6">
+<!-- 文件上传 -->
+<div>
+<label class="block text-sm font-semibold text-slate-700 mb-2">选择地理文件</label>
+<div class="border-2 border-dashed border-slate-200 rounded-xl p-10 text-center hover:border-[#059669] hover:bg-emerald-50/30 transition-all cursor-pointer group" id="drop-zone">
+<input class="hidden" id="file-input" multiple="" type="file"/>
+<div class="flex flex-col items-center">
+<div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+<iconify-icon class="text-2xl text-slate-400 group-hover:text-[#059669]" icon="lucide:upload-cloud"></iconify-icon>
+</div>
+<p class="text-slate-600 font-medium">点击选择或拖拽文件</p>
+<p class="text-slate-400 text-xs mt-1">支持 KML / ovKML / KMZ / CSV / Excel (最大 50MB)</p>
+</div>
+<div class="mt-4 text-sm text-[#059669] font-medium hidden" id="file-name-display"></div>
+</div>
+</div>
+<!-- 矿种输入 -->
+<div>
+<label class="block text-sm font-semibold text-slate-700 mb-2" for="mineral">目标矿种 (可选)</label>
+<input class="w-full px-4 py-3 rounded-lg sh-input text-slate-900 placeholder:text-slate-400" id="mineral" placeholder="例如：锂矿、金矿、铜精矿..." type="text"/>
+<p class="text-xs text-slate-400 mt-2 italic">填写后，报告将自动整合该矿种的全球分布规律与勘探模型分析。</p>
+</div>
+<!-- 操作按钮 -->
+<div class="flex flex-col sm:flex-row gap-3 pt-4">
+<button class="flex-1 bg-[#059669] hover:bg-[#047857] text-white font-semibold py-3 px-6 rounded-lg shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2 active:scale-[0.98]" onclick="startGeneration()">
+<iconify-icon icon="lucide:file-text"></iconify-icon>
+                        上传并生成报告
+                    </button>
+<button class="px-6 py-3 rounded-lg border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition-colors flex items-center justify-center gap-2" onclick="resetAll()">
+<iconify-icon icon="lucide:rotate-ccw"></iconify-icon>
+                        重置
+                    </button>
+</div>
+</div>
+</section>
+<!-- 进度展示区 (默认隐藏) -->
+<section class="sh-card p-8 mb-8 hidden animate-in" id="progress-section">
+<div class="flex items-center justify-between mb-6">
+<div>
+<h3 class="font-bold text-slate-900">数据分析进度</h3>
+<p class="text-xs text-slate-500 mt-1">正在连接云端地质数据库并执行空间分析...</p>
+</div>
+<div class="text-right">
+<span class="text-2xl font-bold text-[#059669]" id="progress-counter">0</span>
+<span class="text-slate-400 text-sm font-medium">/ 8 环节</span>
+</div>
+</div>
+<!-- 进度条 -->
+<div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden mb-8">
+<div class="progress-bar-fill bg-[#059669] h-full w-0" id="progress-bar"></div>
+</div>
+<!-- 详细步骤列表 -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="steps-list">
+<!-- 步骤项动态生成 -->
+</div>
+</section>
+<!-- 成功状态区 (默认隐藏) -->
+<section class="sh-card p-8 border-green-100 bg-green-50/30 hidden animate-in" id="success-section">
+<div class="flex flex-col items-center text-center">
+<div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+<iconify-icon class="text-3xl text-green-600" icon="lucide:check"></iconify-icon>
+</div>
+<h3 class="text-xl font-bold text-slate-900 mb-2">报告生成成功！</h3>
+<p class="text-slate-500 mb-8 max-w-md text-sm">您的综合地质勘探报告已完成 AI 整合与格式化，现可下载 Word 文档或 PPT 演示文稿。</p>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
+<a class="flex items-center justify-center gap-3 bg-white border border-slate-200 p-4 rounded-xl hover:shadow-md transition-all group" href="javascript:void(0)" onclick="alert('正在准备 Word 报告下载...')">
+<div class="p-2 bg-emerald-50 rounded-lg group-hover:bg-emerald-100">
+<iconify-icon class="text-2xl text-[#059669]" icon="lucide:file-text"></iconify-icon>
+</div>
+<div class="text-left">
+<div class="text-sm font-bold text-slate-900">下载 Word 报告</div>
+<div class="text-[10px] text-slate-400 uppercase tracking-wider">DOCX (2.4 MB)</div>
+</div>
+</a>
+<a class="flex items-center justify-center gap-3 bg-white border border-slate-200 p-4 rounded-xl hover:shadow-md transition-all group" href="javascript:void(0)" onclick="alert('正在准备 PPT 报告下载...')">
+<div class="p-2 bg-orange-50 rounded-lg group-hover:bg-orange-100">
+<iconify-icon class="text-2xl text-orange-600" icon="lucide:presentation"></iconify-icon>
+</div>
+<div class="text-left">
+<div class="text-sm font-bold text-slate-900">下载 PPT 演示</div>
+<div class="text-[10px] text-slate-400 uppercase tracking-wider">PPTX (8.7 MB)</div>
+</div>
+</a>
+</div>
+</div>
+</section>
+<!-- 平台页脚 -->
+<footer class="mt-20 pb-12 text-center text-slate-400 text-sm">
+<p>© 2026 Deep Explor OS 深层探索（北京）科技有限公司. 保留所有权利。</p>
+</footer>
+</main>
+<script>
+        const stepsData = [
+            "解析上传文件与地理坐标系统",
+            "连接区域地质数据库匹配层位",
+            "检索构造单元与断裂带数据",
+            "分析成矿潜力及地球物理特征",
+            "提取高精度地形地貌三维数据",
+            "搜集周边历史勘探记录与化验数据",
+            "AI 深度模型生成勘探建议建议",
+            "渲染文档格式并生成导出文件"
+        ];
+
+        let currentStep = 0;
+        let isGenerating = false;
+
+        // 初始化步骤列表
+        function initSteps() {
+            const list = document.getElementById('steps-list');
+            list.innerHTML = '';
+            stepsData.forEach((step, index) => {
+                const div = document.createElement('div');
+                div.className = `flex items-center gap-3 p-3 rounded-lg border border-slate-100 bg-slate-50/50 transition-all opacity-50`;
+                div.id = `step-item-${index}`;
+                div.innerHTML = `
+                    <div id="step-icon-${index}" class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500">
+                        ${index + 1}
+                    </div>
+                    <span class="text-sm text-slate-600">${step}</span>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        // 模拟生成过程
+        function startGeneration() {
+            if (isGenerating) return;
+            
+            // 简单校验
+            const mineral = document.getElementById('mineral').value;
+            
+            isGenerating = true;
+            document.getElementById('progress-section').classList.remove('hidden');
+            document.getElementById('success-section').classList.add('hidden');
+            initSteps();
+            currentStep = 0;
+            updateProgress();
+
+            const interval = setInterval(() => {
+                if (currentStep < stepsData.length) {
+                    completeStep(currentStep);
+                    currentStep++;
+                    updateProgress();
+                } else {
+                    clearInterval(interval);
+                    isGenerating = false;
+                    document.getElementById('success-section').classList.remove('hidden');
+                    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                }
+            }, 800);
+        }
+
+        function completeStep(index) {
+            const item = document.getElementById(`step-item-${index}`);
+            const icon = document.getElementById(`step-icon-${index}`);
+            item.classList.remove('opacity-50', 'bg-slate-50/50');
+            item.classList.add('bg-emerald-50', 'border-emerald-100');
+            icon.classList.remove('bg-slate-200', 'text-slate-500');
+            icon.classList.add('bg-[#059669]', 'text-white');
+            icon.innerHTML = '<iconify-icon icon="lucide:check" class="text-xs"></iconify-icon>';
+        }
+
+        function updateProgress() {
+            const percentage = (currentStep / stepsData.length) * 100;
+            document.getElementById('progress-bar').style.width = `${percentage}%`;
+            document.getElementById('progress-counter').innerText = currentStep;
+        }
+
+        function resetAll() {
+            document.getElementById('mineral').value = '';
+            document.getElementById('file-name-display').innerText = '';
+            document.getElementById('file-name-display').classList.add('hidden');
+            document.getElementById('progress-section').classList.add('hidden');
+            document.getElementById('success-section').classList.add('hidden');
+            currentStep = 0;
+            isGenerating = false;
+        }
+
+        // 文件拖拽交互
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const fileNameDisplay = document.getElementById('file-name-display');
+
+        dropZone.onclick = () => fileInput.click();
+
+        fileInput.onchange = (e) => {
+            if (e.target.files.length > 0) {
+                const names = Array.from(e.target.files).map(f => f.name).join(', ');
+                fileNameDisplay.innerText = `已选择: ${names}`;
+                fileNameDisplay.classList.remove('hidden');
+            }
+        };
+
+        dropZone.ondragover = (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-[#059669]', 'bg-emerald-50/50');
+        };
+
+        dropZone.ondragleave = () => {
+            dropZone.classList.remove('border-[#059669]', 'bg-emerald-50/50');
+        };
+
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-[#059669]', 'bg-emerald-50/50');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                const names = Array.from(e.dataTransfer.files).map(f => f.name).join(', ');
+                fileNameDisplay.innerText = `已选择: ${names}`;
+                fileNameDisplay.classList.remove('hidden');
+            }
+        };
+
+        // 初始化
+        initSteps();
+    </script>
+</body>
+</html>

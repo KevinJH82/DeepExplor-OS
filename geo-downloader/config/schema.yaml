@@ -1,0 +1,132 @@
+seasons:
+  summer:
+  - 6
+  - 7
+  - 8
+  winter:
+  - 11
+  - 12
+  - 1
+  - 2
+  - 3
+  season_summer_label: data-矿权-夏季（6-8月）
+  season_winter_label: data-矿权-冬季（11-3月）
+sensors:
+- id: sentinel2
+  label: Sentinel 2 L2
+  raw_dir: sentinel2
+  seasons:
+  - summer
+  - winter
+  files:
+  - B01.tiff
+  - B02.tiff
+  - B03.tiff
+  - B04.tiff
+  - B05.tiff
+  - B06.tiff
+  - B07.tiff
+  - B08.tiff
+  - B8A.tiff
+  - B09.tiff
+  - B10.tiff
+  - B11.tiff
+  - B12.tiff
+- id: landsat
+  label: Landsat 8 L2
+  raw_dir: landsat
+  seasons:
+  - summer
+  - winter
+  files:
+  - B1.tif
+  - B2.tif
+  - B3.tif
+  - B4.tif
+  - B5.tif
+  - B6.tif
+  - B7.tif
+  - B10.tif
+  - B11.tif
+- id: landsat7
+  label: Landsat 7 ETM+
+  raw_dir: landsat7
+  seasons:
+  - summer
+  - winter
+  files:
+  - B1.tif
+  - B2.tif
+  - B3.tif
+  - B4.tif
+  - B5.tif
+  - B6.tif
+  - B7.tif
+  - B8.tif
+- id: aster
+  label: ASTER L2
+  raw_dir: aster
+  seasons:
+  - summer
+  - winter
+  files:
+  - B1.tif
+  - B2.tif
+  - B3N.tif
+  - B4.tif
+  - B5.tif
+  - B6.tif
+  - B7.tif
+  - B8.tif
+  - B9.tif
+  - B10.tif
+  - B11.tif
+  - B12.tif
+  - B13.tif
+  - B14.tif
+- id: aster_l1t
+  label: ASTER L1T
+  raw_dir: aster_l1t
+  seasons:
+  - summer
+  - winter
+  files:
+  - B1.tif
+  - B2.tif
+  - B3N.tif
+  - B10.tif
+  - B11.tif
+  - B12.tif
+  - B13.tif
+  - B14.tif
+- id: ecostress
+  label: 地表温度
+  raw_dir: ecostress
+  seasons:
+  - summer
+  - winter
+  files:
+  - 地表温度.tif
+- id: sentinel1
+  label: Sentinel-1 GRD
+  raw_dir: sentinel1
+  seasons:
+  - summer
+  - winter
+  files:
+  - VV.tif
+  - VH.tif
+- id: alos
+  label: ALOS PALSAR
+  raw_dir: alos
+  seasons:
+  - summer
+  - winter
+  files: []
+- id: alos2
+  label: ALOS-2 PALSAR-2
+  raw_dir: alos2
+  seasons:
+  - summer
+  - winter
+  files: []

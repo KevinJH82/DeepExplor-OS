@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>geo-drill · 钻探验证与布孔闭环</title>
+  <style>
+    body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+           background:#0f1419; color:#e6e6e6; margin:0; padding:24px; }
+    .wrap { max-width:880px; margin:0 auto; }
+    h1 { font-size:20px; } .sub { color:#8a94a6; font-size:13px; margin-top:-6px; }
+    .card { background:#1a212b; border:1px solid #2a3340; border-radius:10px; padding:18px; margin-top:16px; }
+    label { display:block; font-size:13px; color:#aab4c4; margin:10px 0 4px; }
+    input, select { width:100%; box-sizing:border-box; padding:8px 10px; border-radius:6px;
+                    border:1px solid #2a3340; background:#0f1419; color:#e6e6e6; }
+    .hint { font-size:12px; color:#6b7686; margin-top:4px; }
+    .row { display:flex; gap:14px; } .row > div { flex:1; }
+    button { margin-top:16px; padding:10px 18px; border:0; border-radius:8px; background:#2f81f7;
+             color:#fff; font-size:14px; cursor:pointer; }
+    button:disabled { background:#3a4250; cursor:not-allowed; }
+    pre { background:#0b0f14; border:1px solid #222b36; border-radius:8px; padding:12px;
+          font-size:12px; max-height:280px; overflow:auto; white-space:pre-wrap; }
+    a { color:#6cb6ff; }
+    details > summary { cursor:pointer; color:#6cb6ff; font-size:13px; margin-top:8px; }
+    .fig { width:100%; border:1px solid #2a3340; border-radius:8px; margin-top:10px; display:block; }
+    .v3d { width:100%; height:460px; border:1px solid #2a3340; border-radius:8px; margin-top:10px; background:#0b1020; }
+    .sec { font-size:13px; color:#aab4c4; margin:14px 0 4px; font-weight:600; }
+    table { width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; }
+    th,td { border:1px solid #2a3340; padding:4px 7px; text-align:right; }
+    th { background:#222b36; color:#aab4c4; } td:nth-child(2){ text-align:left; }
+    .pA{color:#48d39a;font-weight:600} .pB{color:#f0c674} .pC{color:#8a94a6}
+    .plain { background:#10261f; border:1px solid #1f5f49; border-radius:8px; padding:8px 12px; margin-top:8px; font-size:13px; line-height:1.7; }
+    .dl { display:inline-block; font-size:13px; padding:6px 11px; margin:8px 6px 0 0; border:1px solid #2a3340;
+          border-radius:6px; background:#0f1419; color:#6cb6ff; text-decoration:none; }
+    .dl.primary { background:#2f81f7; color:#fff; border-color:#2f81f7; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>geo-drill · 钻探验证与布孔闭环</h1>
+  <p class="sub">在 geo-model3d 三维有利度上 AI 辅助布孔 · 见矿判定 · 回灌闭环 · 端口 8089</p>
+
+  <div class="card">
+    <form id="f">
+      <label>研究区文件（.kml / .kmz，必填）</label>
+      <input type="file" name="file" accept=".kml,.kmz,.ovkml" required>
+      <div class="hint">需该研究区先在 geo-model3d 出过三维有利度产物，否则不布孔。</div>
+
+      <div class="row">
+        <div>
+          <label>目标矿种</label>
+          <select name="mineral">{% for m in minerals %}<option value="{{ m }}">{{ m }}</option>{% endfor %}</select>
+        </div>
+        <div>
+          <label>研究区名称（可选）</label>
+          <input type="text" name="aoi_name" placeholder="缺省取文件名">
+        </div>
+      </div>
+
+      <details>
+        <summary>⚙ 布孔参数 / 岩芯编录回灌（可选）</summary>
+        <div class="row">
+          <div><label>布孔模式</label>
+            <select name="siting_mode">
+              <option value="voi">VOI 期望信息增益（P2，默认）</option>
+              <option value="greedy">线性贪心（P1）</option>
+            </select></div>
+          <div><label>斜孔</label>
+            <select name="allow_incline">
+              <option value="1">允许斜孔（按有利度优化方位/倾角）</option>
+              <option value="0">仅竖直孔</option>
+            </select></div>
+        </div>
+        <div class="row">
+          <div><label>布孔数 top_n</label><input type="number" name="top_n" placeholder="20"></div>
+          <div><label>最小孔距(米)</label><input type="number" name="min_sep_m" placeholder="200"></div>
+          <div><label>截止品位 cutoff</label><input type="number" step="any" name="cutoff" placeholder="见矿判定阈值"></div>
+        </div>
+        <label>钻孔编录 — 孔位 collar CSV（hole_id,lon,lat）</label>
+        <input type="file" name="collar" accept=".csv,.txt">
+        <label>区间 intervals CSV（hole_id,from,to,元素品位列…）</label>
+        <input type="file" name="intervals" accept=".csv,.txt">
+        <div class="row">
+          <div><label>SWIR 数字岩芯（depth,mineral）</label><input type="file" name="swir" accept=".csv,.txt"></div>
+          <div><label>XRF 数字岩芯（depth,元素品位）</label><input type="file" name="xrf" accept=".csv,.txt"></div>
+        </div>
+        <div class="hint">上传编录/SWIR/XRF 后自动判见矿/无矿并产出 drill_feedback，可一键回灌 geo-model3d。</div>
+      </details>
+
+      <button type="submit" id="btn">开始布孔</button>
+    </form>
+  </div>
+
+  <div class="card" id="out" style="display:none">
+    <div id="status">…</div>
+    <pre id="logs"></pre>
+    <div id="result"></div>
+  </div>
+</div>
+
+<script>
+const f=document.getElementById('f'),btn=document.getElementById('btn');
+const out=document.getElementById('out'),st=document.getElementById('status'),
+      logs=document.getElementById('logs'),resultBox=document.getElementById('result');
+let timer=null,tid=null;
+
+f.addEventListener('submit',async(e)=>{
+  e.preventDefault(); btn.disabled=true; out.style.display='block'; resultBox.innerHTML='';
+  st.textContent='提交中…';
+  try{
+    const r=await fetch('/api/start',{method:'POST',body:new FormData(f)});
+    const j=await r.json();
+    if(!j.success){st.textContent='失败：'+j.message;btn.disabled=false;return;}
+    tid=j.task_id; st.textContent='任务 '+tid+' 运行中…'; timer=setInterval(poll,1500);
+  }catch(err){st.textContent='错误：'+err;btn.disabled=false;}
+});
+
+async function poll(){
+  const r=await fetch('/api/status/'+tid); const j=await r.json(); if(!j.success)return;
+  const t=j.task; logs.textContent=(t.logs||[]).join('\n');
+  st.textContent='状态：'+t.status+'（'+(t.progress||0)+'%）';
+  if(t.status==='completed'||t.status==='failed'){
+    clearInterval(timer); btn.disabled=false;
+    if(t.status==='completed'&&t.results) showResult(t.results);
+  }
+}
+
+const R = (f) => '/api/result/' + tid + '/' + f;
+
+async function showResult(res){
+  const p=res.products||{}, ms=res.model_stats||{};
+  let html='';
+  // 通俗解读
+  if((ms.plain_summary||[]).length){
+    html+='<div class="plain">'+ms.plain_summary.map(s=>'• '+s).join('<br>')+'</div>';
+  }
+  // 三维交互查看器（内嵌 iframe）+ 全屏
+  if(p.viewer_3d_html){
+    html+='<div class="sec">三维布孔交互视图（拖拽旋转 · 滚轮缩放）</div>';
+    html+='<iframe class="v3d" src="'+R(p.viewer_3d_html)+'"></iframe>';
+    html+='<a class="dl" href="'+R(p.viewer_3d_html)+'" target="_blank">⛶ 全屏打开 3D</a>';
+  }
+  // 静态图（始终可见）：3D + 2D
+  if(p.siting_3d_png) html+='<div class="sec">三维布孔效果图</div><img class="fig" src="'+R(p.siting_3d_png)+'">';
+  for(const f of (p.figures||[])) if(!p.siting_3d_png || f!==p.siting_3d_png)
+    html+='<img class="fig" src="'+R(f)+'">';
+  // 钻孔信息一览表（PNG，配合三维图对照查看）
+  if(p.holes_table_png) html+='<div class="sec">钻孔信息一览表</div><img class="fig" src="'+R(p.holes_table_png)+'">';
+  // 计划孔表
+  try{
+    const r=await fetch(R(p.planned_holes)); const fc=await r.json();
+    const hs=(fc.features||[]).map(x=>({...x.properties,
+      lon:(x.geometry&&x.geometry.coordinates)?x.geometry.coordinates[0]:undefined,
+      lat:(x.geometry&&x.geometry.coordinates)?x.geometry.coordinates[1]:undefined}));
+    if(hs.length){
+      html+='<div class="sec">AI 计划孔（共 '+hs.length+'）</div>';
+      html+='<table><tr><th>#</th><th>孔号</th><th>经度</th><th>纬度</th><th>目标深度(m)</th>'
+           +'<th>方位角(°)</th><th>倾角(°)</th><th>预测得分</th><th>不确定性</th><th>优先级</th></tr>';
+      for(const h of hs)
+        html+='<tr><td>'+h.rank+'</td><td>'+h.hole_id+'</td>'
+              +'<td>'+(h.lon!==undefined?h.lon.toFixed(6):'')+'</td>'
+              +'<td>'+(h.lat!==undefined?h.lat.toFixed(6):'')+'</td>'
+              +'<td>'+h.target_depth_m+'</td>'
+              +'<td>'+Math.round(h.azimuth_deg)+'</td><td>'+Math.round(h.dip_deg)+'</td>'
+              +'<td>'+h.score+'</td><td>'+h.uncertainty+'</td>'
+              +'<td class="p'+h.priority+'">'+h.priority+'</td></tr>';
+      html+='</table>';
+    }
+  }catch(e){}
+  // 下载 + 闭环
+  html+='<div style="margin-top:12px">';
+  html+='<a class="dl" href="/api/download/'+tid+'">⬇ 下载全部 (zip)</a>';
+  if(p.holes_table_csv) html+='<a class="dl" href="'+R(p.holes_table_csv)+'" target="_blank">⬇ 钻孔信息表 (csv)</a>';
+  if(p.drill_feedback) html+='<a class="dl" href="'+R(p.drill_feedback)+'" target="_blank">drill_feedback.geojson</a>';
+  if(res.drill_feedback_path)
+    html+='<a class="dl primary" href="javascript:void(0)" onclick="chain()">↻ 回灌 geo-model3d 重算（闭环）</a>';
+  html+='</div>';
+  resultBox.innerHTML=html;
+}
+
+async function chain(){
+  st.textContent='回灌 geo-model3d 中…';
+  const r=await fetch('/api/chain/'+tid,{method:'POST'}); const j=await r.json();
+  st.textContent=j.success?('已回灌：model3d 任务 '+j.model3d_task_id+'（完成后有利度更新，可再来布孔）'):('回灌失败：'+j.message);
+}
+</script>
+</body>
+</html>

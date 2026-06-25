@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>交付整理 - DeepSearch Downloader</title>
+<script src="https://modao.cc/agent-py/static/source/js/tailwindcss.js"></script>
+<script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.js"></script>
+<script src="/static/notif.js" defer></script>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #fafafa; }
+        .sh-card { background: white; border: 1px solid #e4e4e7; border-radius: 0.5rem; }
+        .sh-input { border: 1px solid #e4e4e7; border-radius: 0.375rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; width: 100%; }
+        .nav-item-active { background-color: #f4f4f5; color: #18181b; font-weight: 600; }
+    </style>
+</head>
+<body class="min-h-screen">
+<!-- 侧边导航 -->
+<aside class="fixed left-0 top-0 h-screen w-64 border-r bg-white z-50">
+<div class="flex flex-col h-full">
+<div class="p-6">
+<div class="flex items-center gap-2 mb-8">
+<div class="bg-blue-600 text-white p-1.5 rounded-lg">
+<iconify-icon class="text-xl" icon="lucide:satellite"></iconify-icon>
+</div>
+<span class="font-bold text-lg tracking-tight uppercase">Deep-Explor</span>
+</div>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-md text-zinc-500 hover:bg-zinc-100 transition-colors" href="index.html">
+<iconify-icon icon="lucide:layers"></iconify-icon>
+<span class="text-sm">任务控制台</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md text-zinc-500 hover:bg-zinc-100 transition-colors" href="architecture.html">
+<iconify-icon icon="lucide:database"></iconify-icon>
+<span class="text-sm">架构设置</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md nav-item-active" href="delivery.html">
+<iconify-icon icon="lucide:package-check"></iconify-icon>
+<span class="text-sm">交付整理</span>
+</a>
+</nav>
+</div>
+</div>
+</aside>
+<!-- 主内容区 -->
+<main class="ml-64 p-8">
+<header class="flex items-center justify-between mb-8">
+<div>
+<h1 class="text-2xl font-bold text-zinc-900 tracking-tight">整理交付文件</h1>
+<p class="text-zinc-500 text-sm mt-1">将下载好的原始数据按照预定义架构进行重命名、归档和元数据生成。</p>
+</div>
+<div class="flex items-center gap-3">
+<a href="http://192.168.112.18/2nd%20Page/index.html" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors" title="返回二级子系统登陆页面">
+<iconify-icon icon="lucide:arrow-left"></iconify-icon>
+<span>返回上一级</span>
+</a>
+<div class="relative" id="notifWrap">
+<button id="notifBell" type="button" class="relative p-2 rounded-md hover:bg-zinc-100 transition-colors" title="消息中心">
+<iconify-icon icon="lucide:bell" class="text-zinc-600 text-lg"></iconify-icon>
+<span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 bg-red-500 text-white text-[10px] leading-4 text-center rounded-full font-medium">0</span>
+</button>
+<div id="notifPanel" class="hidden absolute right-0 top-full mt-2 w-96 max-h-[28rem] bg-white border border-zinc-200 rounded-lg shadow-lg z-50 flex flex-col">
+<div class="flex items-center justify-between px-4 py-2.5 border-b text-sm">
+<span class="font-semibold text-zinc-900">消息中心 <span id="notifPanelUnread" class="text-zinc-500 font-normal"></span></span>
+<button id="notifReadAllBtn" type="button" class="text-blue-600 hover:underline text-xs">全部已读</button>
+</div>
+<div id="notifList" class="flex-1 overflow-y-auto p-1">
+<div id="notifEmpty" class="text-center text-xs text-zinc-400 py-6">暂无消息</div>
+</div>
+<div class="px-4 py-2 border-t flex justify-end">
+<button id="notifClearReadBtn" type="button" class="text-xs text-zinc-500 hover:text-zinc-800">清空已读</button>
+</div>
+</div>
+</div>
+</div>
+</header>
+<div class="max-w-3xl">
+<section class="sh-card p-8 space-y-8">
+<div class="grid grid-cols-2 gap-6">
+<div class="col-span-2">
+<label class="text-xs font-bold text-zinc-500 uppercase mb-2 block">选择已下载区域</label>
+<div class="flex gap-2">
+<select class="sh-input bg-zinc-50">
+<option>South_China_Project_A1 (2026-05-11)</option>
+<option>Himalaya_Grid_B5 (2026-04-22)</option>
+<option>Coastal_Survey_V2 (2026-03-15)</option>
+</select>
+<button class="px-3 border rounded-md hover:bg-zinc-50">
+<iconify-icon class="mt-1" icon="lucide:refresh-ccw"></iconify-icon>
+</button>
+</div>
+</div>
+<div class="col-span-2">
+<label class="text-xs font-bold text-zinc-500 uppercase mb-2 block">KML 文件路径 (可留空)</label>
+<input class="sh-input" placeholder="使用任务默认 KML..." type="text"/>
+</div>
+<div>
+<label class="text-xs font-bold text-zinc-500 uppercase mb-2 block">交付目标根目录</label>
+<input class="sh-input" type="text" value="Z:\Final_Delivery\2026_05_Task"/>
+</div>
+<div>
+<label class="text-xs font-bold text-zinc-500 uppercase mb-2 block">下载输出缓存目录</label>
+<input class="sh-input" type="text" value="E:\Cache\Satellite"/>
+</div>
+<div class="col-span-2 pt-4">
+<label class="text-xs font-bold text-zinc-500 uppercase mb-4 block">功能设置</label>
+<div class="grid grid-cols-1 gap-3">
+<!-- 选项 1 -->
+<div class="flex items-center justify-between p-4 border border-zinc-100 rounded-lg bg-zinc-50/30">
+<div class="space-y-0.5">
+<h4 class="text-sm font-medium text-zinc-900">裁剪到 KML 范围</h4>
+<p class="text-xs text-zinc-500">下载后自动裁剪，减少存储占用</p>
+</div>
+<button aria-checked="true" class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none bg-blue-600" data-state="checked" onclick="toggleSwitch(this)" role="switch" type="button">
+<span class="pointer-events-none block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform translate-x-4"></span>
+</button>
+</div>
+<!-- 选项 2 -->
+<div class="flex items-center justify-between p-4 border border-zinc-100 rounded-lg bg-zinc-50/30">
+<div class="space-y-0.5">
+<h4 class="text-sm font-medium text-zinc-900">计算衍生产品</h4>
+<p class="text-xs text-zinc-500">地表温度 / 温度梯度 / 温度异常梯度 / OTCI</p>
+</div>
+<button aria-checked="false" class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none bg-zinc-200" data-state="unchecked" onclick="toggleSwitch(this)" role="switch" type="button">
+<span class="pointer-events-none block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform translate-x-0"></span>
+</button>
+</div>
+<!-- 选项 3 -->
+<div class="flex items-center justify-between p-4 border border-zinc-100 rounded-lg bg-zinc-50/30">
+<div class="space-y-0.5">
+<h4 class="text-sm font-medium text-zinc-900">打包标准交付目录</h4>
+<p class="text-xs text-zinc-500">按标准文件架构整理，保留原始下载数据</p>
+</div>
+<button aria-checked="true" class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:outline-none bg-blue-600" data-state="checked" onclick="toggleSwitch(this)" role="switch" type="button">
+<span class="pointer-events-none block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform translate-x-4"></span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<div class="p-6 bg-blue-50 rounded-lg border border-blue-100">
+<h5 class="text-sm font-bold text-blue-900 flex items-center gap-2 mb-2">
+<iconify-icon icon="lucide:info"></iconify-icon>
+                        整理逻辑说明
+                    </h5>
+<ul class="text-xs text-blue-700 space-y-2 list-disc list-inside">
+<li>根据 <span class="font-mono bg-white px-1 rounded">architecture.json</span> 中的正则表达式筛选文件。</li>
+<li>自动创建符合 ISO 标准的子目录结构。</li>
+<li>生成每个传感器的覆盖率报表 (PDF/JSON)。</li>
+</ul>
+</div>
+<div class="flex items-center justify-between pt-6 border-t">
+<div class="flex items-center gap-2 text-zinc-400">
+<iconify-icon icon="lucide:clock-3"></iconify-icon>
+<span class="text-xs">预计处理时间: ~4 分钟</span>
+</div>
+<div class="flex gap-3">
+<button class="px-6 py-2 border rounded-md text-sm font-medium hover:bg-zinc-50">取消</button>
+<button class="bg-blue-600 text-white px-8 py-2 rounded-md text-sm font-medium hover:bg-blue-700 shadow-md flex items-center gap-2">
+<iconify-icon icon="lucide:check-circle"></iconify-icon>
+                            立即开始整理
+                        </button>
+</div>
+</div>
+</section>
+</div>
+</main>
+<script>
+        function toggleSwitch(btn) {
+            const isChecked = btn.getAttribute('data-state') === 'checked';
+            const newState = isChecked ? 'unchecked' : 'checked';
+            const span = btn.querySelector('span');
+            
+            btn.setAttribute('data-state', newState);
+            btn.setAttribute('aria-checked', !isChecked);
+            
+            if (newState === 'checked') {
+                btn.classList.replace('bg-zinc-200', 'bg-blue-600');
+                span.classList.replace('translate-x-0', 'translate-x-4');
+            } else {
+                btn.classList.replace('bg-blue-600', 'bg-zinc-200');
+                span.classList.replace('translate-x-4', 'translate-x-0');
+            }
+        }
+    </script>
+</body>
+</html>

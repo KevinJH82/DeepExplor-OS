@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>三维地质建模与立体成矿预测 · geo-model3d</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+         color: #1e293b; background: #f7f9fb; margin: 0; padding: 24px; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  h1 { font-size: 22px; border-bottom: 3px solid #2563eb; padding-bottom: 10px; }
+  .sub { color: #64748b; font-size: 13px; margin-top: -6px; }
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; margin: 16px 0; }
+  label { font-size: 13px; font-weight: 600; display: block; margin: 10px 0 4px; }
+  input, select { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 180px; }
+  button { background: #2563eb; color: #fff; border: 0; border-radius: 7px; padding: 10px 22px;
+           font-size: 15px; cursor: pointer; margin-top: 14px; }
+  button:disabled { background: #94a3b8; cursor: not-allowed; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 6px; font-size: 12px;
+        max-height: 260px; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  th, td { border: 1px solid #e2e8f0; padding: 6px 8px; text-align: left; }
+  th { background: #f1f5f9; }
+  .imgs img { max-width: 300px; border: 1px solid #e2e8f0; border-radius: 6px; margin: 6px; }
+  .warn { background: #fef3c7; border: 1px solid #f59e0b; color: #92400e; padding: 8px 12px;
+          border-radius: 6px; font-size: 13px; margin-top: 8px; }
+  .muted { color: #64748b; font-size: 12px; }
+  .dlbtn { display: inline-block; font-size: 13px; padding: 7px 12px; margin: 4px 6px 4px 0;
+           border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; color: #1d4ed8;
+           text-decoration: none; }
+  .dlbtn:hover { background: #f1f5f9; }
+  .dlbtn.primary { background: #2563eb; color: #fff; border-color: #2563eb; font-weight: 600; }
+  .dlbtn.primary:hover { background: #1d4ed8; }
+  .slicegrid { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .slicelink { display: inline-block; font-size: 12px; padding: 5px 9px; border: 1px solid #cbd5e1;
+               border-radius: 5px; background: #f8fafc; color: #0f172a; text-decoration: none; min-width: 56px; text-align: center; }
+  .slicelink:hover { background: #dbeafe; border-color: #2563eb; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>三维地质建模与立体成矿预测 (geo-model3d)</h1>
+  <div class="sub">上传研究区 KML/KMZ + 选矿种 → 自动汇聚上游蚀变/构造/深度证据 → 三维成矿有利度体 + 不确定性 + 三维靶点</div>
+
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>研究区文件 (.kml / .kmz)</label>
+        <input type="file" id="file" accept=".kml,.kmz,.ovkml">
+      </div>
+      <div>
+        <label>矿种</label>
+        <select id="mineral">
+          {% for m in minerals %}<option value="{{m}}">{{m}}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div><label>最大深度 (m)</label><input type="number" id="z_max_m" value="2000"></div>
+      <div><label>深度步长 (m)</label><input type="number" id="dz_m" value="100"></div>
+      <div><label>水平分辨率 (m)</label><input type="number" id="res_m" value="30"></div>
+      <div><label>靶点数</label><input type="number" id="top_n" value="20"></div>
+      <div><label>融合方法</label>
+        <select id="fusion_method">
+          <option value="knowledge">知识加权（默认）</option>
+          <option value="fuzzy">模糊 γ 算子</option>
+          <option value="bayesian">贝叶斯后验</option>
+        </select>
+      </div>
+    </div>
+    <button id="run">开始建模</button>
+    <div class="muted" style="margin-top:8px">P1：深度维为知识驱动“软推断”（成矿模型深度带），非物探/钻孔反演；无地下约束区不确定性偏高。</div>
+  </div>
+
+  <div class="card" id="statusCard" style="display:none">
+    <b>任务状态：</b><span id="status"></span> &nbsp; <span id="progress"></span>
+    <pre id="logs"></pre>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <h3>结果</h3>
+    <div id="downloads" style="margin-bottom:12px"></div>
+    <div id="warns"></div>
+    <div id="summary"></div>
+    <h4>三维靶点</h4>
+    <div id="targets"></div>
+    <h4>深度切片 GeoTIFF（逐层下载）</h4>
+    <div id="sliceLinks" class="slicegrid"></div>
+    <h4>深度切片 / 剖面预览</h4>
+    <div class="imgs" id="figs"></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let timer = null;
+
+$('#run').onclick = async () => {
+  const f = $('#file').files[0];
+  if (!f) { alert('请选择区域文件'); return; }
+  const fd = new FormData();
+  fd.append('file', f);
+  fd.append('mineral', $('#mineral').value);
+  fd.append('fusion_method', $('#fusion_method').value);
+  for (const k of ['z_max_m','dz_m','res_m','top_n']) fd.append(k, $('#'+k).value);
+  $('#run').disabled = true;
+  $('#statusCard').style.display = 'block';
+  $('#resultCard').style.display = 'none';
+  $('#status').textContent = '提交中…';
+  const r = await fetch('/api/start', {method:'POST', body: fd});
+  const j = await r.json();
+  if (!j.success) { alert(j.message); $('#run').disabled = false; return; }
+  poll(j.task_id);
+};
+
+function poll(tid) {
+  timer = setInterval(async () => {
+    const r = await fetch('/api/status/'+tid);
+    const j = await r.json();
+    if (!j.success) return;
+    const t = j.task;
+    $('#status').textContent = t.status;
+    $('#progress').textContent = (t.progress||0)+'%';
+    $('#logs').textContent = (t.logs||[]).join('\n');
+    if (t.status === 'completed') { clearInterval(timer); $('#run').disabled = false; showResult(tid, t); }
+    if (t.status === 'failed') { clearInterval(timer); $('#run').disabled = false; }
+  }, 1200);
+}
+
+function showResult(tid, t) {
+  const res = t.results; const ms = res.model_stats;
+  $('#resultCard').style.display = 'block';
+
+  // 下载区：整包 ZIP + 关键单文件
+  const p = res.products || {};
+  const dl = (path, label) => `<a class="dlbtn" href="/api/result/${tid}/${path}?download=1" download>${label}</a>`;
+  let html = `<button class="dlbtn primary" onclick="downloadZip('${tid}')">⬇ 下载全部结果 (ZIP)</button>`;
+  if (p.web_viewer_html) html += `<a class="dlbtn primary" target="_blank" href="/api/result/${tid}/${p.web_viewer_html}">🧊 三维查看器</a>`;
+  if (p.prospectivity_volume_nc) html += dl(p.prospectivity_volume_nc, '三维体 NetCDF (.nc)');
+  if (p.targets_3d)             html += dl(p.targets_3d, '三维靶点 (.json)');
+  html += dl('metadata.json', '元数据 (metadata.json)');
+  $('#downloads').innerHTML = html;
+
+  $('#warns').innerHTML = (ms.warnings||[]).map(w => `<div class="warn">⚠ ${w}</div>`).join('');
+  $('#summary').innerHTML = `
+    <table>
+      <tr><th>成因族</th><td>${ms.family} (适用度 ${ms.family_applicability})</td></tr>
+      <tr><th>矿床类型</th><td>${ms.deposit_type||'未知'} ｜ 构造背景 ${ms.tectonic_setting||'-'}</td></tr>
+      <tr><th>成矿深度带</th><td>${ms.depth_km_band[0]}–${ms.depth_km_band[1]} km</td></tr>
+      <tr><th>证据层</th><td>${(ms.available_layers||[]).join(', ')}</td></tr>
+      <tr><th>融合方法</th><td>${ms.modeling_method||ms.fusion_method||'-'}${ms.structure_geometry&&ms.structure_geometry.dip_deg!=null?` ｜ 断裂倾角 ${ms.structure_geometry.dip_deg}°`:''}</td></tr>
+      <tr><th>融合权重</th><td>${JSON.stringify(ms.used_weights)}</td></tr>
+      <tr><th>有利度</th><td>均值 ${ms.score_stats.mean}，峰值 ${ms.score_stats.max}</td></tr>
+      <tr><th>不确定性</th><td>地表 ${ms.uncertainty_stats.surface_mean} → 最深 ${ms.uncertainty_stats.deepest_mean}</td></tr>
+      <tr><th>权重敏感性</th><td>top靶点保留率 ${ms.validation.weight_sensitivity.mean_retention ?? '-'}</td></tr>
+    </table>`;
+  const tg = res.targets||[];
+  $('#targets').innerHTML = '<table><tr><th>#</th><th>经度</th><th>纬度</th><th>深度(m)</th><th>有利度</th><th>不确定性</th></tr>' +
+    tg.map(x => `<tr><td>${x.rank}</td><td>${x.lon}</td><td>${x.lat}</td><td>${x.depth_m}</td><td>${x.score}</td><td>${x.uncertainty}</td></tr>`).join('') + '</table>';
+  const figs = (res.products.slice_pngs||[]).concat([res.products.depth_profile_png]);
+  $('#figs').innerHTML = figs.map(p => `<img src="/api/result/${tid}/${p}">`).join('');
+
+  // 逐层深度切片 GeoTIFF 下载链接
+  loadSliceLinks(tid);
+}
+
+async function downloadZip(tid) {
+  try {
+    const r = await fetch('/api/download/' + tid);
+    const ct = r.headers.get('content-type') || '';
+    if (!r.ok || ct.includes('application/json')) {
+      let msg = '下载失败';
+      try { msg = (await r.json()).message || msg; } catch (e) {}
+      alert(msg + '（任务可能已随服务重启失效，请重新运行一次建模）');
+      return;
+    }
+    const blob = await r.blob();
+    let name = 'model3d_result.zip';
+    const cd = r.headers.get('content-disposition') || '';
+    const m = cd.match(/filename=([^;]+)/);
+    if (m) name = decodeURIComponent(m[1].trim().replace(/"/g, ''));
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click();
+    a.remove(); URL.revokeObjectURL(url);
+  } catch (e) { alert('下载出错: ' + e); }
+}
+
+async function loadSliceLinks(tid) {
+  try {
+    const r = await fetch('/api/slices/' + tid);
+    const j = await r.json();
+    if (!j.success || !j.slices.length) { $('#sliceLinks').innerHTML = '<span class="muted">无深度切片</span>'; return; }
+    const all = `<a class="dlbtn" href="/api/download/${tid}" download>⬇ 全部切片(随ZIP)</a>`;
+    $('#sliceLinks').innerHTML = all + j.slices.map(s =>
+      `<a class="slicelink" href="/api/result/${tid}/${s.rel}?download=1" download title="${s.filename}">${s.depth_m} m</a>`
+    ).join('');
+  } catch (e) { $('#sliceLinks').innerHTML = '<span class="muted">切片列表加载失败</span>'; }
+}
+</script>
+</body>
+</html>

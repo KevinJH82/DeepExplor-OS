@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地质勘探综合报告生成平台 - Deep Explor OS</title>
+    <script src="/static/tailwindcss.js"></script>
+    <script src="/static/iconify-icon.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f8f9fa;
+            color: #0f172a;
+        }
+        .sh-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+        }
+        .sh-input {
+            border: 1px solid #cbd5e1;
+            transition: all 0.2s ease;
+        }
+        .sh-input:focus {
+            outline: none;
+            border-color: #059669;
+            box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.1);
+        }
+        .progress-bar-fill {
+            transition: width 0.5s ease-in-out;
+        }
+        .animate-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ---- styles referenced by existing JS (classList operations) ---- */
+        .file-input-label {
+            display: block;
+            cursor: pointer;
+        }
+
+        .category-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .category-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            font-size: 13px;
+            color: #94a3b8;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease;
+        }
+
+        .category-item.done-ok {
+            color: #059669;
+            background: #ecfdf5;
+            border-color: #a7f3d0;
+        }
+
+        .category-item.done-err {
+            color: #dc2626;
+            background: #fef2f2;
+            border-color: #fecaca;
+        }
+
+        .category-item.running {
+            color: #059669;
+            background: #f0fdf4;
+            border-color: #86efac;
+        }
+
+        .cat-icon {
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .cat-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .cat-error {
+            font-size: 11px;
+            color: #dc2626;
+            margin-top: 2px;
+            word-break: break-all;
+        }
+
+        .progress-log {
+            background: #f9fafb;
+            border-left: 4px solid #059669;
+            padding: 16px;
+            border-radius: 6px;
+            max-height: 280px;
+            overflow-y: auto;
+            margin-bottom: 24px;
+        }
+
+        .log-entry {
+            font-size: 13px;
+            color: #64748b;
+            margin-bottom: 8px;
+            padding: 5px 0;
+            line-height: 1.5;
+        }
+
+        .log-entry.success {
+            color: #059669;
+            font-weight: 500;
+        }
+
+        .log-entry.error {
+            color: #dc2626;
+            font-weight: 500;
+        }
+
+        .log-entry.info {
+            color: #059669;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #e2e8f0;
+            border-top-color: #059669;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            display: none;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        .search-progress {
+            margin-bottom: 20px;
+        }
+
+        .search-progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #64748b;
+            font-weight: 500;
+        }
+
+        .progress-bar-bg {
+            background: #e2e8f0;
+            border-radius: 999px;
+            height: 10px;
+            overflow: hidden;
+            margin-bottom: 14px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: #059669;
+            border-radius: 999px;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        .download-section {
+            display: none;
+            margin-top: 24px;
+        }
+
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .history-table th,
+        .history-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .history-table th {
+            font-size: 12px;
+            color: #64748b;
+            font-weight: 700;
+            background: #f8fafc;
+        }
+
+        .history-table td {
+            font-size: 13px;
+            color: #334155;
+        }
+
+        .task-code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            color: #0f172a;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .status-uploaded {
+            color: #0369a1;
+            background: #e0f2fe;
+        }
+
+        .status-running {
+            color: #047857;
+            background: #d1fae5;
+        }
+
+        .status-completed {
+            color: #15803d;
+            background: #dcfce7;
+        }
+
+        .status-failed {
+            color: #b91c1c;
+            background: #fee2e2;
+        }
+
+        .history-actions {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .history-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            color: #059669;
+            font-weight: 700;
+            font-size: 12px;
+        }
+
+        @media (max-width: 720px) {
+            .history-table thead {
+                display: none;
+            }
+
+            .history-table,
+            .history-table tbody,
+            .history-table tr,
+            .history-table td {
+                display: block;
+                width: 100%;
+            }
+
+            .history-table tr {
+                padding: 12px 0;
+                border-bottom: 1px solid #e2e8f0;
+            }
+
+            .history-table td {
+                border-bottom: 0;
+                padding: 5px 0;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- 导航栏 -->
+    <nav class="sticky top-0 z-50 w-full bg-white/80 backdrop-blur-md border-b border-slate-200">
+        <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
+                    <iconify-icon class="text-white text-xl" icon="lucide:layers"></iconify-icon>
+                </div>
+                <span class="text-lg font-bold tracking-tight text-emerald-600">Deep Explor OS</span>
+            </div>
+            <div class="flex items-center gap-6 text-sm font-medium text-slate-600">
+                <a class="flex items-center gap-1 text-[#059669] hover:text-[#047857] transition-all" href="javascript:history.back()">
+                    <iconify-icon class="text-base" icon="lucide:arrow-left"></iconify-icon>
+                    <span>返回上一级</span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-4xl mx-auto px-4 py-12">
+        <!-- 头部标题 -->
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">地质勘探综合报告生成平台</h1>
+            <p class="text-lg text-slate-500 max-w-2xl mx-auto">
+                上传地理文件，利用 AI 与权威地质数据库自动生成专业化的地质分析报告
+            </p>
+            <div class="mt-6 flex justify-center gap-4 text-xs font-medium text-slate-400">
+                <span class="flex items-center gap-1"><iconify-icon icon="lucide:check-circle"></iconify-icon> 当前日期：2026年05月11日</span>
+                <span class="flex items-center gap-1"><iconify-icon icon="lucide:shield-check"></iconify-icon> 数据安全保障</span>
+            </div>
+        </header>
+
+        <!-- 错误提示 -->
+        <div class="error-message" id="errorMessage"></div>
+
+        <!-- 配置表单区域 -->
+        <section id="uploadForm" class="sh-card p-8 mb-8">
+            <div class="space-y-6">
+                <!-- 文件上传 -->
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">选择地理文件</label>
+                    <label for="kmlFile" class="file-input-label border-2 border-dashed border-slate-200 rounded-xl p-10 text-center hover:border-[#059669] hover:bg-emerald-50/30 transition-all cursor-pointer group block">
+                        <input type="file" id="kmlFile" accept=".kml,.ovkml,.kmz,.ovkmz,.csv,.xlsx,.xls" class="hidden">
+                        <div class="flex flex-col items-center">
+                            <div class="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                <iconify-icon class="text-2xl text-slate-400 group-hover:text-[#059669]" icon="lucide:upload-cloud"></iconify-icon>
+                            </div>
+                            <p class="text-slate-600 font-medium">点击选择或拖拽文件</p>
+                            <p class="text-slate-400 text-xs mt-1">支持 KML / ovKML / KMZ / CSV / Excel (最大 50MB)</p>
+                        </div>
+                        <div class="mt-4 text-sm text-[#059669] font-medium" id="fileName"></div>
+                    </label>
+                </div>
+
+                <!-- 矿种选择 -->
+                <div id="mineralGroup" style="display:none">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2" for="mineralType">目标矿种 (可选)</label>
+                    <select class="w-full px-4 py-3 rounded-lg sh-input text-slate-900" id="mineralType" onchange="onMineralChange()">
+                        <option value="">不限 / 未指定</option>
+                        <optgroup label="贵金属">
+                            <option value="金">金</option>
+                            <option value="银">银</option>
+                            <option value="铂族金属(PGE)">铂族金属 (PGE)</option>
+                        </optgroup>
+                        <optgroup label="有色金属">
+                            <option value="铜">铜</option>
+                            <option value="铅">铅</option>
+                            <option value="锌">锌</option>
+                            <option value="镍">镍</option>
+                            <option value="钴">钴</option>
+                            <option value="钨">钨</option>
+                            <option value="锡">锡</option>
+                            <option value="钼">钼</option>
+                            <option value="锑">锑</option>
+                            <option value="铝土矿">铝土矿</option>
+                        </optgroup>
+                        <optgroup label="黑色金属">
+                            <option value="铁">铁</option>
+                            <option value="锰">锰</option>
+                            <option value="铬">铬</option>
+                            <option value="钛">钛</option>
+                            <option value="钒">钒</option>
+                        </optgroup>
+                        <optgroup label="能源矿产">
+                            <option value="油气">油气</option>
+                            <option value="石油">石油</option>
+                            <option value="天然气">天然气</option>
+                            <option value="煤层气">煤层气</option>
+                            <option value="煤">煤</option>
+                            <option value="铀">铀</option>
+                        </optgroup>
+                        <optgroup label="新能源金属">
+                            <option value="锂">锂</option>
+                            <option value="稀土">稀土</option>
+                            <option value="铍">铍</option>
+                            <option value="铌钽">铌钽</option>
+                        </optgroup>
+                        <optgroup label="非金属矿产">
+                            <option value="金刚石">金刚石</option>
+                            <option value="石墨">石墨</option>
+                            <option value="萤石">萤石</option>
+                            <option value="磷">磷（磷矿）</option>
+                            <option value="钾盐">钾盐</option>
+                            <option value="硼">硼</option>
+                            <option value="硫铁矿">硫铁矿</option>
+                        </optgroup>
+                        <option value="__other__">其它（手动输入）…</option>
+                    </select>
+                    <input class="w-full px-4 py-3 rounded-lg sh-input text-slate-900 placeholder:text-slate-400 mt-2" id="mineralTypeCustom" placeholder="请输入目标矿种，如：油气、钴土矿、铯榴石…" type="text" maxlength="50" style="display:none">
+                    <p class="text-xs text-slate-400 mt-2">选择后，报告将自动整合该矿种的全球分布规律与勘探模型分析。</p>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="flex flex-col sm:flex-row gap-3 pt-4">
+                    <button id="uploadBtn" class="flex-1 bg-[#059669] hover:bg-[#047857] text-white font-semibold py-3 px-6 rounded-lg shadow-lg shadow-emerald-200 transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed" onclick="uploadAndGenerate()" disabled>
+                        <iconify-icon icon="lucide:file-text"></iconify-icon>
+                        上传并生成报告
+                    </button>
+                    <button class="px-6 py-3 rounded-lg border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition-colors flex items-center justify-center gap-2" onclick="resetForm()">
+                        <iconify-icon icon="lucide:rotate-ccw"></iconify-icon>
+                        重置
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 历史任务 -->
+        <section id="historySection" class="sh-card p-6 mb-8">
+            <div class="flex items-center justify-between gap-4 mb-4">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">历史任务</h2>
+                    <p class="text-xs text-slate-500 mt-1">任务编码用于定位日志与排查问题</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button class="px-3 h-9 rounded-lg border border-slate-200 text-slate-600 hover:text-[#059669] hover:bg-slate-50 flex items-center gap-1 text-sm font-semibold" onclick="importTaskHistory()">
+                        <iconify-icon icon="lucide:archive-restore"></iconify-icon>
+                        <span>导入历史</span>
+                    </button>
+                    <button class="w-9 h-9 rounded-lg border border-slate-200 text-slate-500 hover:text-[#059669] hover:bg-slate-50 flex items-center justify-center" onclick="loadTaskHistory()" title="刷新">
+                        <iconify-icon icon="lucide:refresh-cw"></iconify-icon>
+                    </button>
+                </div>
+            </div>
+            <div id="historyEmpty" class="text-sm text-slate-400 py-6 text-center border border-dashed border-slate-200 rounded-lg">暂无历史任务</div>
+            <div id="historyList" class="overflow-x-auto" style="display:none"></div>
+        </section>
+
+        <!-- 进度展示区 -->
+        <section id="progressSection" class="sh-card p-8 mb-8" style="display:none">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <h3 class="font-bold text-slate-900">数据分析进度</h3>
+                    <p class="text-xs text-slate-500 mt-1">正在连接云端地质数据库并执行空间分析...</p>
+                </div>
+                <div class="text-right">
+                    <span class="text-2xl font-bold text-[#059669]" id="progressCount">0 / 10</span>
+                    <span class="text-slate-400 text-sm font-medium"> 类别</span>
+                </div>
+            </div>
+
+            <!-- 搜索进度面板 -->
+            <div class="search-progress" id="searchProgress" style="display:none">
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="progressBarFill"></div>
+                </div>
+                <div class="category-list" id="categoryList"></div>
+            </div>
+
+            <!-- 详细日志 -->
+            <div class="progress-log" id="progressLog"></div>
+
+            <!-- 下载区域 -->
+            <div id="downloadSection" class="download-section">
+                <div class="flex flex-col items-center text-center mb-6">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                        <iconify-icon class="text-3xl text-green-600" icon="lucide:check"></iconify-icon>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 mb-2">报告生成成功！</h3>
+                    <p class="text-slate-500 max-w-md text-sm">您的综合地质勘探报告已完成 AI 整合与格式化，现可下载 Word 文档或 PPT 演示文稿。</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                    <a class="flex items-center justify-center gap-3 bg-white border border-slate-200 p-4 rounded-xl hover:shadow-md transition-all group cursor-pointer" href="javascript:void(0)" onclick="downloadReport()">
+                        <div class="p-2 bg-emerald-50 rounded-lg group-hover:bg-emerald-100">
+                            <iconify-icon class="text-2xl text-[#059669]" icon="lucide:file-text"></iconify-icon>
+                        </div>
+                        <div class="text-left">
+                            <div class="text-sm font-bold text-slate-900">下载 Word 报告</div>
+                            <div class="text-[10px] text-slate-400 uppercase tracking-wider">DOCX</div>
+                        </div>
+                    </a>
+                    <a class="flex items-center justify-center gap-3 bg-white border border-slate-200 p-4 rounded-xl hover:shadow-md transition-all group cursor-pointer" href="javascript:void(0)" onclick="downloadPptx()">
+                        <div class="p-2 bg-orange-50 rounded-lg group-hover:bg-orange-100">
+                            <iconify-icon class="text-2xl text-orange-600" icon="lucide:presentation"></iconify-icon>
+                        </div>
+                        <div class="text-left">
+                            <div class="text-sm font-bold text-slate-900">下载 PPT 演示</div>
+                            <div class="text-[10px] text-slate-400 uppercase tracking-wider">PPTX</div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- 平台页脚 -->
+        <footer class="mt-20 pb-12 text-center text-slate-400 text-sm">
+            <p>© 2026 Deep Explor OS 深层探索（北京）科技有限公司. 保留所有权利。</p>
+        </footer>
+    </main>
+
+    <script>
+        let currentTaskId = null;
+        let selectedFile = null;
+        // 类别顺序，用于预先渲染列表
+        const CATEGORIES = [
+            {id: 'geology',           name: '地质与矿产'},
+            {id: 'geography',         name: '地理与地形地貌'},
+            {id: 'geophysics',        name: '地球物理'},
+            {id: 'geochemistry',      name: '地球化学'},
+            {id: 'remote_sensing',    name: '遥感影像分析'},
+            {id: 'insar_deformation', name: 'InSAR 形变监测'},
+            {id: 'hydrology',         name: '水系与水文'},
+            {id: 'climate',           name: '气候资料'},
+            {id: 'infrastructure',    name: '交通与基础设施'},
+            {id: 'mining_rights',     name: '矿业权与法律政策'},
+        ];
+        const STATUS_LABELS = {
+            kml_uploaded: '待生成',
+            running: '生成中',
+            completed: '已完成',
+            failed: '失败',
+            unknown: '未知',
+        };
+        const STATUS_CLASSES = {
+            kml_uploaded: 'status-uploaded',
+            running: 'status-running',
+            completed: 'status-completed',
+            failed: 'status-failed',
+            unknown: 'status-uploaded',
+        };
+
+        // 文件选择
+        document.getElementById('kmlFile').addEventListener('change', function(e) {
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                document.getElementById('fileName').textContent = `已选择：${selectedFile.name}`;
+                document.getElementById('uploadBtn').disabled = false;
+                document.getElementById('mineralGroup').style.display = 'block';
+            }
+        });
+
+        // 拖拽支持
+        const fileInputLabel = document.querySelector('.file-input-label');
+        fileInputLabel.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileInputLabel.style.background = '#efefff';
+        });
+        fileInputLabel.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            fileInputLabel.style.background = '#f5f5f5';
+        });
+        fileInputLabel.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileInputLabel.style.background = '#f5f5f5';
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('kmlFile').files = files;
+                const event = new Event('change', { bubbles: true });
+                document.getElementById('kmlFile').dispatchEvent(event);
+            }
+        });
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+        }
+
+        function clearError() {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.classList.remove('show');
+        }
+
+        async function uploadAndGenerate() {
+            clearError();
+
+            if (!selectedFile) {
+                showError('请先选择 KML 文件');
+                return;
+            }
+
+            // 上传 KML
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            try {
+                const uploadRes = await fetch('/api/upload-kml', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!uploadRes.ok) {
+                    const error = await uploadRes.json();
+                    showError(`上传失败：${error.error}`);
+                    return;
+                }
+
+	                const uploadData = await uploadRes.json();
+	                currentTaskId = uploadData.task_id;
+	                loadTaskHistory();
+
+	                // 显示进度
+                document.getElementById('uploadForm').style.display = 'none';
+                document.getElementById('progressSection').style.display = 'block';
+                document.getElementById('downloadSection').style.display = 'none';
+                document.getElementById('progressLog').innerHTML = '';
+
+	                addLog(`🎯 文件已上传：${uploadData.area_name}（任务编码：${uploadData.task_code || uploadData.task_id}）`);
+	                addLog('⏳ 开始生成报告...', 'info');
+
+                // 初始化进度面板
+                initProgressPanel();
+
+                // 开始流式报告生成
+                await streamReportGeneration(currentTaskId);
+            } catch (error) {
+                showError(`错误：${error.message}`);
+            }
+        }
+
+        function onMineralChange() {
+            const sel = document.getElementById('mineralType');
+            const custom = document.getElementById('mineralTypeCustom');
+            if (sel.value === '__other__') {
+                custom.style.display = 'block';
+                custom.focus();
+            } else {
+                custom.style.display = 'none';
+                custom.value = '';
+            }
+        }
+
+        function getMineral() {
+            const sel = document.getElementById('mineralType');
+            if (sel.value === '__other__') {
+                return document.getElementById('mineralTypeCustom').value.trim();
+            }
+            return sel.value.trim();
+        }
+
+        async function streamReportGeneration(taskId) {
+            const mineral = getMineral();
+            const url = mineral ? `/api/run/${taskId}?mineral=${encodeURIComponent(mineral)}` : `/api/run/${taskId}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    addLog(`❌ 请求失败：HTTP ${response.status}`, 'error');
+                    return;
+                }
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    // 最后一行可能不完整，留在 buffer 中
+                    buffer = lines.pop();
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const jsonStr = line.substring(6).trim();
+                        if (!jsonStr) continue;
+                        let data;
+                        try {
+                            data = JSON.parse(jsonStr);
+                        } catch (e) {
+                            console.warn('SSE parse error:', jsonStr, e);
+                            continue;
+                        }
+
+	                        if (data.error) {
+	                            addLog(`❌ 错误：${data.error}`, 'error');
+	                            loadTaskHistory();
+	                            return;
+	                        }
+
+                        if (data.step === 'search_progress') {
+                            updateCategoryProgress(data.idx, data.total, data.cat_id, data.cat_name, data.success, data.error_msg || '');
+                            continue;
+                        }
+
+                        if (data.message) {
+                            addLog(data.message, data.step === 5 ? 'success' : 'info');
+                        }
+
+	                        if (data.step === 5) {
+	                            document.getElementById('downloadSection').style.display = 'block';
+	                            // 移除所有旋转 spinner
+	                            document.querySelectorAll('#progressLog .spinner').forEach(el => el.remove());
+	                            loadTaskHistory();
+	                        }
+                    }
+                }
+            } catch (error) {
+                console.error('SSE stream error:', error);
+                // "Failed to fetch" = 服务器断开连接或未响应
+                // "NetworkError" / "network error" = 浏览器级网络问题
+                const hint = error.message.toLowerCase().includes('fetch')
+                    ? '服务器连接中断，请检查服务是否仍在运行'
+                    : error.message;
+	                addLog(`❌ 流式处理错误：${hint}`, 'error');
+	                addLog('💡 请打开浏览器控制台（F12 → Console）查看详细错误信息', 'info');
+	                loadTaskHistory();
+	            }
+	        }
+
+	        function escapeHtml(value) {
+	            return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+	                '&': '&amp;',
+	                '<': '&lt;',
+	                '>': '&gt;',
+	                '"': '&quot;',
+	                "'": '&#039;',
+	            }[char]));
+	        }
+
+	        function formatTaskTime(value) {
+	            if (!value) return '—';
+	            const date = new Date(value);
+	            if (Number.isNaN(date.getTime())) return value;
+	            return date.toLocaleString('zh-CN', { hour12: false });
+	        }
+
+	        async function loadTaskHistory() {
+	            try {
+	                const response = await fetch('/api/tasks');
+	                if (!response.ok) return;
+	                const data = await response.json();
+	                renderTaskHistory(data.tasks || []);
+	            } catch (error) {
+	                console.warn('Load task history failed:', error);
+	            }
+	        }
+
+	        async function importTaskHistory() {
+	            try {
+	                const response = await fetch('/api/tasks/import', { method: 'POST' });
+	                if (!response.ok) return;
+	                await loadTaskHistory();
+	            } catch (error) {
+	                console.warn('Import task history failed:', error);
+	            }
+	        }
+
+	        function renderTaskHistory(tasks) {
+	            const empty = document.getElementById('historyEmpty');
+	            const list = document.getElementById('historyList');
+	            if (!tasks.length) {
+	                empty.style.display = 'block';
+	                list.style.display = 'none';
+	                list.innerHTML = '';
+	                return;
+	            }
+
+	            empty.style.display = 'none';
+	            list.style.display = 'block';
+	            const rows = tasks.map((task) => {
+	                const status = task.status || 'unknown';
+	                const statusLabel = STATUS_LABELS[status] || status;
+	                const statusClass = STATUS_CLASSES[status] || STATUS_CLASSES.unknown;
+	                const taskCode = escapeHtml(task.task_code || task.task_id);
+	                const wordAction = task.has_report
+	                    ? `<a class="history-action" href="/api/download/${encodeURIComponent(task.task_id)}"><iconify-icon icon="lucide:file-text"></iconify-icon>Word</a>`
+	                    : '';
+	                const pptAction = task.has_pptx
+	                    ? `<a class="history-action" href="/api/download/${encodeURIComponent(task.task_id)}?format=pptx"><iconify-icon icon="lucide:presentation"></iconify-icon>PPT</a>`
+	                    : '';
+	                const errorText = task.error ? `<div class="text-xs text-red-600 mt-1">${escapeHtml(task.error)}</div>` : '';
+	                return `
+	                    <tr>
+	                        <td>
+	                            <div class="task-code">${taskCode}</div>
+	                            <button class="history-action mt-1" data-code="${taskCode}" onclick="copyTaskCode(this.dataset.code)" title="复制编码">
+	                                <iconify-icon icon="lucide:copy"></iconify-icon>复制
+	                            </button>
+	                        </td>
+	                        <td>
+	                            <div class="font-semibold text-slate-800">${escapeHtml(task.area_name || '未命名任务')}</div>
+	                            <div class="text-xs text-slate-400 mt-1">${escapeHtml(task.kml_name || '')}</div>
+	                            ${errorText}
+	                        </td>
+	                        <td><span class="status-badge ${statusClass}">${escapeHtml(statusLabel)}</span></td>
+	                        <td>${escapeHtml(formatTaskTime(task.created_at))}</td>
+	                        <td><div class="history-actions">${wordAction}${pptAction || ''}</div></td>
+	                    </tr>
+	                `;
+	            }).join('');
+
+	            list.innerHTML = `
+	                <table class="history-table">
+	                    <thead>
+	                        <tr>
+	                            <th>编码</th>
+	                            <th>任务</th>
+	                            <th>状态</th>
+	                            <th>创建时间</th>
+	                            <th>文件</th>
+	                        </tr>
+	                    </thead>
+	                    <tbody>${rows}</tbody>
+	                </table>
+	            `;
+	        }
+
+	        async function copyTaskCode(taskCode) {
+	            try {
+	                await navigator.clipboard.writeText(taskCode);
+	            } catch (error) {
+	                console.warn('Copy task code failed:', error);
+	            }
+	        }
+
+        function initProgressPanel() {
+            const panel = document.getElementById('searchProgress');
+            const list = document.getElementById('categoryList');
+            panel.style.display = 'block';
+            list.innerHTML = '';
+            CATEGORIES.forEach(cat => {
+                const item = document.createElement('div');
+                item.className = 'category-item';
+                item.id = `cat-${cat.id}`;
+                item.innerHTML = `<span class="cat-icon">⏳</span><span class="cat-text"><span>${cat.name}</span></span>`;
+                list.appendChild(item);
+            });
+            document.getElementById('progressCount').textContent = `0 / ${CATEGORIES.length}`;
+            document.getElementById('progressBarFill').style.width = '0%';
+        }
+
+        function updateCategoryProgress(idx, total, catId, catName, success, errorMsg) {
+            const item = document.getElementById(`cat-${catId}`);
+            if (item) {
+                item.className = `category-item ${success ? 'done-ok' : 'done-err'}`;
+                item.querySelector('.cat-icon').textContent = success ? '✅' : '❌';
+                const textEl = item.querySelector('.cat-text');
+                if (!success && errorMsg) {
+                    // 截断过长的错误信息
+                    const short = errorMsg.length > 40 ? errorMsg.slice(0, 40) + '…' : errorMsg;
+                    textEl.innerHTML = `<span>${catName}</span><span class="cat-error">${short}</span>`;
+                }
+            }
+            // 如果下一个类别存在，标记为运行中
+            const nextIdx = CATEGORIES.findIndex(c => c.id === catId) + 1;
+            if (nextIdx < CATEGORIES.length) {
+                const nextItem = document.getElementById(`cat-${CATEGORIES[nextIdx].id}`);
+                if (nextItem && !nextItem.classList.contains('done-ok') && !nextItem.classList.contains('done-err')) {
+                    nextItem.className = 'category-item running';
+                    nextItem.querySelector('.cat-icon').textContent = '🔄';
+                }
+            }
+            // 进度条和计数
+            document.getElementById('progressCount').textContent = `${idx} / ${total}`;
+            document.getElementById('progressBarFill').style.width = `${Math.round(idx / total * 100)}%`;
+        }
+
+        function addLog(message, type = 'normal') {
+            const log = document.getElementById('progressLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+
+            if (type === 'info') {
+                entry.innerHTML = `<span class="spinner"></span>${message}`;
+            } else {
+                entry.textContent = message;
+            }
+
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        async function downloadReport() {
+            if (!currentTaskId) return;
+
+            const link = document.createElement('a');
+            link.href = `/api/download/${currentTaskId}`;
+            link.download = 'report.docx';
+            link.click();
+        }
+
+        async function downloadPptx() {
+            if (!currentTaskId) return;
+
+            const link = document.createElement('a');
+            link.href = `/api/download/${currentTaskId}?format=pptx`;
+            link.download = 'report.pptx';
+            link.click();
+        }
+
+	        function resetForm() {
+            document.getElementById('uploadForm').style.display = 'block';
+            document.getElementById('progressSection').style.display = 'none';
+            document.getElementById('downloadSection').style.display = 'none';
+            document.getElementById('kmlFile').value = '';
+            document.getElementById('fileName').textContent = '';
+            document.getElementById('uploadBtn').disabled = true;
+            document.getElementById('mineralGroup').style.display = 'none';
+            document.getElementById('mineralType').value = '';
+            const _mc = document.getElementById('mineralTypeCustom');
+            if (_mc) { _mc.value = ''; _mc.style.display = 'none'; }
+	            clearError();
+	        }
+
+	        loadTaskHistory();
+	    </script>
+</body>
+</html>

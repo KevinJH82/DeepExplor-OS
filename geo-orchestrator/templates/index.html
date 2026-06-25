@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>geo-orchestrator · 智能编排引擎</title>
+  <style>
+    body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+           background:#0f1419;color:#e6e6e6;margin:0;padding:24px; }
+    .wrap { max-width:960px;margin:0 auto; }
+    h1 { font-size:22px; } .sub { color:#8a94a6;font-size:13px;margin-top:-6px; }
+    .card { background:#1a212b;border:1px solid #2a3340;border-radius:10px;padding:18px;margin-top:16px; }
+    label { display:block;font-size:13px;color:#aab4c4;margin:10px 0 4px; }
+    input,select { width:100%;box-sizing:border-box;padding:8px 10px;border-radius:6px;
+                    border:1px solid #2a3340;background:#0f1419;color:#e6e6e6; }
+    button { margin-top:16px;padding:10px 18px;border:0;border-radius:8px;background:#2f81f7;
+             color:#fff;font-size:14px;cursor:pointer; }
+    button:disabled { background:#3a4250;cursor:not-allowed; }
+    pre { background:#0b0f14;border:1px solid #222b36;border-radius:8px;padding:12px;
+          font-size:12px;max-height:280px;overflow:auto;white-space:pre-wrap; }
+    .phase { margin:8px 0;padding:12px;background:#0f1419;border:1px solid #2a3340;border-radius:8px; }
+    .phase-head { font-weight:600;color:#6cb6ff;cursor:pointer;margin-bottom:4px; }
+    .svc { margin:6px 0 6px 16px;font-size:13px; }
+    .svc-name { color:#48d39a;font-weight:600; }
+    .skip { color:#6b7686;text-decoration:line-through; }
+    .reason { color:#8a94a6;font-size:12px;margin-left:8px; }
+    .task { color:#aab4c4;font-size:12px;margin-left:32px; }
+    .rationale { margin-top:12px;padding:12px;background:#10261f;border:1px solid #1f5f49;border-radius:8px;font-size:13px;line-height:1.8; }
+    .badge { display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;margin:0 4px; }
+    .badge-required { background:#1a3a1a;color:#48d39a; }
+    .badge-optional { background:#3a3a1a;color:#f0c674; }
+    .badge-skip { background:#2a2a2a;color:#6b7686; }
+    .badge-existing { background:#1a2a3a;color:#6cb6ff; }
+    .progress-bar { width:100%;height:6px;background:#2a3340;border-radius:3px;margin-top:8px; }
+    .progress-fill { height:100%;background:#2f81f7;border-radius:3px;transition:width 0.3s; }
+    .status-text { font-size:13px;color:#8a94a6;margin-top:6px; }
+    .sensor-tag { display:inline-block;padding:2px 10px;margin:3px;border-radius:4px;font-size:12px;
+                  background:#1a2a3a;color:#6cb6ff;border:1px solid #2a4a5a; }
+    .sensor-tag.optional { border-color:#3a3a1a;color:#f0c674; }
+    details { margin-top:8px; }
+    details > summary { cursor:pointer;color:#6cb6ff;font-size:13px; }
+    /* ── 执行面板 ── */
+    .exec-phase { margin:8px 0;padding:10px;background:#0f1419;border:1px solid #2a3340;border-radius:8px; }
+    .exec-phase-head { font-weight:600;color:#6cb6ff;font-size:13px;display:flex;justify-content:space-between; }
+    .exec-svc { display:flex;align-items:center;gap:8px;margin:5px 0 5px 12px;font-size:13px; }
+    .dot { width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:#3a4250; }
+    .dot.running { background:#f0c674;animation:pulse 1s infinite; }
+    .dot.completed { background:#48d39a; }
+    .dot.failed { background:#e5534b; }
+    .dot.submitted { background:#6cb6ff; }
+    .dot.skipped { background:#4a5260; }
+    .dot.pending { background:#3a4250; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.35;} }
+    .exec-detail { color:#8a94a6;font-size:12px; }
+    .ph-badge { font-size:11px;padding:1px 8px;border-radius:4px;background:#1a2a3a;color:#6cb6ff; }
+    .btn-exec { background:#2ea043; } .btn-exec:hover { background:#3fb950; }
+    .btn-ghost { background:#2a3340;margin-left:8px; }
+    /* 质量指示灯 + 降级提示（P3）*/
+    .qtag { font-size:11px;padding:1px 7px;border-radius:4px;margin-left:6px; }
+    .qtag.good { background:#13301f;color:#48d39a; }
+    .qtag.weak { background:#332a10;color:#f0c674; }
+    .qtag.poor { background:#3a1a1a;color:#e5825b; }
+    .qtag.prior_only { background:#152a3a;color:#6cb6ff; }
+    .qtag.unknown { background:#262b33;color:#8a94a6; }
+    .degrade-box { margin:10px 0;padding:10px 12px;background:#2a1a10;border:1px solid #6b4a1f;
+                   border-radius:8px;font-size:12px;line-height:1.7; }
+    .degrade-box b { color:#f0a050; }
+    /* P4：经验/偏置/对话/版本 */
+    .exp-box { margin:10px 0;padding:10px 12px;background:#10261f;border:1px solid #1f5f49;
+               border-radius:8px;font-size:12px;line-height:1.7; }
+    .bias-box { margin:10px 0;padding:10px 12px;background:#151f33;border:1px solid #2a4a7a;
+                border-radius:8px;font-size:12px;line-height:1.7; }
+    .chat-log { background:#0b0f14;border:1px solid #222b36;border-radius:8px;padding:10px;
+                max-height:240px;overflow:auto;font-size:13px; }
+    .chat-msg { margin:6px 0;padding:6px 10px;border-radius:8px;max-width:85%; }
+    .chat-user { background:#1a2a3a;color:#cfe3ff;margin-left:auto; }
+    .chat-bot { background:#1a212b;color:#dfe6ee; }
+    .chat-row { display:flex; }
+    .proposal-box { margin:6px 0;padding:8px 10px;background:#10261f;border:1px solid #1f5f49;
+                    border-radius:8px;font-size:12px; }
+    .ver-item { display:flex;gap:8px;align-items:center;font-size:12px;margin:4px 0; }
+    .ver-item input { width:auto; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>geo-orchestrator · 智能编排引擎</h1>
+  <p class="sub">上传研究区 + 选择矿种 → 自动分析 ROI → 生成全管线任务编排单</p>
+
+  <div class="card">
+    <form id="f">
+      <label>研究区文件（.kml / .kmz）</label>
+      <input type="file" name="file" accept=".kml,.kmz,.ovkml" required>
+
+      <div style="display:flex;gap:14px">
+        <div style="flex:1">
+          <label>目标矿种</label>
+          <select name="mineral">
+            <option value="铜">铜</option><option value="铜钼">铜钼</option>
+            <option value="铜金">铜金</option><option value="金">金</option>
+            <option value="银">银</option><option value="钼">钼</option>
+            <option value="铅锌">铅锌</option><option value="铁">铁</option>
+            <option value="钨锡">钨锡</option><option value="钨">钨</option>
+            <option value="锡">锡</option><option value="锂">锂</option>
+            <option value="稀土">稀土</option><option value="镍">镍</option>
+            <option value="铬">铬</option><option value="铀">铀</option>
+            <option value="锰">锰</option><option value="钒钛">钒钛</option>
+            <option value="钴">钴</option><option value="锑">锑</option>
+            <option value="铝土">铝土</option><option value="金刚石">金刚石</option>
+            <option value="铂族">铂族</option><option value="石油">石油</option>
+            <option value="天然气">天然气</option><option value="煤">煤</option>
+            <option value="石墨">石墨</option><option value="萤石">萤石</option>
+          </select>
+        </div>
+      </div>
+
+      <button type="submit" id="btn">生成编排单</button>
+    </form>
+  </div>
+
+  <div class="card" id="out" style="display:none">
+    <div id="status" class="status-text">…</div>
+    <div class="progress-bar"><div class="progress-fill" id="pbar" style="width:0%"></div></div>
+    <details open><summary>实时日志</summary><pre id="logs"></pre></details>
+    <div id="plan" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card" id="execCard" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b style="color:#6cb6ff">执行进度</b>
+      <div>
+        <button type="button" class="btn-ghost" id="pauseBtn" style="display:none">暂停</button>
+        <button type="button" class="btn-ghost" id="resumeBtn" style="display:none">恢复</button>
+      </div>
+    </div>
+    <div id="execStatus" class="status-text">…</div>
+    <div id="execPhases" style="margin-top:10px"></div>
+    <details open><summary>执行日志</summary><pre id="execLogs"></pre></details>
+  </div>
+
+  <div class="card" id="chatCard" style="display:none">
+    <b style="color:#6cb6ff">💬 与编排 Agent 对话</b>
+    <p class="sub" style="margin:4px 0 8px">可追问"为什么没推荐 ASTER"、要求"加上 ASTER / 去掉 InSAR / 把 top_n 调到 8"。修改会生成新版本待你确认。</p>
+    <div class="chat-log" id="chatLog"></div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <input type="text" id="chatInput" placeholder="输入问题或修改要求…" style="flex:1">
+      <button type="button" id="chatSend" style="margin-top:0">发送</button>
+    </div>
+  </div>
+
+  <div class="card" id="versionsCard" style="display:none">
+    <b style="color:#6cb6ff">🗂 该 ROI 的编排单版本</b>
+    <div id="versionList" style="margin-top:8px"></div>
+    <button type="button" class="btn-ghost" id="compareBtn" style="margin-left:0">对比选中的两版</button>
+    <div id="compareOut" style="margin-top:8px"></div>
+  </div>
+</div>
+
+<script>
+const f=document.getElementById('f'),btn=document.getElementById('btn');
+const out=document.getElementById('out'),st=document.getElementById('status'),
+      pbar=document.getElementById('pbar'),logsEl=document.getElementById('logs'),
+      planEl=document.getElementById('plan');
+let timer=null,tid=null;
+
+f.addEventListener('submit',async(e)=>{
+  e.preventDefault();btn.disabled=true;out.style.display='block';planEl.innerHTML='';
+  pbar.style.width='0%';st.textContent='提交中…';logsEl.textContent='';
+  try{
+    const r=await fetch('/api/plan',{method:'POST',body:new FormData(f)});
+    const j=await r.json();
+    if(!j.success){st.textContent='失败：'+j.message;btn.disabled=false;return;}
+    tid=j.task_id;st.textContent='编排单生成中…';timer=setInterval(poll,1500);
+  }catch(err){st.textContent='错误：'+err;btn.disabled=false;}
+});
+
+async function poll(){
+  const r=await fetch('/api/status/'+tid);const j=await r.json();if(!j.success)return;
+  const t=j.task;logsEl.textContent=(t.logs||[]).join('\n');
+  st.textContent='状态：'+t.status+'（'+(t.progress||0)+'%）';
+  pbar.style.width=(t.progress||0)+'%';
+  if(t.status==='completed'||t.status==='failed'){
+    clearInterval(timer);btn.disabled=false;
+    if(t.status==='completed'&&t.plan) renderPlan(t.plan);
+    else if(t.status==='failed') st.textContent='生成失败，请查看日志';
+  }
+  logsEl.scrollTop=logsEl.scrollHeight;
+}
+
+function renderPlan(plan){
+  let h='';
+
+  // ROI 摘要
+  if(plan.roi){
+    const r=plan.roi;
+    h+=`<div style="margin:8px 0;padding:10px;background:#1a212b;border-radius:8px;font-size:13px">`;
+    h+=`<b>ROI：</b>${r.aoi_name||'-'} &nbsp; <b>面积：</b>${(r.area_km2||0).toFixed(1)} km² &nbsp; `;
+    h+=`<b>高程：</b>${(r.elevation_range||[0,0])[0]}–${(r.elevation_range||[0,0])[1]} m &nbsp; `;
+    h+=`<b>气候：</b>${r.climate_zone||'-'} &nbsp; <b>植被：</b>${r.vegetation_cover||'-'} &nbsp; `;
+    h+=`<b>构造：</b>${r.tectonic_setting||'-'}`;
+    h+=`</div>`;
+  }
+
+  // 矿种 + 族
+  h+=`<div style="margin:4px 0;font-size:14px">`;
+  h+=`<b>矿种：</b>${plan.mineral||'-'} → <b>成因族：</b>${plan.family||'-'} `;
+  h+=`</div>`;
+
+  // 执行阶段
+  const phases=(plan.execution_plan||{}).phases||[];
+  phases.forEach(ph=>{
+    h+=`<div class="phase">`;
+    h+=`<div class="phase-head">阶段 ${ph.phase}：${ph.name}</div>`;
+    (ph.parallel_groups||[]).forEach(g=>{
+      const skip=g.skip;
+      const cls=skip?'skip':'';
+      const badge=g.required
+        ?(skip?'<span class="badge badge-existing">已有·可跳过</span>':'<span class="badge badge-required">必选</span>')
+        :(skip?'<span class="badge badge-skip">跳过</span>':'<span class="badge badge-optional">可选</span>');
+      h+=`<div class="svc ${cls}">`;
+      h+=`<span class="svc-name">${g.service}</span> ${badge}`;
+      h+=`<span class="reason">${g.reason||''}</span>`;
+      if(g.skip_reason) h+=`<span style="color:#6cb6ff;margin-left:8px">（${g.skip_reason}）</span>`;
+      h+=`</div>`;
+      (g.tasks||[]).forEach(task=>{
+        h+=`<div class="task">`;
+        Object.entries(task).forEach(([k,v])=>{
+          if(k==='reason') return;
+          const val=Array.isArray(v)?v.join(', '):v;
+          h+=`<span style="margin-right:12px">${k}: <b>${val}</b></span>`;
+        });
+        if(task.reason) h+=`<span style="color:#6b7686">← ${task.reason}</span>`;
+        h+=`</div>`;
+      });
+    });
+    h+=`</div>`;
+  });
+
+  // 决策理由
+  if(plan.decision_rationale){
+    const dr=plan.decision_rationale;
+    h+=`<div class="rationale"><b>决策理由</b><br>`;
+    Object.entries(dr).forEach(([k,v])=>{
+      h+=`• <b>${k}</b>：${v}<br>`;
+    });
+    h+=`</div>`;
+  }
+
+  // P4：跨 ROI 经验提示
+  if(plan.experience && plan.experience.length){
+    h+=`<div class="exp-box"><b>📎 历史相似 ROI 经验（${plan.experience.length}）</b><br>`;
+    plan.experience.forEach(e=>{
+      h+=`• <b>${e.aoi_name}</b>（${e.mineral}/${e.family}，匹配:${e.match_reasons.join('、')}）`;
+      h+=` 用过传感器 [${(e.sensors||[]).join(', ')}]<br>`;
+    });
+    h+=`</div>`;
+  }
+  // P4：历史策略偏置（学习闭环）
+  if(plan.strategy_bias && plan.strategy_bias.length){
+    h+=`<div class="bias-box"><b>📊 历史策略偏置</b><br>`;
+    plan.strategy_bias.forEach(b=>{ h+=`• <b>${b.service}</b> [${b.bias}]：${b.note}<br>`; });
+    h+=`</div>`;
+  }
+
+  // 原始 JSON
+  h+=`<details style="margin-top:12px"><summary>查看完整编排单 JSON</summary>`;
+  h+=`<pre>${JSON.stringify(plan,null,2)}</pre></details>`;
+
+  // 执行按钮
+  h+=`<button type="button" class="btn-exec" id="execBtn">▶ 执行此编排单</button>`;
+
+  planEl.innerHTML=h;
+  document.getElementById('execBtn').addEventListener('click',startExecution);
+  // 加载该 ROI 历史版本
+  loadVersions(plan.roi && plan.roi.aoi_name);
+}
+
+// ── 执行（P2）─────────────────────────────────────────────
+const execCard=document.getElementById('execCard'),
+      execStatus=document.getElementById('execStatus'),
+      execPhases=document.getElementById('execPhases'),
+      execLogs=document.getElementById('execLogs'),
+      pauseBtn=document.getElementById('pauseBtn'),
+      resumeBtn=document.getElementById('resumeBtn');
+let execEvt=null,execPoll=null;
+
+async function startExecution(){
+  const eb=document.getElementById('execBtn');eb.disabled=true;eb.textContent='执行中…';
+  execCard.style.display='block';execLogs.textContent='';
+  execStatus.textContent='启动执行…';
+  pauseBtn.style.display='inline-block';resumeBtn.style.display='inline-block';
+  const r=await fetch('/api/execute/'+tid,{method:'POST'});
+  const j=await r.json();
+  if(!j.success){execStatus.textContent='失败：'+j.message;eb.disabled=false;eb.textContent='▶ 执行此编排单';return;}
+  // SSE 实时流
+  if(execEvt) execEvt.close();
+  execEvt=new EventSource('/api/execute/'+tid+'/stream');
+  execEvt.onmessage=(e)=>{
+    let d;try{d=JSON.parse(e.data);}catch(_){return;}
+    if(d.type==='log') appendExecLog(d.line);
+    else if(d.type==='done'){ execEvt.close();refreshExecStatus(); }
+    else if(d.type==='snapshot'){ renderExec(d.snapshot); }
+    else refreshExecStatus();   // overall/phase/service 变更 → 拉一次快照
+  };
+  execEvt.onerror=()=>{ /* 断流由轮询兜底 */ };
+  // 轮询兜底（每 2s）
+  if(execPoll) clearInterval(execPoll);
+  execPoll=setInterval(refreshExecStatus,2000);
+  refreshExecStatus();
+}
+
+async function refreshExecStatus(){
+  try{
+    const r=await fetch('/api/execute/'+tid+'/status');const j=await r.json();
+    if(j.success) renderExec(j.execution);
+  }catch(_){}
+}
+
+function appendExecLog(line){
+  execLogs.textContent+=(execLogs.textContent?'\n':'')+line;
+  execLogs.scrollTop=execLogs.scrollHeight;
+}
+
+function renderExec(ex){
+  if(!ex) return;
+  const fin=(ex.overall_status==='completed'||ex.overall_status==='failed');
+  execStatus.textContent='整体状态：'+ex.overall_status;
+  if(fin){
+    if(execPoll){clearInterval(execPoll);execPoll=null;}
+    if(execEvt){execEvt.close();}
+    const eb=document.getElementById('execBtn');if(eb){eb.disabled=false;eb.textContent='▶ 重新执行';}
+    pauseBtn.style.display='none';resumeBtn.style.display='none';
+  }
+  let h='';
+  // 降级提示（P3）
+  const degs=ex.degradations||[];
+  if(degs.length){
+    h+=`<div class="degrade-box"><b>⚠ 降级事件（${degs.length}）</b><br>`;
+    degs.forEach(d=>{ h+=`• <b>${d.service}</b> [${d.action}]：${d.impact}<br>`; });
+    h+=`</div>`;
+  }
+  const qual=ex.quality||{};
+  const phs=ex.phases||{};
+  Object.keys(phs).sort((a,b)=>a-b).forEach(pno=>{
+    const ph=phs[pno];
+    h+=`<div class="exec-phase">`;
+    h+=`<div class="exec-phase-head"><span>阶段 ${pno}：${ph.name}</span><span class="ph-badge">${ph.status}</span></div>`;
+    Object.entries(ph.services||{}).forEach(([svc,sv])=>{
+      h+=`<div class="exec-svc"><span class="dot ${sv.status}"></span>`;
+      h+=`<span class="svc-name">${svc}</span>`;
+      const q=qual[svc];
+      if(q) h+=`<span class="qtag ${q.level}" title="${q.note||''}">质量:${q.level}</span>`;
+      h+=`<span class="exec-detail">${sv.status}${sv.detail?' · '+sv.detail:''}</span></div>`;
+    });
+    h+=`</div>`;
+  });
+  execPhases.innerHTML=h;
+  if(ex.logs && !execEvt) execLogs.textContent=(ex.logs||[]).join('\n');
+}
+
+pauseBtn.addEventListener('click',()=>fetch('/api/execute/'+tid+'/pause',{method:'POST'}));
+resumeBtn.addEventListener('click',()=>fetch('/api/execute/'+tid+'/resume',{method:'POST'}));
+
+// ── P4：多轮对话 Agent ────────────────────────────────────
+const chatCard=document.getElementById('chatCard'),chatLog=document.getElementById('chatLog'),
+      chatInput=document.getElementById('chatInput'),chatSend=document.getElementById('chatSend');
+function addChat(role,text){
+  const row=document.createElement('div');row.className='chat-row';
+  const m=document.createElement('div');m.className='chat-msg '+(role==='user'?'chat-user':'chat-bot');
+  m.textContent=text;row.appendChild(m);chatLog.appendChild(row);chatLog.scrollTop=chatLog.scrollHeight;
+  return m;
+}
+async function sendChat(){
+  const msg=chatInput.value.trim();if(!msg)return;chatInput.value='';
+  addChat('user',msg);chatSend.disabled=true;
+  try{
+    const r=await fetch('/api/chat/'+tid,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:msg})});
+    const j=await r.json();
+    if(!j.success){addChat('bot','出错：'+j.message);return;}
+    addChat('bot',j.reply);
+    if(j.has_proposal){
+      const box=document.createElement('div');box.className='proposal-box';
+      box.innerHTML=`已生成修改提案。<button type="button" style="margin:6px 0 0;padding:4px 12px">✔ 确认生成新版本</button>`;
+      box.querySelector('button').addEventListener('click',()=>confirmProposal(j.proposal_id,box));
+      chatLog.appendChild(box);chatLog.scrollTop=chatLog.scrollHeight;
+    }
+  }catch(e){addChat('bot','请求失败：'+e);}finally{chatSend.disabled=false;}
+}
+async function confirmProposal(pid,box){
+  const r=await fetch('/api/chat/'+tid+'/confirm/'+pid,{method:'POST'});
+  const j=await r.json();
+  if(!j.success){box.innerHTML='确认失败：'+j.message;return;}
+  box.innerHTML=`✔ 已生成新版本 <b>${j.plan_id}</b>，已切换为当前编排单。`;
+  tid=j.plan_id;chatLog.innerHTML='';   // 切到新版本，重置对话
+  renderPlan(j.plan);
+}
+chatSend.addEventListener('click',sendChat);
+chatInput.addEventListener('keydown',e=>{if(e.key==='Enter')sendChat();});
+
+// ── P4：版本管理 + 对比 ───────────────────────────────────
+async function loadVersions(aoi){
+  chatCard.style.display='block';
+  if(!aoi)return;
+  try{
+    const r=await fetch('/api/plans?aoi='+encodeURIComponent(aoi));const j=await r.json();
+    if(!j.success||!j.plans.length){versionsCard.style.display='none';return;}
+    versionsCard.style.display='block';
+    let h='';
+    j.plans.forEach(p=>{
+      const tag=p.source==='chat'?'对话改写':'自动';
+      h+=`<div class="ver-item"><input type="checkbox" class="vchk" value="${p.plan_id}">`;
+      h+=`<b>${p.plan_id}</b> · ${p.mineral||''}/${p.family||''} · [${tag}]`;
+      h+=`${p.parent_plan_id?(' ← '+p.parent_plan_id):''} · 传感器[${(p.sensors||[]).join(',')}] · ${p.created_at||''}</div>`;
+    });
+    document.getElementById('versionList').innerHTML=h;
+  }catch(e){}
+}
+const versionsCard=document.getElementById('versionsCard');
+document.getElementById('compareBtn').addEventListener('click',async()=>{
+  const sel=[...document.querySelectorAll('.vchk:checked')].map(c=>c.value);
+  const out=document.getElementById('compareOut');
+  if(sel.length!==2){out.textContent='请勾选两个版本进行对比。';return;}
+  const r=await fetch('/api/plans/compare?a='+sel[0]+'&b='+sel[1]);const j=await r.json();
+  if(!j.success){out.textContent=j.message;return;}
+  const d=j.diff;
+  let h=`<div class="proposal-box"><b>${d.a}</b> vs <b>${d.b}</b><br>`;
+  h+=`矿种：${d.mineral.a} / ${d.mineral.b} &nbsp; 族：${d.family.a} / ${d.family.b}<br>`;
+  h+=`传感器仅 A：[${d.sensors.only_a.join(',')}] &nbsp; 仅 B：[${d.sensors.only_b.join(',')}]<br>`;
+  h+=`服务仅 A：[${d.services.only_a.join(',')}] &nbsp; 仅 B：[${d.services.only_b.join(',')}]</div>`;
+  out.innerHTML=h;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+Flask==2.3.3
+Werkzeug==2.3.7
+numpy==1.24.3
+scipy==1.11.1
+matplotlib==3.7.1
+rasterio==1.3.8
+Pillow>=10.0.0
+python-dotenv>=1.0.0
+# 仅"参考图配准(ORB 特征匹配)"几何校正模式需要;不用该模式可不装
+opencv-python>=4.8.0

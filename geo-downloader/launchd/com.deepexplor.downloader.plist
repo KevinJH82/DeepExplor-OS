@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.deepexplor.downloader</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/deepexplor-services/geo-downloader/venv/bin/python3</string>
+        <string>web/app.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/opt/deepexplor-services/geo-downloader</string>
+
+    <!-- 关键修复：以 demacmini 用户运行，规避 macOS TCC 对 root daemon 写入外置卷的拦截 -->
+    <key>UserName</key>
+    <string>demacmini</string>
+    <key>GroupName</key>
+    <string>staff</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>GDAL_CONFIG</key>
+        <string>/opt/homebrew/bin/gdal-config</string>
+        <key>HOME</key>
+        <string>/Users/demacmini</string>
+        <key>LANG</key>
+        <string>zh_CN.UTF-8</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- 日志切到用户可写路径，避免和此前 root 拥有的 /tmp/*.log 冲突 -->
+    <key>StandardOutPath</key>
+    <string>/Users/demacmini/Library/Logs/deepexplor-downloader.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/demacmini/Library/Logs/deepexplor-downloader-error.log</string>
+</dict>
+</plist>

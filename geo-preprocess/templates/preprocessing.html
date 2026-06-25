@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据预处理 · Deep Explor OS</title>
+    <script src="/static/tailwindcss.js"></script>
+    <script src="/static/iconify-icon.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .thin-border { border-width: 0.5px; border-color: #f1f5f9; }
+        .module-panel { display: none; }
+        .module-panel.active { display: block; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+<nav class="fixed top-0 w-full h-16 border-b border-slate-100 bg-white/80 backdrop-blur-md z-50 flex items-center justify-between px-8">
+    <div class="flex items-center gap-8">
+        <a class="flex items-center gap-2" href="#" onclick="showModule('atmo'); return false;">
+            <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <iconify-icon class="text-white text-xl" icon="lucide:settings-2"></iconify-icon>
+            </div>
+            <span class="text-lg font-bold tracking-tight text-blue-600">数据预处理</span>
+        </a>
+        <div class="hidden md:flex items-center gap-6 text-sm font-medium">
+            <a data-nav="atmo" class="nav-link text-slate-500 hover:text-slate-900 transition-colors" href="#" onclick="showModule('atmo'); return false;">大气校正</a>
+            <a data-nav="geom" class="nav-link text-slate-500 hover:text-slate-900 transition-colors" href="#" onclick="showModule('geom'); return false;">几何校正</a>
+            <a data-nav="interf" class="nav-link text-slate-500 hover:text-slate-900 transition-colors" href="#" onclick="showModule('interf'); return false;">干扰剔除</a>
+        </div>
+    </div>
+    <a class="text-sm text-slate-400 hover:text-slate-700 transition-colors" href="http://www.deepexplor-system.net/2nd%20Page/index.html">返回上一级</a>
+</nav>
+
+<div id="browseModal" style="display:none;" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl w-[520px] max-w-[95vw] max-h-[80vh] flex flex-col shadow-2xl">
+        <div class="flex justify-between items-center p-5 border-b-thin">
+            <h3 class="text-base font-semibold m-0">选择目录</h3>
+            <button class="bg-none border-none text-lg cursor-pointer text-slate-400 hover:text-slate-900 hover:bg-slate-100 px-2 py-1 rounded-md transition-colors" onclick="closeBrowse()">✕</button>
+        </div>
+        <div class="px-5 py-3 bg-slate-50 border-b-thin text-xs font-mono">
+            <span id="browsePath" class="text-slate-700 break-all"></span>
+        </div>
+        <div id="browseList" class="flex-1 overflow-y-auto py-2 min-h-[200px] max-h-[400px]"></div>
+        <div class="flex justify-end gap-3 p-4 border-t-thin">
+            <button class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors" onclick="closeBrowse()">取消</button>
+            <button class="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition-colors" onclick="confirmBrowse()">选择此目录</button>
+        </div>
+    </div>
+</div>
+
+<div id="module-view">
+    <div class="module-panel" id="panel-atmo">
+        <main class="pt-24 pb-20 px-8 max-w-[800px] mx-auto">
+            <div class="flex items-center justify-between mb-8">
+                <div class="flex items-center gap-4">
+                    <a class="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer" onclick="returnToPreprocessing()">
+                        <iconify-icon icon="lucide:arrow-left"></iconify-icon>
+                    </a>
+                    <div>
+                        <h1 class="text-2xl font-bold tracking-tight">大气校正</h1>
+                        <nav class="flex text-xs text-slate-400 mt-1">
+                            <span>数据预处理</span>
+                            <span class="mx-2">/</span>
+                            <span class="text-slate-600">大气校正</span>
+                        </nav>
+                    </div>
+                </div>
+                <a class="text-sm text-emerald-600 font-medium hover:text-emerald-700 transition-colors cursor-pointer" onclick="returnToPreprocessing()">返回上一级</a>
+            </div>
+
+            <!-- 文件选择 -->
+            <section class="space-y-8">
+                <div class="p-6 border thin-border rounded-2xl bg-white space-y-4">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">输入目录</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="inputDir" placeholder="e.g., ~/data/raw" class="flex-1 p-2 border thin-border rounded-lg text-xs outline-none focus:border-black">
+                            <button class="px-3 py-2 border thin-border rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors" onclick="openBrowse('input')">选择</button>
+                        </div>
+                        <button id="scanBtn" class="px-4 py-2 bg-slate-900 text-white rounded-lg text-xs font-medium hover:bg-slate-800 transition-colors mt-1">扫描</button>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">输出目录</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="outputDirAtmo" placeholder="e.g., ~/data/processed" class="flex-1 p-2 border thin-border rounded-lg text-xs outline-none focus:border-black">
+                            <button class="px-3 py-2 border thin-border rounded-lg text-xs font-medium hover:bg-slate-50 transition-colors" onclick="openBrowse('output')">选择</button>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 rounded-lg p-3">
+                        <p class="text-xs">已发现: <strong id="fileCount">0</strong> 个文件</p>
+                        <div id="fileList" class="mt-2 text-xs space-y-1 max-h-[120px] overflow-y-auto"></div>
+                    </div>
+                </div>
+
+                <!-- 校正参数 -->
+                <div class="p-8 border thin-border rounded-3xl bg-white space-y-6">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">校正方法</label>
+                        <div class="grid grid-cols-2 gap-4">
+                            <label class="p-4 border-2 border-black rounded-xl bg-slate-50 flex items-center gap-3 cursor-pointer">
+                                <input checked class="accent-black" name="atmos_method" type="radio" value="dos">
+                                <span class="text-xs font-bold">DOS (暗目标消减)</span>
+                            </label>
+                            <label class="p-4 border thin-border rounded-xl flex items-center gap-3 cursor-pointer hover:bg-slate-50">
+                                <input class="accent-black" name="atmos_method" type="radio" value="simple">
+                                <span class="text-xs font-bold">Simple (简化模型)</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-6 pt-4 border-t thin-border">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">太阳天顶角 (度)</label>
+                            <input class="w-full p-2 border thin-border rounded-lg text-xs outline-none" type="number" id="solar_zenith" value="45.2" step="0.1">
+                        </div>
+                        <div class="space-y-2" id="simple_params" style="display:none;">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">气溶胶类型</label>
+                            <select class="w-full p-2 border thin-border rounded-lg text-xs bg-white outline-none" id="aerosol_type">
+                                <option>城市型 (Urban)</option>
+                                <option>乡村型 (Rural)</option>
+                                <option>海洋型 (Maritime)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="p-4 bg-blue-50/50 rounded-xl">
+                        <p class="text-[10px] text-blue-600 font-medium leading-relaxed">注意：对于高光谱影像，建议使用 DOS 算法以保证波谱曲线的连续性。</p>
+                    </div>
+                    <input type="hidden" id="atmo_method" value="dos">
+                    <button id="processBtn" class="w-full py-4 bg-black text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
+                        开始大气校正
+                    </button>
+                </div>
+            </section>
+
+            <!-- 进度与日志 -->
+            <section class="mt-8 space-y-4">
+                <div class="p-6 border thin-border rounded-2xl bg-white">
+                    <h3 class="text-sm font-bold mb-4">处理进度</h3>
+                    <div id="progressBar" class="w-full h-1 bg-slate-100 rounded-full overflow-hidden" style="display:none;">
+                        <div id="progressFill" class="h-full bg-slate-900 rounded-full" style="width:0%;"></div>
+                    </div>
+                    <p id="progressText" class="text-center mt-3 text-xs text-slate-500">准备就绪</p>
+                    <div id="logContainer" class="mt-3 bg-slate-50 border thin-border rounded-lg p-3 max-h-[160px] overflow-y-auto text-xs font-mono text-slate-600 space-y-1">
+                        <p class="text-blue-600">准备就绪，等待开始处理...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 影像预览 -->
+            <section class="mt-8">
+                <div class="p-6 border thin-border rounded-2xl bg-white">
+                    <h3 class="text-sm font-bold mb-4">影像预览</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center">
+                            <p class="text-xs text-slate-400 mb-2">处理前</p>
+                            <img id="previewBefore" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23f8fafc' width='200' height='200' rx='8'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%2394a3b8' font-size='12'%3E等待数据%3C/text%3E%3C/svg%3E" alt="处理前" class="w-full aspect-square object-cover rounded-xl border thin-border bg-slate-50">
+                            <p id="previewBeforeStatus" class="text-[10px] text-slate-400 mt-1 break-all"></p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-xs text-slate-400 mb-2">处理后</p>
+                            <img id="previewAfter" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23f8fafc' width='200' height='200' rx='8'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%2394a3b8' font-size='12'%3E等待数据%3C/text%3E%3C/svg%3E" alt="处理后" class="w-full aspect-square object-cover rounded-xl border thin-border bg-slate-50">
+                            <p id="previewAfterStatus" class="text-[10px] text-slate-400 mt-1 break-all"></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div><!-- /#panel-atmo -->
+
+    <!-- ── 几何校正模块 (match geometric.html design) ── -->
+    <div class="module-panel" id="panel-geom">
+        <main class="pt-24 pb-20 px-8 max-w-[800px] mx-auto">
+            <div class="flex items-center justify-between mb-8">
+                <div class="flex items-center gap-4">
+                    <a class="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer" onclick="returnToPreprocessing()">
+                        <iconify-icon icon="lucide:arrow-left"></iconify-icon>
+                    </a>
+                    <div>
+                        <h1 class="text-2xl font-bold tracking-tight">几何校正</h1>
+                        <nav class="flex text-xs text-slate-400 mt-1">
+                            <span>数据预处理</span><span class="mx-2">/</span><span class="text-slate-600">几何校正</span>
+                        </nav>
+                    </div>
+                </div>
+                <a class="text-sm text-emerald-600 font-medium hover:text-emerald-700 transition-colors cursor-pointer" onclick="returnToPreprocessing()">返回上一级</a>
+            </div>
+
+            <!-- 文件信息 (shared) -->
+            <div class="mb-6 p-4 border thin-border rounded-2xl bg-white">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-xs text-slate-500">
+                        <iconify-icon icon="lucide:folder"></iconify-icon>
+                        <span>已发现: <strong id="fileCountGeom">0</strong> 个文件</span>
+                    </div>
+                    <span id="dataStatus" class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">待配置</span>
+                </div>
+            </div>
+
+            <section class="space-y-8">
+                <div class="p-8 border thin-border rounded-3xl bg-white space-y-6">
+                    <select id="geom_method" class="hidden" onchange="onGeomMethodChange()">
+                        <option value="affine" selected>仿射变换</option>
+                        <option value="polynomial">多项式</option>
+                        <option value="reference">参考图配准</option>
+                    </select>
+                    <div id="geom_classic_params">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">重采样算法</label>
+                            <select id="interpolation" class="w-full p-3 border thin-border rounded-xl text-xs bg-white outline-none">
+                                <option value="nearest">最近邻内插法 (Nearest Neighbor)</option>
+                                <option value="bilinear" selected>双线性内插法 (Bilinear)</option>
+                                <option value="cubic">三次卷积内插法 (Cubic)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="geom_ref_params" style="display:none;">
+                        <div class="space-y-2 pt-4 border-t thin-border">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">特征配准参考图</label>
+                            <div class="border-2 border-dashed border-slate-100 rounded-xl p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:border-slate-300 transition-colors" id="refImgUploadArea" onclick="document.getElementById('ref_image_input').click()">
+                                <input type="file" id="ref_image_input" accept="image/*,.tif,.tiff" style="display:none;" onchange="onRefImageSelected(this)">
+                                <iconify-icon class="text-3xl text-slate-200 mb-2" icon="lucide:file-image"></iconify-icon>
+                                <p class="text-xs font-bold" id="refImgPrompt">点击或拖拽参考图至此处</p>
+                                <p class="text-[10px] text-slate-400 mt-1">支持：Geotiff / Google Satellite</p>
+                                <img id="refImgThumb" style="display:none; max-height:80px; border-radius:8px; margin-top:8px;">
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between p-4 border thin-border rounded-xl mt-4">
+                            <div class="flex items-center gap-2">
+                                <iconify-icon class="text-emerald-500" icon="lucide:check-circle-2"></iconify-icon>
+                                <span class="text-xs font-bold">自动提取 GCP 控制点</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input checked class="sr-only peer" type="checkbox">
+                                <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-black"></div>
+                            </label>
+                        </div>
+                    </div>
+                    <button id="processBtnGeom" class="w-full py-4 bg-black text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
+                        开始几何校正
+                    </button>
+                </div>
+            </section>
+
+            <!-- 进度与日志 -->
+            <section class="mt-8 space-y-4">
+                <div class="p-6 border thin-border rounded-2xl bg-white">
+                    <h3 class="text-sm font-bold mb-4">处理进度</h3>
+                    <div id="progressBarGeom" class="w-full h-1 bg-slate-100 rounded-full overflow-hidden" style="display:none;">
+                        <div id="progressFillGeom" class="h-full bg-slate-900 rounded-full" style="width:0%;"></div>
+                    </div>
+                    <p id="progressTextGeom" class="text-center mt-3 text-xs text-slate-500">准备就绪</p>
+                    <div id="logContainerGeom" class="mt-3 bg-slate-50 border thin-border rounded-lg p-3 max-h-[160px] overflow-y-auto text-xs font-mono text-slate-600 space-y-1">
+                        <p class="text-blue-600">准备就绪，等待开始处理...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 影像预览 -->
+            <section class="mt-8">
+                <div class="p-6 border thin-border rounded-2xl bg-white">
+                    <h3 class="text-sm font-bold mb-4">影像预览</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center">
+                            <p class="text-xs text-slate-400 mb-2">处理前</p>
+                            <img id="previewBeforeGeom" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23f8fafc' width='200' height='200' rx='8'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%2394a3b8' font-size='12'%3E等待数据%3C/text%3E%3C/svg%3E" alt="处理前" class="w-full aspect-square object-cover rounded-xl border thin-border bg-slate-50">
+                            <p id="previewBeforeGeomStatus" class="text-[10px] text-slate-400 mt-1 break-all"></p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-xs text-slate-400 mb-2">处理后</p>
+                            <img id="previewAfterGeom" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23f8fafc' width='200' height='200' rx='8'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%2394a3b8' font-size='12'%3E等待数据%3C/text%3E%3C/svg%3E" alt="处理后" class="w-full aspect-square object-cover rounded-xl border thin-border bg-slate-50">
+                            <p id="previewAfterGeomStatus" class="text-[10px] text-slate-400 mt-1 break-all"></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div><!-- /#panel-geom -->
+
+    <!-- ── 干扰剔除模块 (match interference.html design) ── -->
+    <div class="module-panel" id="panel-interf">
+        <main class="pt-24 pb-20 px-8 max-w-[800px] mx-auto">
+            <div class="flex items-center justify-between mb-8">
+                <div class="flex items-center gap-4">
+                    <a class="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors cursor-pointer" onclick="returnToPreprocessing()">
+                        <iconify-icon icon="lucide:arrow-left"></iconify-icon>
+                    </a>
+                    <div>
+                        <h1 class="text-2xl font-bold tracking-tight">干扰剔除</h1>
+                        <nav class="flex text-xs text-slate-400 mt-1">
+                            <span>数据预处理</span><span class="mx-2">/</span><span class="text-slate-600">干扰剔除</span>
+                        </nav>
+                    </div>
+                </div>
+                <a class="text-sm text-emerald-600 font-medium hover:text-emerald-700 transition-colors cursor-pointer" onclick="returnToPreprocessing()">返回上一级</a>
+            </div>
+
+            <!-- 文件信息 (复用大气面板的扫描状态) -->
+            <div class="mb-6 p-4 border thin-border rounded-2xl bg-white">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2 text-xs text-slate-500">
+                        <iconify-icon icon="lucide:folder"></iconify-icon>
+                        <span>已发现: <strong id="fileCountInterf">0</strong> 个文件</span>
+                        <span class="text-slate-300">·</span>
+                        <span class="text-slate-400">输入目录：<span id="inputDirHintInterf" class="text-slate-500 font-mono break-all">尚未配置（请先到大气校正面板设置目录并扫描）</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <section class="space-y-8">
+                <div class="p-8 border thin-border rounded-3xl bg-white space-y-6">
+                    <select id="sensor" class="hidden">
+                        <option value="Landsat8/9" selected>Landsat 8/9 (L1)</option>
+                        <option value="Landsat8/9_L2">Landsat 8/9 (L2)</option>
+                        <option value="Sentinel2">Sentinel-2 (L1C)</option>
+                        <option value="Sentinel2_L2">Sentinel-2 (L2A)</option>
+                        <option value="ASTER">ASTER (L1)</option>
+                        <option value="ASTER_L2">ASTER (L2)</option>
+                    </select>
+                    <div class="space-y-4">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">干扰识别模式</label>
+                        <div class="grid grid-cols-1 gap-3">
+                            <label class="flex items-center justify-between p-4 border thin-border rounded-xl cursor-pointer hover:bg-slate-50">
+                                <div class="flex items-center gap-3">
+                                    <iconify-icon class="text-emerald-500 text-lg" icon="lucide:sprout"></iconify-icon>
+                                    <span class="text-xs font-bold">植被剔除 (NDVI 阈值法)</span>
+                                </div>
+                                <input checked class="accent-black" type="checkbox" id="mask_vegetation">
+                            </label>
+                            <label class="flex items-center justify-between p-4 border thin-border rounded-xl cursor-pointer hover:bg-slate-50">
+                                <div class="flex items-center gap-3">
+                                    <iconify-icon class="text-blue-500 text-lg" icon="lucide:droplets"></iconify-icon>
+                                    <span class="text-xs font-bold">水体剔除 (NDWI 阈值法)</span>
+                                </div>
+                                <input checked class="accent-black" type="checkbox" id="mask_water">
+                            </label>
+                            <label class="flex items-center justify-between p-4 border thin-border rounded-xl cursor-pointer hover:bg-slate-50">
+                                <div class="flex items-center gap-3">
+                                    <iconify-icon class="text-slate-400 text-lg" icon="lucide:cloud"></iconify-icon>
+                                    <span class="text-xs font-bold">云/雪掩膜</span>
+                                </div>
+                                <input checked class="accent-black" type="checkbox" id="mask_cloud">
+                            </label>
+                        </div>
+                    </div>
+                    <div class="space-y-2" style="display:none;">
+                        <input type="checkbox" id="mask_snow">
+                        <input type="checkbox" id="mask_buildup">
+                    </div>
+                    <div class="pt-4 border-t thin-border space-y-2">
+                        <div class="flex justify-between">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">NDVI 植被阈值</label>
+                            <span class="text-xs font-bold" id="ndviVal">0.20</span>
+                        </div>
+                        <input id="ndvi_threshold" class="w-full accent-black h-1" type="range" min="0" max="1" step="0.01" value="0.20" oninput="document.getElementById('ndviVal').innerText=parseFloat(this.value).toFixed(2)">
+                        <div class="flex justify-between text-[10px] text-slate-400"><span>0</span><span>1</span></div>
+                    </div>
+                    <div class="pt-4 border-t thin-border space-y-2">
+                        <div class="flex justify-between">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase">掩膜敏感度</label>
+                            <span class="text-xs font-bold" id="sensVal">75%</span>
+                        </div>
+                        <input id="cloud_threshold" class="w-full accent-black h-1" type="range" min="0" max="100" value="75" oninput="document.getElementById('sensVal').innerText=this.value+'%'">
+                        <div class="flex justify-between text-[10px] text-slate-400"><span>保守</span><span>激进</span></div>
+                    </div>
+                    <button id="processBtnInterf" class="w-full py-4 bg-black text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200">
+                        启动干扰识别
+                    </button>
+                </div>
+            </section>
+
+            <!-- 进度与日志 -->
+            <section class="mt-8 space-y-4">
+                <div class="p-6 border thin-border rounded-2xl bg-white">
+                    <h3 class="text-sm font-bold mb-4">处理进度</h3>
+                    <div id="progressBarInterf" class="w-full h-1 bg-slate-100 rounded-full overflow-hidden" style="display:none;">
+                        <div id="progressFillInterf" class="h-full bg-slate-900 rounded-full" style="width:0%;"></div>
+                    </div>
+                    <p id="progressTextInterf" class="text-center mt-3 text-xs text-slate-500">准备就绪</p>
+                    <div id="logContainerInterf" class="mt-3 bg-slate-50 border thin-border rounded-lg p-3 max-h-[160px] overflow-y-auto text-xs font-mono text-slate-600 space-y-1">
+                        <p class="text-blue-600">准备就绪，等待开始处理...</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 影像预览 -->
+            <section class="mt-8">
+                <div class="p-6 border thin-border rounded-2xl bg-white">
+                    <h3 class="text-sm font-bold mb-4">影像预览</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="text-center">
+                            <p class="text-xs text-slate-400 mb-2">处理前</p>
+                            <img id="previewBeforeInterf" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23f8fafc' width='200' height='200' rx='8'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%2394a3b8' font-size='12'%3E等待数据%3C/text%3E%3C/svg%3E" alt="处理前" class="w-full aspect-square object-cover rounded-xl border thin-border bg-slate-50">
+                            <p id="previewBeforeInterfStatus" class="text-[10px] text-slate-400 mt-1 break-all"></p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-xs text-slate-400 mb-2">处理后</p>
+                            <img id="previewAfterInterf" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23f8fafc' width='200' height='200' rx='8'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%2394a3b8' font-size='12'%3E等待数据%3C/text%3E%3C/svg%3E" alt="处理后" class="w-full aspect-square object-cover rounded-xl border thin-border bg-slate-50">
+                            <p id="previewAfterInterfStatus" class="text-[10px] text-slate-400 mt-1 break-all"></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="mt-8 p-6 bg-amber-50 rounded-2xl border border-amber-100">
+                <div class="flex items-center gap-2 text-amber-700 mb-2">
+                    <iconify-icon icon="lucide:info"></iconify-icon>
+                    <span class="text-xs font-bold">处理建议</span>
+                </div>
+                <p class="text-[11px] text-amber-600/80 leading-relaxed">在进行蚀变信息提取前，强烈建议先执行干扰剔除。未剔除的植被波谱可能会与铁氧化物蚀变特征产生混淆，导致虚假异常的出现。</p>
+            </div>
+        </main>
+    </div><!-- /#panel-interf -->
+
+</div>
+
+<script>
+/* ═══════ Standalone Nav (geo-preprocess 独立页) ═══════ */
+function hideAllPanels() {
+    document.querySelectorAll('.module-panel').forEach(p => p.classList.remove('active'));
+}
+function setActiveNav(view) {
+    document.querySelectorAll('.nav-link').forEach(a => {
+        const on = a.getAttribute('data-nav') === view;
+        a.classList.toggle('text-slate-900', on);
+        a.classList.toggle('text-slate-500', !on);
+    });
+}
+function showModule(id) {
+    hideAllPanels();
+    const p = document.getElementById('panel-' + id);
+    if (p) p.classList.add('active');
+    setActiveNav(id);
+}
+function returnToPreprocessing() { showModule('atmo'); }
+function showDashboard() { showModule('atmo'); }
+
+/* ═══════ Browse Modal ═══════ */
+let _browseTarget = null;
+
+function openBrowse(target) {
+    _browseTarget = target;
+    const pathMap = {
+        'input':   document.getElementById('inputDir').value || '~',
+        'output':  document.getElementById('outputDirAtmo') ? (document.getElementById('outputDirAtmo').value || '~') : '~'
+    };
+    loadBrowse(pathMap[target] || '~');
+    document.getElementById('browseModal').style.display = 'flex';
+}
+
+function closeBrowse() {
+    document.getElementById('browseModal').style.display = 'none';
+}
+
+function loadBrowse(path) {
+    const list = document.getElementById('browseList');
+    list.innerHTML = '<div class="px-5 py-3 text-center text-slate-400 text-sm">加载中…</div>';
+    fetch('/api/browse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: path })
+    })
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('browsePath').textContent = data.current || path;
+            list.innerHTML = '';
+            const parentPath = data.parent;
+            if (parentPath) {
+                const up = document.createElement('div');
+                up.className = 'flex items-center gap-2 px-5 py-3 cursor-pointer select-none text-blue-600 font-semibold border-b border-slate-100 text-sm hover:bg-blue-50 transition-colors';
+                up.innerHTML = '⬆&nbsp;&nbsp;..（上级目录）';
+                up.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    loadBrowse(parentPath);
+                });
+                list.appendChild(up);
+            }
+            if (!data.entries || data.entries.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'px-5 py-3 text-center text-slate-400 text-sm';
+                empty.textContent = '（空目录）';
+                list.appendChild(empty);
+                return;
+            }
+            data.entries.forEach(item => {
+                const isFile = item.type === 'file';
+                const itemPath = item.path;
+                const el = document.createElement('div');
+                el.className = 'flex items-center gap-2 px-5 py-3 cursor-pointer select-none text-sm text-slate-700 hover:bg-slate-50 transition-colors' + (isFile ? ' text-blue-700 italic' : '');
+                el.innerHTML = (isFile ? '📄&nbsp;&nbsp;' : '📁&nbsp;&nbsp;') + item.name;
+                if (!isFile) {
+                    el.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        loadBrowse(itemPath);
+                    });
+                }
+                list.appendChild(el);
+            });
+        })
+        .catch(() => {
+            list.innerHTML = '<div class="px-5 py-3 text-center text-slate-400 text-sm">无法读取目录</div>';
+        });
+}
+
+document.getElementById('browseModal').addEventListener('click', function (e) {
+    if (e.target === this) closeBrowse();
+});
+
+function confirmBrowse() {
+    const path = document.getElementById('browsePath').textContent;
+    let target = null;
+    if (_browseTarget === 'input') {
+        target = document.getElementById('inputDir');
+    } else if (_browseTarget === 'output') {
+        target = document.getElementById('outputDirAtmo');
+    }
+    if (target) {
+        target.value = path;
+        // 让通过 .value = ... 设置的输入框也能触发监听器（如蚀变面板的文件名回显）
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        target.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    closeBrowse();
+}
+
+/* ═══════ File Scan ═══════ */
+let _scannedFiles = [];
+let _scannedInputDir = '';
+
+const PREVIEW_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23f8fafc' width='200' height='200' rx='8'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%2394a3b8' font-size='12'%3E等待数据%3C/text%3E%3C/svg%3E";
+const PREVIEW_LOADING = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Crect fill='%23f8fafc' width='200' height='200' rx='8'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%2394a3b8' font-size='12'%3E生成中%E2%80%A6%3C/text%3E%3C/svg%3E";
+
+function loadPreview(filePath, imgEl, statusEl) {
+    if (!imgEl) return;
+    imgEl.src = PREVIEW_LOADING;
+    if (statusEl) { statusEl.textContent = '生成中…'; statusEl.className = 'text-[10px] text-slate-400 mt-1 break-all'; }
+    fetch('/api/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_path: filePath })
+    })
+    .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+    .then(({ ok, data }) => {
+        if (ok && data.preview) {
+            imgEl.src = data.preview;
+            imgEl.title = filePath;
+            if (statusEl) {
+                const name = filePath.split('/').pop();
+                const s = data.stats;
+                let txt = name;
+                let cls = 'text-[10px] text-slate-500 mt-1 break-all';
+                if (s) {
+                    const rng = `[${s.min.toFixed(3)}, ${s.max.toFixed(3)}]`;
+                    if (s.max === 0 && s.min === 0) {
+                        txt = `${name} · ⚠ 数据全为 0（DOS 在合成/低对比影像上常见，换真实多波段 Landsat 数据再试）`;
+                        cls = 'text-[10px] text-amber-600 mt-1 break-all';
+                    } else if (s.positive_ratio < 0.05) {
+                        txt = `${name} · ⚠ 仅 ${(s.positive_ratio*100).toFixed(1)}% 像素 > 0，范围 ${rng}`;
+                        cls = 'text-[10px] text-amber-600 mt-1 break-all';
+                    } else {
+                        txt = `${name} · 范围 ${rng}`;
+                    }
+                }
+                statusEl.textContent = txt;
+                statusEl.className = cls;
+            }
+        } else {
+            imgEl.src = PREVIEW_PLACEHOLDER;
+            const err = (data && data.error) || '预览失败';
+            imgEl.title = err;
+            if (statusEl) { statusEl.textContent = '预览失败：' + err; statusEl.className = 'text-[10px] text-red-500 mt-1 break-all'; }
+        }
+    })
+    .catch(e => {
+        imgEl.src = PREVIEW_PLACEHOLDER;
+        imgEl.title = '预览请求失败';
+        if (statusEl) { statusEl.textContent = '预览请求失败：' + (e.message || ''); statusEl.className = 'text-[10px] text-red-500 mt-1 break-all'; }
+    });
+}
+
+function formatSize(mb) {
+    if (typeof mb !== 'number' || isNaN(mb)) return '';
+    if (mb < 1) return (mb * 1024).toFixed(1) + ' KB';
+    if (mb < 1024) return mb.toFixed(2) + ' MB';
+    return (mb / 1024).toFixed(2) + ' GB';
+}
+
+document.getElementById('scanBtn').addEventListener('click', function () {
+    const dir = document.getElementById('inputDir').value.trim();
+    if (!dir) { alert('请先输入输入目录'); return; }
+    const btn = this;
+    const list = document.getElementById('fileList');
+    btn.disabled = true;
+    const origText = btn.textContent;
+    btn.textContent = '扫描中…';
+    list.innerHTML = '<div class="text-slate-400 text-xs py-1">扫描中…</div>';
+    fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ directory: dir })
+    })
+    .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
+    .then(({ ok, data }) => {
+        if (!ok || data.error) {
+            const msg = data.error || '扫描失败';
+            list.innerHTML = '<div class="text-red-500 text-xs py-1">' + msg + '</div>';
+            document.getElementById('fileCount').textContent = 0;
+            const fcGeomErr = document.getElementById('fileCountGeom');
+            if (fcGeomErr) fcGeomErr.textContent = 0;
+            const fcInterfErr = document.getElementById('fileCountInterf');
+            if (fcInterfErr) fcInterfErr.textContent = 0;
+            const inputHintInterfErr = document.getElementById('inputDirHintInterf');
+            if (inputHintInterfErr) inputHintInterfErr.textContent = '尚未配置（请先到大气校正面板设置目录并扫描）';
+            _scannedFiles = [];
+            _scannedInputDir = '';
+            alert(msg);
+            return;
+        }
+        _scannedFiles = data.files || [];
+        _scannedInputDir = dir;
+        const count = data.total || 0;
+        // 扫描成功 → 预览第一个文件（"处理前"），同时把"处理后"复位为占位
+        const previewBefore = document.getElementById('previewBefore');
+        const previewAfter  = document.getElementById('previewAfter');
+        const previewBeforeStatus = document.getElementById('previewBeforeStatus');
+        const previewAfterStatus  = document.getElementById('previewAfterStatus');
+        if (previewAfter) previewAfter.src = PREVIEW_PLACEHOLDER;
+        if (previewAfterStatus) previewAfterStatus.textContent = '';
+        if (count > 0 && previewBefore) {
+            loadPreview(_scannedFiles[0].path, previewBefore, previewBeforeStatus);
+        } else if (previewBefore) {
+            previewBefore.src = PREVIEW_PLACEHOLDER;
+            if (previewBeforeStatus) previewBeforeStatus.textContent = '';
+        }
+        document.getElementById('fileCount').textContent = count;
+        const fcGeom = document.getElementById('fileCountGeom');
+        if (fcGeom) fcGeom.textContent = count;
+        const fcInterf = document.getElementById('fileCountInterf');
+        if (fcInterf) fcInterf.textContent = count;
+        const inputHintInterf = document.getElementById('inputDirHintInterf');
+        if (inputHintInterf) inputHintInterf.textContent = dir;
+        list.innerHTML = '';
+        (data.files || []).forEach(f => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center gap-2 py-1';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox'; cb.checked = true;
+            cb.className = 'accent-black w-3 h-3';
+            const name = document.createElement('span');
+            name.className = 'flex-1 truncate';
+            name.textContent = f.name;
+            const sz = document.createElement('span');
+            sz.className = 'text-slate-400 whitespace-nowrap';
+            sz.textContent = formatSize(f.size);
+            div.appendChild(cb); div.appendChild(name); div.appendChild(sz);
+            list.appendChild(div);
+        });
+        if (count === 0) {
+            list.innerHTML = '<div class="text-slate-400 text-xs py-1">未发现可处理的影像文件</div>';
+        }
+        const ds = document.getElementById('dataStatus');
+        if (ds) ds.textContent = '已就绪';
+        const dsg = document.getElementById('dataStatusGeom');
+        if (dsg) dsg.textContent = '已就绪';
+    })
+    .catch(() => {
+        list.innerHTML = '<div class="text-red-500 text-xs py-1">扫描失败，请检查目录路径</div>';
+        alert('扫描失败，请检查目录路径');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.textContent = origText;
+    });
+});
+
+/* ═══════ Geometric Correction ═══════ */
+function onGeomMethodChange() {}  // handled by current module panel
+
+function onRefImageSelected(input) {
+    if (!input.files || !input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        const prompt = document.getElementById('refImgPrompt');
+        if (prompt) prompt.style.display = 'none';
+        const thumb = document.getElementById('refImgThumb');
+        thumb.src = e.target.result;
+        thumb.style.display = 'block';
+    };
+    reader.readAsDataURL(input.files[0]);
+}
+
+/* ═══════ Background Image ═══════ */
+function onBgImageSelected(input) {
+    if (!input.files || !input.files[0]) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        const prompt = document.getElementById('bgUploadPrompt');
+        if (prompt) prompt.style.display = 'none';
+        const thumb = document.getElementById('bgPreviewThumb');
+        thumb.src = e.target.result;
+        thumb.style.display = 'block';
+        const row = document.getElementById('bgFileRow');
+        if (row) row.style.display = 'flex';
+        const name = document.getElementById('bgFileName');
+        if (name) name.textContent = input.files[0].name;
+    };
+    reader.readAsDataURL(input.files[0]);
+}
+
+function clearBgImage() {
+    document.getElementById('bgUploadPrompt').style.display = 'block';
+    document.getElementById('bgPreviewThumb').style.display = 'none';
+    document.getElementById('bgFileRow').style.display = 'none';
+    document.getElementById('bg_image_input').value = '';
+}
+
+/* ═══════ Atmospheric Method Toggle ═══════ */
+(function() {
+    const radios = document.querySelectorAll('input[name="atmos_method"]');
+    radios.forEach(r => {
+        r.addEventListener('change', function() {
+            document.getElementById('simple_params').style.display = this.value === 'simple' ? 'block' : 'none';
+            document.getElementById('atmo_method').value = this.value;
+        });
+    });
+})();
+
+/* ═══════ Shared: 流式 /api/process 处理 ═══════ */
+async function runProcessing(opts) {
+    const inputDir  = document.getElementById('inputDir').value.trim();
+    const outputDir = document.getElementById('outputDirAtmo').value.trim();
+    if (!inputDir)  { alert('请先选择输入目录'); return; }
+    if (!outputDir) { alert('请先选择输出目录'); return; }
+    if (!_scannedFiles.length) { alert('请先点击「扫描」加载文件清单'); return; }
+    if (inputDir !== _scannedInputDir) {
+        if (!confirm('输入目录已改动，是否仍用上次扫描得到的文件清单继续？\n建议先重新扫描。')) return;
+    }
+
+    const { params, btn, bar, fill, text, log, previewAfter, previewAfterStatus, kickoffMsg } = opts;
+    const origText = btn.textContent;
+
+    function pushLog(msg, cls) {
+        const p = document.createElement('p');
+        p.className = cls || 'text-slate-600';
+        p.textContent = msg;
+        log.appendChild(p);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '处理中…';
+    bar.style.display = 'block';
+    fill.style.width = '0%';
+    text.textContent = '准备中…';
+    log.innerHTML = '';
+    if (previewAfter) previewAfter.src = PREVIEW_PLACEHOLDER;
+    if (previewAfterStatus) previewAfterStatus.textContent = '';
+    pushLog(kickoffMsg, 'text-blue-600 font-medium');
+
+    try {
+        const resp = await fetch('/api/process', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                input_dir:  inputDir,
+                output_dir: outputDir,
+                files:      _scannedFiles,
+                params:     params
+            })
+        });
+        if (!resp.ok) {
+            let errMsg = `HTTP ${resp.status}`;
+            try { const e = await resp.json(); if (e && e.error) errMsg = e.error; } catch (_) {}
+            throw new Error(errMsg);
+        }
+
+        const reader  = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            let nl;
+            while ((nl = buf.indexOf('\n')) >= 0) {
+                const line = buf.slice(0, nl).trim();
+                buf = buf.slice(nl + 1);
+                if (!line) continue;
+                let evt;
+                try { evt = JSON.parse(line); } catch (_) { pushLog(`[非 JSON] ${line}`, 'text-red-500'); continue; }
+                if (evt.type === 'progress') {
+                    text.textContent = `[${evt.current}/${evt.total}] ${evt.message}`;
+                    fill.style.width = (evt.percent || 0) + '%';
+                    pushLog(`[${evt.current}/${evt.total}] ${evt.message}`);
+                } else if (evt.type === 'file_complete') {
+                    text.textContent = `已完成 ${evt.current}/${evt.total}`;
+                    fill.style.width = (evt.percent || 0) + '%';
+                    if (evt.status === 'success') {
+                        pushLog(`✓ ${evt.file}`, 'text-emerald-600');
+                    } else {
+                        const reason = evt.error ? `：${evt.error}` : '';
+                        pushLog(`✗ ${evt.file}${reason}`, 'text-red-500');
+                    }
+                } else if (evt.type === 'file_error') {
+                    pushLog(`✗ ${evt.file}: ${evt.error}`, 'text-red-500');
+                } else if (evt.type === 'complete') {
+                    const s = evt.summary || {};
+                    text.textContent = `全部完成：成功 ${s.successful || 0} · 失败 ${s.failed || 0} · 总数 ${s.total || 0}`;
+                    fill.style.width = '100%';
+                    pushLog(`处理完成：成功 ${s.successful || 0}，失败 ${s.failed || 0}`, 'text-emerald-600 font-bold');
+                    const firstOk = (evt.results || []).find(r => r.status === 'success' && (r.output_path || r.output_groups));
+                    if (firstOk && previewAfter) {
+                        let outPath = firstOk.output_path;
+                        if (!outPath && firstOk.output_groups) {
+                            outPath = Object.values(firstOk.output_groups)[0];
+                        }
+                        if (outPath) {
+                            loadPreview(outPath, previewAfter, previewAfterStatus);
+                        } else if (previewAfterStatus) {
+                            previewAfterStatus.textContent = '输出路径缺失（complete 事件未带 output_path）';
+                            previewAfterStatus.className = 'text-[10px] text-red-500 mt-1 break-all';
+                        }
+                    } else if (previewAfter) {
+                        previewAfter.src = PREVIEW_PLACEHOLDER;
+                        if (previewAfterStatus) {
+                            previewAfterStatus.textContent = '无可用输出（无成功项）';
+                            previewAfterStatus.className = 'text-[10px] text-red-500 mt-1 break-all';
+                        }
+                    }
+                }
+            }
+        }
+        if (buf.trim()) {
+            try {
+                const evt = JSON.parse(buf.trim());
+                if (evt.type === 'complete') {
+                    const s = evt.summary || {};
+                    text.textContent = `全部完成：成功 ${s.successful || 0} · 失败 ${s.failed || 0} · 总数 ${s.total || 0}`;
+                    fill.style.width = '100%';
+                }
+            } catch (_) {}
+        }
+    } catch (e) {
+        pushLog(`处理失败：${e.message}`, 'text-red-500');
+        text.textContent = '处理失败';
+        alert(`处理失败：${e.message}`);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
+}
+
+/* ═══════ Atmospheric Correction · Start ═══════ */
+document.getElementById('processBtn').addEventListener('click', function () {
+    const params = {
+        atmo_method:  document.getElementById('atmo_method').value || 'dos',
+        solar_zenith: parseFloat(document.getElementById('solar_zenith').value) || 45.0,
+    };
+    runProcessing({
+        params: params,
+        btn:    this,
+        bar:    document.getElementById('progressBar'),
+        fill:   document.getElementById('progressFill'),
+        text:   document.getElementById('progressText'),
+        log:    document.getElementById('logContainer'),
+        previewAfter:       document.getElementById('previewAfter'),
+        previewAfterStatus: document.getElementById('previewAfterStatus'),
+        kickoffMsg: `开始大气校正：${_scannedFiles.length} 个文件，方法=${params.atmo_method}，太阳天顶角=${params.solar_zenith}°`,
+    });
+});
+
+/* ═══════ Geometric Correction · Start ═══════ */
+document.getElementById('processBtnGeom').addEventListener('click', function () {
+    const geomMethod = (document.getElementById('geom_method') || {}).value || 'affine';
+    const params = {
+        geom_method:   geomMethod,
+        interpolation: (document.getElementById('interpolation') || {}).value || 'bilinear',
+    };
+    if (geomMethod === 'reference') {
+        const thumb = document.getElementById('refImgThumb');
+        if (!thumb || !thumb.src || thumb.src.startsWith('data:image/svg+xml')) {
+            alert('参考图配准模式下请先上传参考图');
+            return;
+        }
+        params.ref_image = thumb.src;
+    }
+    // 扫描完成后给"几何处理前"也同步预览第一张
+    const previewBeforeGeom = document.getElementById('previewBeforeGeom');
+    const previewBeforeGeomStatus = document.getElementById('previewBeforeGeomStatus');
+    if (_scannedFiles.length && previewBeforeGeom) {
+        loadPreview(_scannedFiles[0].path, previewBeforeGeom, previewBeforeGeomStatus);
+    }
+    runProcessing({
+        params: params,
+        btn:    this,
+        bar:    document.getElementById('progressBarGeom'),
+        fill:   document.getElementById('progressFillGeom'),
+        text:   document.getElementById('progressTextGeom'),
+        log:    document.getElementById('logContainerGeom'),
+        previewAfter:       document.getElementById('previewAfterGeom'),
+        previewAfterStatus: document.getElementById('previewAfterGeomStatus'),
+        kickoffMsg: `开始几何校正：${_scannedFiles.length} 个文件，方法=${geomMethod}，重采样=${params.interpolation}`,
+    });
+});
+
+/* ═══════ Interference Removal · Start ═══════ */
+document.getElementById('processBtnInterf').addEventListener('click', function () {
+    const params = {
+        // 隐藏的 sensor / mask_snow / mask_buildup 保留后端默认值，不读取
+        mask_vegetation: document.getElementById('mask_vegetation').checked,
+        mask_water:      document.getElementById('mask_water').checked,
+        mask_cloud:      document.getElementById('mask_cloud').checked,
+        ndvi_threshold:  parseFloat(document.getElementById('ndvi_threshold').value),
+        cloud_threshold: parseInt(document.getElementById('cloud_threshold').value, 10),
+    };
+    // 进面板时同步"处理前"预览
+    const pBefore  = document.getElementById('previewBeforeInterf');
+    const pBeforeS = document.getElementById('previewBeforeInterfStatus');
+    if (_scannedFiles.length && pBefore) loadPreview(_scannedFiles[0].path, pBefore, pBeforeS);
+
+    const enabled = Object.entries(params)
+        .filter(([k, v]) => k.startsWith('mask_') && v)
+        .map(([k]) => k.slice(5));
+    runProcessing({
+        params: params,
+        btn:    this,
+        bar:    document.getElementById('progressBarInterf'),
+        fill:   document.getElementById('progressFillInterf'),
+        text:   document.getElementById('progressTextInterf'),
+        log:    document.getElementById('logContainerInterf'),
+        previewAfter:       document.getElementById('previewAfterInterf'),
+        previewAfterStatus: document.getElementById('previewAfterInterfStatus'),
+        kickoffMsg: `开始干扰剔除：${_scannedFiles.length} 个文件，启用掩膜=${enabled.length ? enabled.join('/') : '无（仅产出 mask 副产物）'}`,
+    });
+});
+
+
+/* 默认进入大气校正面板 */
+showModule('atmo');
+</script>
+</body>
+</html>

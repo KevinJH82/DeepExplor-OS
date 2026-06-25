@@ -1,0 +1,173 @@
+{% extends "_base.html" %}
+{% set active = 'preflight' %}
+{% block title %}前置检查{% endblock %}
+{% block page_title %}前置检查{% endblock %}
+{% block page_sub %}运维诊断面板:HyP3 端点、端口、凭证、依赖、网络出口。{% endblock %}
+
+{% block content %}
+<section class="sh-card p-6">
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="font-semibold text-zinc-900 flex items-center gap-2">
+      <iconify-icon icon="lucide:stethoscope" class="text-purple-600"></iconify-icon>
+      环境检查
+    </h3>
+    <div class="flex items-center gap-2">
+      <button id="btn-fix" class="sh-btn-fix hidden">
+        <iconify-icon icon="lucide:wrench"></iconify-icon>
+        <span id="btn-fix-text">一键修复</span>
+      </button>
+      <button id="btn-run" class="sh-btn-primary">
+        <iconify-icon icon="lucide:refresh-cw"></iconify-icon>运行检查
+      </button>
+    </div>
+  </div>
+  <div id="preflight-result" class="text-sm">点击右上方按钮开始检查。检查不阻塞服务运行,只是给运维提供诊断信息。</div>
+</section>
+
+<section class="sh-card p-6 mt-6">
+  <h3 class="font-semibold text-zinc-900 flex items-center gap-2 mb-3">
+    <iconify-icon icon="lucide:book-open" class="text-purple-600"></iconify-icon>
+    项目修复建议
+  </h3>
+  <ul class="text-sm text-zinc-700 list-disc list-inside space-y-2">
+    <li><b>HyP3 端点不通</b>:检查 OpenVPN 出口(参考 <code>commons/network.py</code> 的 <code>resolve_proxies</code>)</li>
+    <li><b>HyP3 授权缺失</b>:登 <a href="https://hyp3-api.asf.alaska.edu/ui/" class="text-purple-600 underline" target="_blank">https://hyp3-api.asf.alaska.edu/ui/</a> 用 Earthdata 账号授权 HyP3 应用</li>
+    <li><b>Earthdata 凭证缺失</b>:复制 <code>/opt/deepexplor-services/geo-downloader/credentials.yaml.example</code> 到 <code>config/credentials.yaml</code> 并填写 <code>nasa_earthdata</code> 段</li>
+    <li><b>Python 依赖缺失</b>:点击上方"一键修复"自动安装,或在 geo-insar 目录运行 <code>pip install -r requirements.txt</code></li>
+    <li><b>端口被占</b>:修改 <code>config.yaml</code> 中的 <code>port</code>(默认 8084),或释放冲突进程</li>
+  </ul>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<style>
+  .sh-btn-fix {
+    background: #f59e0b; color: #fff; padding: 0.5rem 1rem; border-radius: 0.375rem;
+    font-weight: 500; display: inline-flex; align-items: center; gap: 0.5rem; transition: opacity 0.2s;
+  }
+  .sh-btn-fix:hover { opacity: 0.9; }
+  .sh-btn-fix:disabled { opacity: 0.5; cursor: not-allowed; }
+  .fix-tag {
+    display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px; border-radius: 4px;
+    font-size: 10px; font-weight: 500; margin-left: 6px;
+  }
+  .fix-tag-auto { background: #fef3c7; color: #92400e; }
+  .fix-tag-manual { background: #fee2e2; color: #991b1b; }
+</style>
+<script>
+let lastChecks = [];
+
+document.getElementById('btn-run').onclick = runCheck;
+document.getElementById('btn-fix').onclick = runFix;
+
+async function runCheck() {
+  const box = document.getElementById('preflight-result');
+  box.innerHTML = '运行中(最长 60 秒)…';
+  try {
+    const r = await fetch('/api/preflight');
+    const j = await r.json();
+    const items = j.report?.checks || [];
+    lastChecks = items;
+
+    // 统计可自动修复的失败项
+    const autoFixable = items.filter(c => c.status === 'fail' && c.fix === 'pip');
+
+    let rows = items.map(c => {
+      const ok = c.status === 'pass';
+      const pill = ok ? 'pill-done' : (c.status === 'warn' ? 'pill-running' : 'pill-error');
+      const icon = ok ? '✅' : (c.status === 'warn' ? '⚠️' : '❌');
+      // 修复标签
+      let fixTag = '';
+      if (c.status === 'fail' && c.fix === 'pip') {
+        fixTag = '<span class="fix-tag fix-tag-auto">可自动修复</span>';
+      } else if (c.status === 'fail' && c.fix === 'manual') {
+        fixTag = '<span class="fix-tag fix-tag-manual">需手动处理</span>';
+      }
+      return `<tr class="border-b border-zinc-100">
+        <td class="py-2 w-8">${icon}</td>
+        <td class="py-2 font-medium">${c.name}${fixTag}</td>
+        <td class="py-2 text-xs text-zinc-500">${c.detail||''}</td>
+        <td class="py-2"><span class="status-pill ${pill}">${c.status}</span></td>
+      </tr>`;
+    }).join('');
+
+    // 摘要行
+    const failCount = items.filter(c => c.status === 'fail').length;
+    const manualCount = items.filter(c => c.status === 'fail' && c.fix === 'manual').length;
+    let summaryExtra = '';
+    if (failCount > 0) {
+      const parts = [];
+      if (autoFixable.length) parts.push(`<b>${autoFixable.length}</b> 项可自动修复`);
+      if (manualCount) parts.push(`<b>${manualCount}</b> 项需手动处理`);
+      summaryExtra = ` · ${parts.join(', ')}`;
+    }
+
+    box.innerHTML = `
+      <div class="mb-3 text-xs text-zinc-500">退出码: <b>${j.exit_code}</b> · 检查 ${items.length} 项${summaryExtra}</div>
+      <table class="w-full">${rows||'<tr><td class="text-zinc-400 py-3">脚本未返回检查项</td></tr>'}</table>
+      ${j.stderr ? `<details class="mt-3 text-xs"><summary class="text-zinc-500 cursor-pointer">stderr</summary><pre class="bg-zinc-50 p-2 mt-1 rounded">${j.stderr}</pre></details>` : ''}
+    `;
+
+    // 显示/隐藏一键修复按钮
+    const btnFix = document.getElementById('btn-fix');
+    if (autoFixable.length > 0) {
+      btnFix.classList.remove('hidden');
+      document.getElementById('btn-fix-text').textContent = `一键修复 (${autoFixable.length} 项)`;
+    } else {
+      btnFix.classList.add('hidden');
+    }
+  } catch (e) {
+    box.innerHTML = `<span class="text-red-600">检查失败: ${e}</span>`;
+  }
+}
+
+async function runFix() {
+  const btnFix = document.getElementById('btn-fix');
+  const btnFixText = document.getElementById('btn-fix-text');
+  const box = document.getElementById('preflight-result');
+
+  btnFix.disabled = true;
+  btnFixText.textContent = '修复中…';
+
+  try {
+    const r = await fetch('/api/preflight/fix', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ actions: ['pip'] }),
+    });
+    const j = await r.json();
+    const result = (j.results || [])[0] || {};
+    if (result.success) {
+      box.innerHTML = `
+        <div class="bg-emerald-50 border border-emerald-200 rounded-md p-4 mb-4">
+          <div class="flex items-center gap-2 text-emerald-800 font-medium mb-2">
+            <iconify-icon icon="lucide:check-circle"></iconify-icon>
+            修复完成,正在重新检查…
+          </div>
+          <details class="text-xs text-emerald-700">
+            <summary class="cursor-pointer">查看安装日志</summary>
+            <pre class="bg-white p-2 mt-1 rounded border text-zinc-600 max-h-40 overflow-auto">${result.output || ''}</pre>
+          </details>
+        </div>`;
+      // 自动重新检查
+      await new Promise(resolve => setTimeout(resolve, 500));
+      await runCheck();
+    } else {
+      box.innerHTML = `
+        <div class="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+          <div class="flex items-center gap-2 text-red-800 font-medium mb-2">
+            <iconify-icon icon="lucide:x-circle"></iconify-icon>
+            修复失败
+          </div>
+          <pre class="text-xs text-red-700 bg-white p-2 rounded border max-h-40 overflow-auto">${result.output || '未知错误'}</pre>
+        </div>`;
+    }
+  } catch (e) {
+    box.innerHTML = `<span class="text-red-600">修复请求失败: ${e}</span>`;
+  } finally {
+    btnFix.disabled = false;
+    // 按钮文字由 runCheck 更新
+  }
+}
+</script>
+{% endblock %}

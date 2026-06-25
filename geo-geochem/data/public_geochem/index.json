@@ -1,0 +1,25 @@
+{
+  "_note": "公开化探数据注册表。broker 不联网取数，只发现本目录内已落地的数据集，按 AOI(bbox) 相交命中后走与用户上传 CSV 相同的插值/C-A 异常流程。新增数据集：放入点位文件并在 datasets 追加一条即可。详见 README.md。",
+  "datasets": [
+    {
+      "name": "ngsa_demo_goldfields",
+      "source": "演示数据（仿 Geoscience Australia NGSA 区域水系沉积物布局，非真实采样）",
+      "license": "demo-only",
+      "bbox": [121.0, -29.0, 121.5, -28.5],
+      "crs": "EPSG:4326",
+      "path": "ngsa_demo_goldfields.csv",
+      "scale_note": "区域尺度水系沉积物示例（约 1 点/数百 km²），仅用于联调演示自动接入链路",
+      "columns": {
+        "lon": "LONGITUDE",
+        "lat": "LATITUDE",
+        "elements": {
+          "Cu": "Cu_ppm",
+          "Pb": "Pb_ppm",
+          "Zn": "Zn_ppm",
+          "Au": "Au_ppb",
+          "As": "As_ppm"
+        }
+      }
+    }
+  ]
+}

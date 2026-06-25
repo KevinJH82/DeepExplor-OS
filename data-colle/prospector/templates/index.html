@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prospector — 找矿前期资料收集</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+
+<div class="app-header">
+  <div class="container" style="max-width: 960px;">
+    <h1>🏔️ <span>Prospector</span> <small class="text-muted fs-6">找矿前期资料自动收集</small></h1>
+  </div>
+</div>
+
+<div class="container" style="max-width: 960px;">
+
+  <!-- ===== 历史任务 ===== -->
+  <div id="historyPanel" class="card-dark p-3 mb-4">
+    <div class="d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="toggleHistory()">
+      <h6 class="mb-0">📂 历史任务</h6>
+      <i id="historyToggleIcon" class="bi bi-chevron-down" style="transition: transform .2s;"></i>
+    </div>
+    <div id="historyBody" class="hidden mt-2" style="max-height: 300px; overflow-y: auto;">
+      <div id="historyList">
+        <div class="text-muted text-center py-3">加载中...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 全球数据缓存 ===== -->
+  <div class="card-dark p-3 mb-4">
+    <div class="d-flex justify-content-between align-items-center" style="cursor: pointer;" onclick="document.getElementById('cacheBody').classList.toggle('hidden')">
+      <h6 class="mb-0">💾 全球数据缓存</h6>
+      <i class="bi bi-chevron-down" style="transition: transform .2s;"></i>
+    </div>
+    <div id="cacheBody" class="hidden mt-2">
+      <div id="cacheStatus" class="text-muted small mb-2">加载中...</div>
+      <div class="d-flex align-items-center gap-2">
+        <input type="file" id="cacheFileInput" accept=".tif,.nc,.zip" hidden onchange="uploadCacheFile(event)">
+        <button class="btn btn-sm btn-outline-info" onclick="document.getElementById('cacheFileInput').click()">
+          📤 上传全球数据文件
+        </button>
+        <span class="text-muted small">支持 EMAG2 磁异常 (.tif/.zip)、WGM2012 重力 (.nc)</span>
+      </div>
+      <div id="cacheUploadResult" class="mt-2 small"></div>
+    </div>
+  </div>
+
+  <!-- ===== 输入区 ===== -->
+  <div id="inputSection" class="card-dark p-4 mb-4">
+    <h5 class="mb-3">📋 输入 ROI + 矿种</h5>
+
+    <div class="upload-zone mb-3" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+      <div class="icon">📁</div>
+      <div class="fw-semibold">点击或拖拽上传 ROI 文件</div>
+      <div class="text-muted small mt-1">支持 .kml / .ovkml / .xlsx</div>
+      <input type="file" id="fileInput" accept=".kml,.ovkml,.xlsx,.xls" hidden onchange="handleFile(event)">
+    </div>
+    <div id="fileInfo" class="hidden mb-3 p-2 rounded" style="background: rgba(56,189,248,.1);">
+      <span id="fileName"></span>
+      <button class="btn btn-sm btn-link text-muted float-end" onclick="clearFile()">✕</button>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label text-muted small">🎯 目标矿种</label>
+        <select id="mineralSelect" class="form-select bg-dark text-light border-secondary">
+          {% for m in minerals %}
+          <option value="{{ m }}">{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label text-muted small">📏 外扩距离: <strong id="bufferVal">20</strong> km</label>
+        <input type="range" id="bufferSlider" class="form-range" min="5" max="50" value="20" oninput="document.getElementById('bufferVal').textContent=this.value; if(AppState.currentFile) previewRoi(AppState.currentFile, this.value);">
+      </div>
+      <div class="col-md-3 d-flex align-items-end">
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" id="autoDownload">
+          <label class="form-check-label small text-muted" for="autoDownload">自动下载磁法+重力数据</label>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-accent mt-3 w-100" id="submitBtn" disabled onclick="submitTask()">
+      🚀 开始收集资料
+    </button>
+  </div>
+
+  <!-- ===== 地图预览 ===== -->
+  <div id="mapSection" class="hidden card-dark mb-4" style="overflow: hidden; border-radius: 12px;">
+    <div id="mapContainer" style="height: 320px;"></div>
+  </div>
+
+  <!-- ===== 进度区 ===== -->
+  <div id="progressSection" class="hidden card-dark p-4 mb-4">
+    <div class="d-flex align-items-center gap-3 mb-3">
+      <div class="spinner-border spinner-border-sm text-info" role="status"></div>
+      <span id="stepText" class="fw-semibold">解析 ROI...</span>
+    </div>
+    <!-- 多步骤指示器 -->
+    <div id="stepIndicators" class="d-flex flex-wrap gap-2 mb-3"></div>
+    <div class="progress" style="height: 6px; background: var(--border);">
+      <div id="progressBar" class="progress-bar bg-info" style="width: 0%; transition: width .3s;"></div>
+    </div>
+  </div>
+
+  <!-- ===== 结果区 ===== -->
+  <div id="resultSection" class="hidden card-dark p-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">📊 收集结果</h5>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-info" onclick="viewReport()">📄 查看报告</button>
+        <button class="btn btn-sm btn-outline-light" onclick="downloadHTML()">🌐 下载 HTML 报告</button>
+        <a id="downloadBtn" class="btn btn-sm btn-success" href="#" download>📥 下载成果包 (ZIP)</a>
+      </div>
+    </div>
+    <div id="resultSummary"></div>
+  </div>
+
+  <!-- ===== 元素背景值图表 ===== -->
+  <div id="elementChartSection" class="hidden card-dark p-4 mb-4">
+    <h6 class="mb-3">🧪 元素地球化学背景值</h6>
+    <div style="height: 300px; position: relative;">
+      <canvas id="elementChartContainer"></canvas>
+    </div>
+  </div>
+
+  <!-- ===== 物探地图 ===== -->
+  <div id="geophysMapsContainer"></div>
+
+  <!-- ===== 论文卡片 ===== -->
+  <div id="paperCardsSection" class="hidden card-dark p-4 mb-4">
+    <h6 class="mb-3">📚 区域相关学术论文</h6>
+    <div id="paperCardsContainer"></div>
+  </div>
+
+  <!-- ===== 报告 Modal ===== -->
+  <div class="modal fade" id="reportModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content bg-dark text-light">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title">📄 资料收集报告</h5>
+          <button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="reportContent">
+          <div class="text-center text-muted py-4">加载中...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/static/js/state.js"></script>
+<script src="/static/js/upload.js"></script>
+<script src="/static/js/pipeline.js"></script>
+<script src="/static/js/results.js"></script>
+<script src="/static/js/history.js"></script>
+<script src="/static/js/map.js"></script>
+<script src="/static/js/charts.js"></script>
+<script>
+  initUpload();
+  refreshHistory();
+</script>
+</body>
+</html>

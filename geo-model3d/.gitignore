@@ -1,0 +1,22 @@
+# 数据/产物（不进代码库）
+results/
+uploads/
+logs/
+*.nc
+*.tif
+*.tiff
+*.mat
+*.npy
+_tasks.json
+
+# Python 缓存/环境
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# 系统
+.DS_Store
+Thumbs.db

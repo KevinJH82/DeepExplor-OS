@@ -1,0 +1,3 @@
+Migration Readiness Score: 97.4/100 → 🟡 有条件就绪
+Blocking: 1 items
+Tests: 242/246 passed (98.4%)

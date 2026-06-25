@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>DeepExplor Portal Sample AOI</name>
+    <Placemark>
+      <name>baiyin_demo</name>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              104.00,36.40,0 104.50,36.40,0 104.50,36.70,0 104.00,36.70,0 104.00,36.40,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>

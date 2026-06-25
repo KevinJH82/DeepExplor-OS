@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.deepexplor.prospector</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/deepexplor-services/data-colle/prospector/venv/bin/python3</string>
+        <string>/opt/deepexplor-system/run_prospector.py</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/opt/deepexplor-services/data-colle-main/prospector</string>
+
+    <!-- 与其它服务一致：以 demacmini 用户运行，规避 macOS TCC 对 root daemon 写入外置卷的拦截 -->
+    <key>UserName</key>
+    <string>demacmini</string>
+    <key>GroupName</key>
+    <string>staff</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>GDAL_CONFIG</key>
+        <string>/opt/homebrew/bin/gdal-config</string>
+        <key>HOME</key>
+        <string>/Users/demacmini</string>
+        <key>LANG</key>
+        <string>zh_CN.UTF-8</string>
+        <!-- 密钥占位符：部署时替换为真实值（请勿把真实密钥提交回仓库） -->
+        <key>DEEPSEEK_API_KEY</key>
+        <string>REPLACE_WITH_DEEPSEEK_API_KEY</string>
+        <key>OPENTOPOGRAPHY_API_KEY</key>
+        <string>REPLACE_WITH_OPENTOPOGRAPHY_API_KEY</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/demacmini/Library/Logs/deepexplor-prospector.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/demacmini/Library/Logs/deepexplor-prospector-error.log</string>
+</dict>
+</plist>

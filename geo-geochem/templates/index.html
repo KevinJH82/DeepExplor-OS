@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>geo-geochem · 地球化学异常处理</title>
+  <style>
+    body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+           background:#0f1419; color:#e6e6e6; margin:0; padding:24px; }
+    .wrap { max-width:880px; margin:0 auto; }
+    h1 { font-size:20px; } .sub { color:#8a94a6; font-size:13px; margin-top:-6px; }
+    h4 { margin:14px 0 0; font-size:14px; color:#aab4c4; }
+    .card { background:#1a212b; border:1px solid #2a3340; border-radius:10px; padding:18px; margin-top:16px; }
+    label { display:block; font-size:13px; color:#aab4c4; margin:10px 0 4px; }
+    input, select { width:100%; box-sizing:border-box; padding:8px 10px; border-radius:6px;
+                    border:1px solid #2a3340; background:#0f1419; color:#e6e6e6; }
+    .hint { font-size:12px; color:#6b7686; margin-top:4px; }
+    .muted2 { color:#8a94a6; font-size:12px; margin-top:6px; }
+    button { margin-top:16px; padding:10px 18px; border:0; border-radius:8px; background:#2f81f7;
+             color:#fff; font-size:14px; cursor:pointer; }
+    button:disabled { background:#3a4250; cursor:not-allowed; }
+    pre { background:#0b0f14; border:1px solid #222b36; border-radius:8px; padding:12px;
+          font-size:12px; max-height:280px; overflow:auto; white-space:pre-wrap; }
+    .row { display:flex; gap:14px; } .row > div { flex:1; }
+    a { color:#6cb6ff; }
+    details.adv > summary, details.prof > summary { cursor:pointer; color:#6cb6ff; font-size:13px; margin-top:4px; }
+    table { width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; }
+    th, td { border:1px solid #2a3340; padding:5px 8px; text-align:left; vertical-align:top; }
+    th { background:#222b36; color:#aab4c4; font-weight:600; white-space:nowrap; }
+    table.sub { margin:4px 0; }
+    .plain { background:#10261f; border:1px solid #1f5f49; border-radius:8px; padding:10px 14px; margin-top:10px; }
+    .plain b { color:#48d39a; }
+    .plain ul { margin:6px 0 0; padding-left:20px; line-height:1.7; font-size:13px; }
+    .warn { background:#3a2e12; border:1px solid #8a6d1f; color:#f0c674; padding:8px 12px;
+            border-radius:6px; font-size:13px; margin-top:8px; }
+    .dlrow { margin-top:12px; }
+    .dlbtn { display:inline-block; font-size:13px; padding:7px 12px; margin:4px 6px 4px 0;
+             border:1px solid #2a3340; border-radius:6px; background:#0f1419; color:#6cb6ff; text-decoration:none; }
+    .dlbtn.primary { background:#2f81f7; color:#fff; border-color:#2f81f7; font-weight:600; }
+    .figs { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    .figs img { max-width:320px; border:1px solid #2a3340; border-radius:6px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>geo-geochem · 地球化学异常处理</h1>
+  <p class="sub">C-A 分形背景/异常分离 + 多元素组合异常 · 端口 8088 · 产物经 broker 进 geo-model3d</p>
+
+  <div class="card">
+    <form id="f">
+      <label>研究区文件（.kml / .kmz，必填）</label>
+      <input type="file" name="file" accept=".kml,.kmz,.ovkml" required>
+      <div class="hint">仅用于确定 AOI 范围与 UTM 投影带。</div>
+
+      <div class="row">
+        <div>
+          <label>目标矿种</label>
+          <select name="mineral">
+            {% for m in minerals %}<option value="{{ m }}">{{ m }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>研究区名称（可选）</label>
+          <input type="text" name="aoi_name" placeholder="缺省取文件名">
+        </div>
+      </div>
+
+      <div class="muted2">非专家只需 <b>上传 KML + 选矿种</b> → 点开始。若研究区命中已接入的公开化探数据集，会自动取点位做异常提取；否则退化为区域背景阈值先验。</div>
+
+      <details class="adv" style="margin-top:10px">
+        <summary>⚙ 专业选项（化探专家操作，非专家无需展开）</summary>
+        <label>化探采样点 CSV（含 lon,lat 与元素列如 Cu,Pb,Zn…）</label>
+        <input type="file" name="geochem" accept=".csv,.txt">
+        <div class="hint">上传实测 ICP-MS/XRF 点位将作为最高优先级数据；不上传则按上述自动取数/降级，不会臆造异常。</div>
+      </details>
+
+      <button type="submit" id="btn">开始处理</button>
+    </form>
+  </div>
+
+  <div class="card" id="out" style="display:none">
+    <div id="status">…</div>
+    <pre id="logs"></pre>
+    <div id="result"></div>
+  </div>
+</div>
+
+<script>
+const f = document.getElementById('f'), btn = document.getElementById('btn');
+const out = document.getElementById('out'), st = document.getElementById('status'),
+      logs = document.getElementById('logs'), resultBox = document.getElementById('result');
+let timer = null, tid = null;
+
+f.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  btn.disabled = true; out.style.display = 'block'; resultBox.innerHTML = '';
+  st.textContent = '提交中…';
+  try {
+    const r = await fetch('/api/start', { method:'POST', body: new FormData(f) });
+    const j = await r.json();
+    if (!j.success) { st.textContent = '失败：' + j.message; btn.disabled = false; return; }
+    tid = j.task_id; st.textContent = '任务 ' + tid + ' 运行中…';
+    timer = setInterval(poll, 1500);
+  } catch (err) { st.textContent = '错误：' + err; btn.disabled = false; }
+});
+
+async function poll() {
+  const r = await fetch('/api/status/' + tid); const j = await r.json();
+  if (!j.success) return;
+  const t = j.task;
+  logs.textContent = (t.logs || []).join('\n');
+  st.textContent = '状态：' + t.status + '（' + (t.progress||0) + '%）';
+  if (t.status === 'completed' || t.status === 'failed') {
+    clearInterval(timer); btn.disabled = false;
+    if (t.status === 'completed' && t.results) showResult(t.results);
+  }
+}
+
+// ---- 富展示 ----
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function fmt(x){ return (typeof x==='number') ? (Math.abs(x)>=1 ? x.toFixed(3) : x.toPrecision(3)) : (x==null?'-':esc(x)); }
+function rp(path){ return String(path).split('/').map(encodeURIComponent).join('/'); }
+function row(k, v){ return '<tr><th>'+k+'</th><td>'+v+'</td></tr>'; }
+
+function srcLabel(ds){
+  if (ds.public && ds.public.dataset) return '公开区域数据：'+esc(ds.public.dataset)+'（区域尺度）';
+  if (ds.upload && ds.upload.status === 'ok') return '用户上传点位（实测）';
+  const th = ds.thresholds || {};
+  return '仅背景阈值先验' + (th.source ? '（'+esc(th.source)+'）' : '');
+}
+
+function summaryTable(ms){
+  const ds = ms.data_sources || {};
+  let r = '';
+  r += row('数据来源', srcLabel(ds));
+  r += row('状态', esc(ms.status||'-'));
+  r += row('尺度说明', esc(ms.scale_note||'-'));
+  if (Array.isArray(ms.key_elements) && ms.key_elements.length) r += row('关键元素', esc(ms.key_elements.join('、')));
+  const ast = ms.anomaly_stats;
+  if (ast) {
+    r += row('采样点数', ast.n_points!=null ? ast.n_points : '-');
+    r += row('处理元素', esc((ast.elements_processed||[]).join('、')));
+    const comb = ast.combination || {};
+    r += row('组合方法', esc(comb.method||'-') + (Array.isArray(comb.elements)&&comb.elements.length ? '（'+esc(comb.elements.join('+'))+'）' : ''));
+    const th = ast.thresholds || {}, tk = Object.keys(th);
+    if (tk.length) {
+      const tt = '<table class="sub"><tr><th>元素</th><th>异常下限</th><th>方法</th></tr>' +
+        tk.map(k => '<tr><td>'+esc(k)+'</td><td>'+fmt(th[k].threshold)+'</td><td>'+esc(th[k].method||'-')+'</td></tr>').join('') +
+        '</table>';
+      r += row('C-A 异常下限', tt);
+    }
+  } else if (ms.prior_only) {
+    r += row('背景阈值元素数', ms.prior_only.n_threshold_elements!=null ? ms.prior_only.n_threshold_elements : '-');
+  }
+  return '<table>' + r + '</table>';
+}
+
+function showResult(res){
+  const ms = res.model_stats || {}, p = res.products || {}, figs = p.figures || [];
+  let html = '';
+
+  // 📖 通俗解读（用户最该看的报告内容）
+  const plain = ms.plain_summary || [];
+  if (plain.length)
+    html += '<div class="plain"><b>📖 通俗解读</b><ul>' + plain.map(s => '<li>'+esc(s)+'</li>').join('') + '</ul></div>';
+
+  // ⚠ 警告
+  (ms.warnings || []).forEach(w => { html += '<div class="warn">⚠ '+esc(w)+'</div>'; });
+
+  // 下载区
+  const dl = (path, label) => '<a class="dlbtn" href="/api/result/'+tid+'/'+rp(path)+'?download=1" download>'+label+'</a>';
+  html += '<div class="dlrow"><a class="dlbtn primary" href="/api/download/'+tid+'">⬇ 下载全部 (zip)</a>';
+  if (p.anomalies) html += dl(p.anomalies, '浓集中心 (GeoJSON)');
+  if (p.multi_element_factor) html += dl(p.multi_element_factor, '组合异常 (GeoTIFF)');
+  html += dl('metadata.json', '元数据 JSON') + '</div>';
+
+  // 📊 专业指标表（折叠，专家用）
+  html += '<details class="prof"><summary>📊 化探专业指标（专家用）</summary>' + summaryTable(ms) + '</details>';
+
+  // 图件画廊
+  if (figs.length) {
+    html += '<h4>异常图件</h4><div class="figs">' + figs.map(fp =>
+      '<a href="/api/result/'+tid+'/'+rp(fp)+'" target="_blank"><img src="/api/result/'+tid+'/'+rp(fp)+'"></a>'
+    ).join('') + '</div>';
+  } else {
+    html += '<div class="hint" style="margin-top:10px">本次无异常图件（多为无实测点位的背景先验降级，见上方说明）。</div>';
+  }
+
+  resultBox.innerHTML = html;
+}
+</script>
+</body>
+</html>

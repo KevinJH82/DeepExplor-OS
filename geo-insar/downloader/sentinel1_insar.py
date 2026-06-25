@@ -1,0 +1,390 @@
+"""
+sentinel1_insar.py — Sentinel-1 InSAR 通过 ASF HyP3 云端处理
+
+流程:
+1. 解析 AOI(commons/aoi.py)
+2. asf_search 查 Sentinel-1 SLC 场景
+3. 按配对策略生成 reference-secondary 对清单
+4. hyp3_sdk 提交 InSAR jobs(INSAR_GAMMA 或 INSAR_ISCE_BURST)
+5. 后台轮询 → 下载 → 标准化(postprocess/insar.py)
+
+注册: nasa_earthdata 凭证(优先 token,fallback username/password)
+"""
+
+import sys
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Any, Callable
+
+# commons/ 兄弟目录导入
+_COMMONS_PATH = Path("/opt/deepexplor-services")
+if str(_COMMONS_PATH) not in sys.path:
+    sys.path.insert(0, str(_COMMONS_PATH))
+
+from commons.base_downloader import BaseDownloader
+from commons.aoi import bbox_to_wkt
+
+try:
+    import asf_search as asf
+    HAS_ASF = True
+except ImportError:
+    HAS_ASF = False
+
+try:
+    import hyp3_sdk
+    HAS_HYP3 = True
+except ImportError:
+    HAS_HYP3 = False
+
+
+# 配对策略
+PAIR_CLOSEST = "closest_in_time"
+PAIR_FIXED_MASTER = "fixed_master"
+PAIR_CASCADE = "cascade"
+
+# HyP3 后端
+BACKEND_GAMMA = "INSAR_GAMMA"
+BACKEND_ISCE_BURST = "INSAR_ISCE_BURST"
+
+# 认证重试参数 —— EDL/ASF 鉴权偶发网络抖动(连接重置、5xx、限流),
+# hyp3_sdk / asf_search 不自带重试,单次失败就把整个任务判 error。
+_AUTH_RETRIES = 4
+_AUTH_BACKOFF = 2.0  # 秒,指数退避:2 → 4 → 8(总等待 ~14s)
+
+
+def _auth_with_retry(build: Callable[[], Any], what: str) -> Any:
+    """
+    执行一次鉴权(build()),失败按指数退避重试。
+
+    背景:NASA EDL(urs.earthdata.nasa.gov)/ ASF(auth.asf.alaska.edu)鉴权端点偶发
+    连接抖动或 5xx。hyp3_sdk 的 get_authenticated_session 把任何 HTTPError 一律折叠成
+    "Was not able to authenticate with credentials provided / This could be due to invalid
+    credentials or a connection error.",凭证明明有效也会被误判,且单次失败即整体放弃。
+    上游 get_earthdata_creds(auto_token=True) 已先用同一套 username/password 成功换过
+    EDL token,因此到这一步再失败,绝大多数是瞬时网络问题 → 重试即可恢复。
+    """
+    last_exc: Optional[BaseException] = None
+    for attempt in range(1, _AUTH_RETRIES + 1):
+        try:
+            return build()
+        except Exception as e:  # noqa: BLE001 — EDL/ASF 把各种网络错都包成鉴权异常
+            last_exc = e
+            if attempt < _AUTH_RETRIES:
+                delay = _AUTH_BACKOFF * (2 ** (attempt - 1))
+                print(f"    [{what}] 鉴权第 {attempt}/{_AUTH_RETRIES} 次失败,"
+                      f"{delay:.0f}s 后重试: {str(e)[:120]}")
+                time.sleep(delay)
+    raise RuntimeError(
+        f"{what} 鉴权连续 {_AUTH_RETRIES} 次失败。上游已用相同账号成功换取过 EDL token,"
+        f"故凭证有效,这极可能是 NASA EDL / ASF 鉴权端点的瞬时网络问题(连接重置/5xx/限流)。"
+        f"请稍后重试该任务。最后一次错误: {last_exc}"
+    ) from last_exc
+
+
+class Sentinel1InsarDownloader(BaseDownloader):
+
+    PLATFORM_NAME = "sentinel1_insar"
+    REQUIRES_AUTH = True
+
+    def __init__(
+        self,
+        credentials: Dict[str, str],
+        output_dir: str = "./downloads",
+        **kwargs,
+    ):
+        super().__init__(credentials=credentials, output_dir=output_dir)
+        self._asf_session = None
+        self._hyp3 = None
+
+    def _check_deps(self):
+        missing = []
+        if not HAS_ASF:
+            missing.append("asf_search")
+        if not HAS_HYP3:
+            missing.append("hyp3_sdk")
+        if missing:
+            raise ImportError(
+                f"缺少依赖: {', '.join(missing)}\n"
+                f"请运行: pip install {' '.join(missing)}"
+            )
+
+    def _get_asf_session(self):
+        if self._asf_session is None:
+            self._check_deps()
+            token = self.credentials.get("token") or ""
+
+            def _build():
+                if token:
+                    return asf.ASFSession().auth_with_token(token)
+                return asf.ASFSession().auth_with_creds(
+                    self.credentials["username"],
+                    self.credentials["password"],
+                )
+
+            self._asf_session = _auth_with_retry(_build, "ASF")
+        return self._asf_session
+
+    def _get_hyp3(self):
+        if self._hyp3 is None:
+            self._check_deps()
+            # 注意:hyp3_sdk 6.x 只支持「用户名+密码」HTTP Basic 鉴权,不接受 EDL token。
+            # 早先版本把 token 当 password 传(password=... or token),token-only 配置必然
+            # 失败并报同一句误导性的 "invalid credentials or connection error"。这里只用
+            # username/password —— get_earthdata_creds 保证二者齐全。
+            username = self.credentials["username"]
+            password = self.credentials.get("password") or ""
+            if not password:
+                raise RuntimeError(
+                    "HyP3 提交需要 nasa_earthdata 的 username + password"
+                    "(hyp3_sdk 不支持仅 token 登录)。请在 credentials.yaml 补全 password。"
+                )
+
+            self._hyp3 = _auth_with_retry(
+                lambda: hyp3_sdk.HyP3(username=username, password=password),
+                "HyP3",
+            )
+        return self._hyp3
+
+    # ─────────────────────────────────────────────────────────
+    # search() — 查 Sentinel-1 SLC 或 BURST(取决于 backend)
+    # ─────────────────────────────────────────────────────────
+    def search(
+        self,
+        bbox: Tuple[float, float, float, float],
+        start_date: str,
+        end_date: str,
+        beam_mode: str = "IW",
+        polarization: str = "VV",
+        backend: str = BACKEND_ISCE_BURST,
+        **kwargs,
+    ) -> List[Any]:
+        """
+        搜索 Sentinel-1 数据。
+
+        - backend=INSAR_GAMMA      → 整景 SLC(processingLevel=SLC)
+        - backend=INSAR_ISCE_BURST → burst 级 granule(processingLevel=BURST),
+                                      因为 HyP3 的 ISCE_BURST API 只接受 burst granule。
+        """
+        self._check_deps()
+        self._validate_date(start_date)
+        self._validate_date(end_date)
+
+        aoi_wkt = bbox_to_wkt(bbox)
+        session = self._get_asf_session()
+
+        if backend == BACKEND_ISCE_BURST:
+            proc_level = asf.PRODUCT_TYPE.BURST
+            kind = "BURST"
+            # burst 数据每个 polarization 是独立 granule,默认只取 VV(配对一致性)
+            search_pol = polarization
+        else:
+            proc_level = asf.PRODUCT_TYPE.SLC
+            kind = "SLC"
+            # SLC 是整景,polarization 字段表示该景包含的极化(VV+VH 是 IW 主流)
+            search_pol = "VV+VH"
+
+        results = asf.search(
+            platform=[asf.PLATFORM.SENTINEL1],
+            processingLevel=[proc_level],
+            beamMode=[beam_mode],
+            polarization=[search_pol],
+            intersectsWith=aoi_wkt,
+            start=f"{start_date}T00:00:00Z",
+            end=f"{end_date}T23:59:59Z",
+            maxResults=500 if kind == "BURST" else 200,
+            opts=asf.ASFSearchOptions(session=session),
+        )
+
+        scenes = list(results)
+        print(f"    [Sentinel-1 {kind}] 找到 {len(scenes)} 个")
+        for s in scenes[:5]:
+            p = s.properties
+            if kind == "BURST":
+                b = p.get("burst") or {}
+                print(f"      {p.get('startTime','?')[:10]}  "
+                      f"burst={b.get('fullBurstID','?')}  "
+                      f"pol={p.get('polarization','?')}")
+            else:
+                print(f"      {p.get('startTime','?')[:10]}  "
+                      f"path={p.get('pathNumber','?')}  "
+                      f"frame={p.get('frameNumber','?')}  "
+                      f"pol={p.get('polarization','?')}")
+        if len(scenes) > 5:
+            print(f"      ... 共 {len(scenes)} 个")
+        return scenes
+
+    # ─────────────────────────────────────────────────────────
+    # 配对策略
+    # ─────────────────────────────────────────────────────────
+    @staticmethod
+    def _scene_datetime(scene) -> datetime:
+        return datetime.fromisoformat(scene.properties["startTime"].replace("Z", "+00:00"))
+
+    def make_pairs(
+        self,
+        scenes: List[Any],
+        strategy: str = PAIR_CLOSEST,
+        max_temporal_baseline_days: int = 24,
+        max_perp_baseline_m: float = 200.0,
+        max_pairs: int = 50,
+    ) -> List[Tuple[Any, Any]]:
+        """
+        根据策略生成 (reference, secondary) 干涉对清单。
+
+        过滤:
+        - 同 path/frame/orbit_direction
+        - 时间基线 <= max_temporal_baseline_days
+        - 垂直基线 <= max_perp_baseline_m(若可获取)
+        """
+        if not scenes:
+            return []
+
+        # 分组键:同组内的影像才能配对
+        # - SLC:  (path, frame, orbit_direction)
+        # - BURST:(fullBurstID, polarization)—— frame=None,必须用 burst ID
+        def _group_key(s):
+            b = s.properties.get("burst")
+            if b:  # burst 数据
+                return (b.get("fullBurstID"), s.properties.get("polarization"))
+            return (
+                s.properties.get("pathNumber"),
+                s.properties.get("frameNumber"),
+                s.properties.get("flightDirection"),
+            )
+
+        groups: Dict[Tuple, List] = {}
+        for s in scenes:
+            groups.setdefault(_group_key(s), []).append(s)
+
+        # 按组分别生成对（asc/desc、各 burst 互不混；只有同组影像才能干涉）
+        group_pairs: Dict[Tuple, List[Tuple[Any, Any]]] = {}
+        for key, group in groups.items():
+            group_sorted = sorted(group, key=lambda x: self._scene_datetime(x))
+            if len(group_sorted) < 2:
+                continue
+            gp: List[Tuple[Any, Any]] = []
+
+            if strategy == PAIR_CLOSEST:
+                for i in range(len(group_sorted) - 1):
+                    ref, sec = group_sorted[i], group_sorted[i + 1]
+                    if self._baseline_days(ref, sec) <= max_temporal_baseline_days:
+                        gp.append((ref, sec))
+
+            elif strategy == PAIR_FIXED_MASTER:
+                master = group_sorted[0]
+                for sec in group_sorted[1:]:
+                    if self._baseline_days(master, sec) <= max_temporal_baseline_days:
+                        gp.append((master, sec))
+
+            elif strategy == PAIR_CASCADE:
+                for i in range(len(group_sorted) - 1):
+                    for j in range(i + 1, len(group_sorted)):
+                        if self._baseline_days(group_sorted[i], group_sorted[j]) > max_temporal_baseline_days:
+                            break
+                        gp.append((group_sorted[i], group_sorted[j]))
+
+            else:
+                raise ValueError(f"未知配对策略: {strategy}")
+
+            if gp:
+                gp.sort(key=lambda p: self._scene_datetime(p[0]))
+                group_pairs[key] = gp
+
+        # 公平截断：按组轮转取对，避免某条轨道/burst 被"全局排序砍前 N"而整组饿死。
+        # 升降双轨 / 多 burst 时关键：保证每组都拿到配额，总数仍受 max_pairs 约束。
+        keys = list(group_pairs.keys())
+        total = sum(len(v) for v in group_pairs.values())
+        if total <= max_pairs:
+            pairs = [p for k in keys for p in group_pairs[k]]
+        else:
+            pairs = []
+            cursor = {k: 0 for k in keys}
+            while len(pairs) < max_pairs and any(cursor[k] < len(group_pairs[k]) for k in keys):
+                for k in keys:
+                    if cursor[k] < len(group_pairs[k]):
+                        pairs.append(group_pairs[k][cursor[k]])
+                        cursor[k] += 1
+                        if len(pairs) >= max_pairs:
+                            break
+            print(f"    [配对] 共可配 {total} 对（{len(keys)} 组），按组公平截至 {max_pairs} 对")
+
+        # 各组（轨道/burst）各贡献多少，便于核对升降双轨覆盖
+        from collections import Counter
+        per_group = Counter(_group_key(ref) for ref, _sec in pairs)
+        groups_desc = "; ".join(f"{k}:{n}" for k, n in per_group.items())
+        print(f"    [配对] 生成 {len(pairs)} 对（策略 {strategy}；分组 {groups_desc}）")
+        return pairs
+
+    def _baseline_days(self, ref, sec) -> int:
+        return abs((self._scene_datetime(sec) - self._scene_datetime(ref)).days)
+
+    # ─────────────────────────────────────────────────────────
+    # download() — 提交 HyP3 jobs(异步,真正下载由 postprocess 触发)
+    # ─────────────────────────────────────────────────────────
+    def submit_pairs(
+        self,
+        pairs: List[Tuple[Any, Any]],
+        backend: str = BACKEND_ISCE_BURST,
+        include_dem: bool = False,
+        include_water_mask: bool = False,
+        include_inc_map: bool = False,
+        job_name_prefix: str = "geo-insar",
+    ) -> List[Any]:
+        """
+        向 HyP3 提交 InSAR jobs。返回 hyp3_sdk.Job 列表。
+        """
+        self._check_deps()
+        hyp3 = self._get_hyp3()
+        jobs = []
+
+        for ref, sec in pairs:
+            ref_name = ref.properties.get("sceneName") or ref.properties.get("granuleName")
+            sec_name = sec.properties.get("sceneName") or sec.properties.get("granuleName")
+            ref_date = self._scene_datetime(ref).strftime("%Y%m%d")
+            sec_date = self._scene_datetime(sec).strftime("%Y%m%d")
+            name = f"{job_name_prefix}_{ref_date}_{sec_date}"
+
+            if backend == BACKEND_GAMMA:
+                result = hyp3.submit_insar_job(
+                    granule1=ref_name,
+                    granule2=sec_name,
+                    name=name,
+                    include_look_vectors=include_inc_map,
+                    include_los_displacement=True,
+                    include_inc_map=include_inc_map,
+                    include_dem=include_dem,
+                    include_wrapped_phase=True,
+                    apply_water_mask=include_water_mask,
+                )
+            elif backend == BACKEND_ISCE_BURST:
+                result = hyp3.submit_insar_isce_burst_job(
+                    granule1=ref_name,
+                    granule2=sec_name,
+                    name=name,
+                    apply_water_mask=include_water_mask,
+                )
+            else:
+                raise ValueError(f"未知后端: {backend}")
+
+            # hyp3_sdk 7.x 的 submit_* 返回 Batch(单 pair 提交时 Batch 里就 1 个 Job)
+            job = result.jobs[0] if hasattr(result, "jobs") else result
+            print(f"    [HyP3 提交] {name} → job_id={job.job_id} (backend={backend})")
+            jobs.append(job)
+
+        return jobs
+
+    def download(
+        self,
+        search_results: List[Any],
+        save_dir: Path,
+        **kwargs,
+    ) -> List[Path]:
+        """
+        BaseDownloader 兼容接口:提交 pairs 后立即返回(不阻塞)。
+        实际下载由 task_store 的轮询线程驱动。
+        """
+        raise NotImplementedError(
+            "InSAR 是异步流程,请使用 search() + make_pairs() + submit_pairs() + "
+            "task_store 轮询机制,不要直接调 download()"
+        )

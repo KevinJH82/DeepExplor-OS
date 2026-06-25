@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>矿产深部探测系统</title>
+<script src="/static/tailwindcss.js"></script>
+<script src="/static/iconify-icon.min.js"></script>
+<script src="/static/echarts.min.js"></script>
+<style>
+        body { font-family: 'Inter', 'Microsoft YaHei', sans-serif; }
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .glass-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(8px); }
+        .detector-checkbox.selected {
+            background-color: #2563eb !important;
+            border-color: #2563eb !important;
+        }
+        .detector-checkbox.selected span, 
+        .detector-checkbox.selected iconify-icon {
+            color: white !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 overflow-hidden">
+<div class="flex h-screen w-full">
+<!-- 左侧控制面板 -->
+<aside class="w-80 border-r border-slate-200 bg-white flex flex-col h-full shadow-sm z-10">
+<div class="p-6 border-b border-slate-100">
+<div class="flex items-center gap-2">
+<div class="p-1.5 bg-blue-600 rounded-lg text-white">
+<iconify-icon class="text-base" icon="lucide:layers"></iconify-icon>
+</div>
+<h1 class="text-base font-bold tracking-tight text-slate-900">Deep Explor OS</h1>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto sidebar-scroll p-6 space-y-8">
+<!-- 任务名称 -->
+<section>
+<label class="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
+<iconify-icon class="text-slate-500" icon="lucide:tag"></iconify-icon>
+                    任务名称（可选）
+                </label>
+<input class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all" placeholder="输入本次分析任务的名称..." type="text"/>
+</section>
+<!-- 数据文件上传 --><section>
+<div class="flex items-center justify-between mb-3">
+<label class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+<iconify-icon class="text-blue-500" icon="lucide:file-archive"></iconify-icon>
+                            数据文件上传
+                        </label>
+<span class="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded font-mono">.ZIP</span>
+</div>
+<div class="border-2 border-dashed border-slate-200 rounded-xl p-6 transition-all hover:border-blue-400 hover:bg-blue-50/30 group cursor-pointer text-center">
+<iconify-icon class="text-3xl text-slate-300 group-hover:text-blue-500 mb-2" icon="lucide:upload-cloud"></iconify-icon>
+<p class="text-xs text-slate-500 leading-relaxed">点击或拖拽上传压缩包文件</p>
+<p class="text-[10px] text-slate-400 mt-1 italic">需包含遥感原始传感数据</p>
+</div>
+<!-- Phase 1.5: InSAR 数据自动识别提示 -->
+<div class="mt-3 flex items-start gap-2 px-3 py-2 bg-purple-50 border border-purple-100 rounded-lg">
+<iconify-icon class="text-purple-500 mt-0.5" icon="lucide:radar"></iconify-icon>
+<div class="text-[11px] text-purple-700 leading-relaxed">
+<span class="font-semibold">InSAR 自动识别:</span>
+压缩包内含 <code class="bg-purple-100 px-1 rounded">los_velocity.tif</code> 和 <code class="bg-purple-100 px-1 rounded">coherence.tif</code>(或 <code class="bg-purple-100 px-1 rounded">sentinel1_insar/&lt;pair&gt;/</code> 子目录)时,系统自动启用 SlowVars 第 8 类形变因素,与 DEM 应力场联合识别活动构造。
+</div>
+</div>
+</section>
+<!-- ROI 坐标上传 -->
+<section>
+<div class="flex items-center justify-between mb-3">
+<label class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+<iconify-icon class="text-emerald-500" icon="lucide:map-pin"></iconify-icon>
+                            ROI 坐标文件
+                        </label>
+<span class="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded font-mono">XLS / XLSX / CSV</span>
+</div>
+<div class="border border-slate-200 rounded-lg p-3 bg-slate-50 flex items-center gap-3 cursor-pointer hover:bg-white transition-colors">
+<iconify-icon class="text-xl text-emerald-600" icon="lucide:file-spread-sheet"></iconify-icon>
+<div class="flex-1 overflow-hidden">
+<p class="text-xs font-medium text-slate-700 truncate">选择坐标定义文件</p>
+</div>
+</div>
+</section>
+<!-- 探测器选择 -->
+<section>
+<label class="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
+<iconify-icon class="text-indigo-500" icon="lucide:cpu"></iconify-icon>
+                        探测器选择
+                    </label>
+<div class="grid grid-cols-2 gap-2">
+<div class="detector-checkbox selected flex flex-col items-center justify-center p-3 rounded-xl border border-blue-600 bg-blue-600 cursor-pointer transition-all hover:shadow-md group">
+<input checked="" class="hidden" type="checkbox"/>
+<iconify-icon class="text-xl text-white mb-1" icon="lucide:zap"></iconify-icon>
+<span class="text-[10px] font-bold text-white">RedEdge（红边）</span>
+</div>
+<div class="detector-checkbox flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-white cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50/30 group">
+<input class="hidden" type="checkbox"/>
+<iconify-icon class="text-xl text-slate-400 group-hover:text-blue-500 mb-1" icon="lucide:zap"></iconify-icon>
+<span class="text-[10px] font-bold text-slate-600 group-hover:text-blue-600">Intrinsic（本征吸收）</span>
+</div>
+<div class="detector-checkbox flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-white cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50/30 group">
+<input class="hidden" type="checkbox"/>
+<iconify-icon class="text-xl text-slate-400 group-hover:text-blue-500 mb-1" icon="lucide:zap"></iconify-icon>
+<span class="text-[10px] font-bold text-slate-600 group-hover:text-blue-600">SlowVars（慢变量）</span>
+</div>
+<div class="detector-checkbox opacity-40 flex flex-col items-center justify-center p-3 rounded-xl border border-slate-100 bg-slate-50 cursor-not-allowed group">
+<input class="hidden" disabled="" type="checkbox"/>
+<iconify-icon class="text-xl text-slate-300 mb-1" icon="lucide:zap"></iconify-icon>
+<span class="text-[10px] font-bold text-slate-400">KnownAnomaly（KML）</span>
+</div>
+</div>
+</section>
+<!-- KML 异常数据 -->
+<section>
+<label class="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
+<iconify-icon class="text-orange-500" icon="lucide:database"></iconify-icon>
+                        KML 已知异常数据
+                    </label>
+<div class="space-y-2">
+<div class="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+<input checked="" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" id="known_anomaly_layer" type="checkbox"/>
+<span class="text-xs text-slate-600">加载历史地质异常层</span>
+</div>
+<div class="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm opacity-60">
+<input class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox"/>
+<span class="text-xs text-slate-600">叠加同位素辐射热点</span>
+</div>
+</div>
+</section>
+<!-- 分析参数 -->
+<section>
+<label class="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
+<iconify-icon class="text-slate-500" icon="lucide:settings-2"></iconify-icon>
+                        分析参数设定
+                    </label>
+<div class="space-y-4">
+<div>
+<label class="block text-[11px] text-slate-500 mb-1.5">目标矿种</label>
+<select class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+<option>金矿 (Au)</option>
+<option>铜矿 (Cu)</option>
+<option>锂矿 (Li)</option>
+<option>稀土元素 (REE)</option>
+</select>
+</div>
+<div>
+<label class="block text-[11px] text-slate-500 mb-1.5">预设检测模型</label>
+<select class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+<option>DeepMineral V2.4</option>
+<option>Schumann-Net Pro</option>
+<option>Resonance-X Standard</option>
+</select>
+</div>
+<div>
+<div class="flex justify-between mb-1.5 text-[11px] text-slate-500">
+<span>检测阈值</span>
+<span class="font-mono" id="thresholdValue">0.85</span>
+</div>
+<input class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" max="1" min="0" step="0.01" type="range" value="0.85"/>
+</div>
+</div>
+</section>
+</div>
+<!-- 运行控制区域 -->
+<div class="p-6 bg-slate-50 border-t border-slate-200">
+<div class="mb-4">
+<div class="flex justify-between items-end mb-2">
+<span class="text-xs font-semibold text-slate-700">系统就绪</span>
+<span class="text-[10px] text-slate-400">2026.05.09 14:30:22</span>
+</div>
+<div class="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+<div class="h-full bg-blue-600 transition-all duration-500" id="progressBar" style="width: 35%;"></div>
+</div>
+</div>
+<div class="grid grid-cols-1 gap-2">
+<button class="w-full bg-slate-900 hover:bg-black text-white py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-slate-200 active:scale-95">
+<iconify-icon class="text-lg" icon="lucide:play-circle"></iconify-icon>
+                        开始运行
+                    </button>
+<div class="grid grid-cols-2 gap-2">
+<button class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-xl font-semibold text-xs flex items-center justify-center gap-1 transition-all active:scale-95">
+<iconify-icon icon="lucide:square"></iconify-icon>
+                            停止
+                        </button>
+<button class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-xl font-semibold text-xs flex items-center justify-center gap-1 transition-all active:scale-95">
+<iconify-icon icon="lucide:refresh-cw"></iconify-icon>
+                            重置
+                        </button>
+</div>
+</div>
+</div>
+</aside>
+<!-- 右侧主内容区 -->
+<main class="flex-1 flex flex-col h-full relative">
+<!-- 顶部状态栏 -->
+<header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8">
+<div class="flex items-center gap-4">
+<h2 class="text-2xl font-bold text-slate-900 uppercase tracking-wider">矿产深部探测系统</h2>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-[11px] font-bold text-slate-400 mr-2">2026年05月09日</span>
+<div class="flex items-center gap-2 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+<span class="text-xs font-medium text-emerald-700">传感器连接正常</span>
+</div>
+<div class="h-8 w-[1px] bg-slate-200 mx-2"></div>
+<div class="flex items-center gap-2">
+<div class="text-right">
+<p class="text-xs font-bold text-slate-900">Dr. Sarah Chen</p>
+<p class="text-[10px] text-slate-500">高级分析员</p>
+</div>
+<img alt="User Avatar" class="w-9 h-9 rounded-full border border-slate-200" src="https://modao.cc/agent-py/media/generated_images/2026-05-09/b6db954ed0874dfcb4eee32a3766be2c.jpg#desc=User%20Avatar"/>
+</div>
+</div>
+</header>
+<!-- 主要显示区域 -->
+<div class="flex-1 p-8 overflow-y-auto bg-[#F8FAFC]">
+<div class="max-w-7xl mx-auto space-y-6">
+<!-- 结果标签页控制 -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+<div class="border-b border-slate-100 flex px-2 overflow-x-auto">
+<button class="px-6 py-4 text-sm font-semibold text-blue-600 border-b-2 border-blue-600 transition-all tab-btn shrink-0" onclick="switchResultTab(event, 'log')">运行日志</button>
+<button class="px-6 py-4 text-sm font-medium text-slate-500 hover:text-slate-900 transition-all tab-btn shrink-0" onclick="switchResultTab(event, 'resonance')">共振参数</button>
+<button class="px-6 py-4 text-sm font-medium text-slate-500 hover:text-slate-900 transition-all tab-btn shrink-0" onclick="switchResultTab(event, 'mask')">掩码集成</button>
+<button class="px-6 py-4 text-sm font-medium text-slate-500 hover:text-slate-900 transition-all tab-btn shrink-0" onclick="switchResultTab(event, 'prediction')">深部预测</button>
+</div>
+<div class="p-6">
+<!-- 运行日志 -->
+<div class="tab-content" id="tab-log">
+<div class="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+<div class="flex gap-4 p-3 bg-slate-50 rounded-lg">
+<div class="w-1.5 h-1.5 mt-1.5 rounded-full bg-blue-500 shrink-0"></div>
+<div class="flex-1">
+<div class="flex justify-between mb-1">
+<span class="text-[10px] font-mono font-bold text-slate-400">2026-05-09 14:30:22</span>
+<span class="px-1.5 py-0.5 rounded bg-blue-100 text-[10px] text-blue-600 font-bold">INFO</span>
+</div>
+<p class="text-xs text-slate-600">系统初始化完成，遥感数据处理引擎已就绪。</p>
+</div>
+</div>
+<div class="flex gap-4 p-3 bg-slate-50 rounded-lg">
+<div class="w-1.5 h-1.5 mt-1.5 rounded-full bg-blue-500 shrink-0"></div>
+<div class="flex-1">
+<div class="flex justify-between mb-1">
+<span class="text-[10px] font-mono font-bold text-slate-400">2026-05-09 14:31:05</span>
+<span class="px-1.5 py-0.5 rounded bg-blue-100 text-[10px] text-blue-600 font-bold">INFO</span>
+</div>
+<p class="text-xs text-slate-600">正在匹配 ROI 坐标空间投影参考系 (WGS-84)，检测到 12 个重点监控区域。</p>
+</div>
+</div>
+<div class="flex gap-4 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+<div class="w-1.5 h-1.5 mt-1.5 rounded-full bg-emerald-500 shrink-0"></div>
+<div class="flex-1">
+<div class="flex justify-between mb-1">
+<span class="text-[10px] font-mono font-bold text-emerald-400">2026-05-09 14:32:15</span>
+<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-[10px] text-emerald-600 font-bold">SUCCESS</span>
+</div>
+<p class="text-xs text-emerald-700 font-medium">成功加载 KML 异常层: Gold_Mine_Belt_2026.kml，共导入 3,452 个历史异常点。</p>
+</div>
+</div>
+<div class="flex gap-4 p-3 bg-slate-50 rounded-lg">
+<div class="w-1.5 h-1.5 mt-1.5 rounded-full bg-blue-500 shrink-0"></div>
+<div class="flex-1">
+<div class="flex justify-between mb-1">
+<span class="text-[10px] font-mono font-bold text-slate-400">2026-05-09 14:33:40</span>
+<span class="px-1.5 py-0.5 rounded bg-blue-100 text-[10px] text-blue-600 font-bold">PROCESS</span>
+</div>
+<p class="text-xs text-slate-600">正在执行舒曼波一阶共振频率 (7.83Hz) 特征提取，当前进度 45%...</p>
+</div>
+</div>
+</div>
+</div>
+<!-- 共振参数 -->
+<div class="tab-content hidden" id="tab-resonance">
+<div class="relative w-full h-[500px] bg-slate-50 rounded-xl overflow-hidden group border border-slate-100">
+<div class="absolute inset-0 flex items-center justify-center overflow-auto p-4">
+<img alt="Resonance Parameters Chart" class="max-w-none transition-transform duration-200 ease-out" id="img-resonance" src="https://modao.cc/agent-py/media/generated_images/2026-05-09/aa40d95109c545e5a869724bcb093f24.jpg#desc=Resonance%20Parameters%20Chart" style="transform: scale(1);"/>
+</div>
+<div class="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+<button class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center" onclick="changeZoom('img-resonance', 0.2)" title="放大">
+<iconify-icon icon="lucide:zoom-in"></iconify-icon>
+</button>
+<button class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center" onclick="changeZoom('img-resonance', -0.2)" title="缩小">
+<iconify-icon icon="lucide:zoom-out"></iconify-icon>
+</button>
+<button class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center" onclick="resetZoom('img-resonance')" title="重置">
+<iconify-icon icon="lucide:refresh-cw"></iconify-icon>
+</button>
+<button class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center" onclick="fitZoom('img-resonance')" title="适应显示">
+<iconify-icon icon="lucide:maximize-2"></iconify-icon>
+</button>
+</div>
+<div class="absolute bottom-4 left-4 pointer-events-none">
+<span class="px-3 py-1.5 bg-white/80 backdrop-blur rounded-full text-[10px] font-bold text-slate-500 border border-slate-200 shadow-sm uppercase tracking-wider">Resonance Parameters Analysis</span>
+</div>
+</div>
+</div>
+<!-- 掩码集成 -->
+<div class="tab-content hidden" id="tab-mask">
+<div class="relative w-full h-[500px] bg-slate-50 rounded-xl overflow-hidden group border border-slate-100">
+<div class="absolute inset-0 flex items-center justify-center overflow-auto p-4">
+<img alt="Mask Integrated Map" class="max-w-none transition-transform duration-200 ease-out" id="img-mask" src="https://modao.cc/agent-py/media/generated_images/2026-05-09/6634e3d825444248975850314dd88723.jpg#desc=Mask%20Integrated%20Map" style="transform: scale(1);"/>
+</div>
+<div class="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+<button class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center" onclick="changeZoom('img-mask', 0.2)" title="放大">
+<iconify-icon icon="lucide:zoom-in"></iconify-icon>
+</button>
+<button class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center" onclick="changeZoom('img-mask', -0.2)" title="缩小">
+<iconify-icon icon="lucide:zoom-out"></iconify-icon>
+</button>
+<button class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center" onclick="resetZoom('img-mask')" title="重置">
+<iconify-icon icon="lucide:refresh-cw"></iconify-icon>
+</button>
+<button class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center" onclick="fitZoom('img-mask')" title="适应显示">
+<iconify-icon icon="lucide:maximize-2"></iconify-icon>
+</button>
+</div>
+<div class="absolute bottom-4 left-4 pointer-events-none">
+<span class="px-3 py-1.5 bg-white/80 backdrop-blur rounded-full text-[10px] font-bold text-slate-500 border border-slate-200 shadow-sm uppercase tracking-wider">Mask Integration Visualization</span>
+</div>
+</div>
+</div>
+<!-- 深部预测 -->
+<div class="tab-content hidden" id="tab-prediction">
+<div class="relative w-full h-[500px] bg-slate-50 rounded-xl overflow-hidden group border border-slate-100">
+<div class="absolute inset-0 flex items-center justify-center overflow-auto p-4">
+<img alt="Deep Prediction Map" class="max-w-none transition-transform duration-200 ease-out" id="img-prediction" src="https://modao.cc/agent-py/media/generated_images/2026-05-09/9df4bc2327484095ac8b0069fa47bae0.jpg#desc=Deep%20Prediction%20Map" style="transform: scale(1);"/>
+</div>
+<div class="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+<button class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center" onclick="changeZoom('img-prediction', 0.2)" title="放大">
+<iconify-icon icon="lucide:zoom-in"></iconify-icon>
+</button>
+<button class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center" onclick="changeZoom('img-prediction', -0.2)" title="缩小">
+<iconify-icon icon="lucide:zoom-out"></iconify-icon>
+</button>
+<button class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center" onclick="resetZoom('img-prediction')" title="重置">
+<iconify-icon icon="lucide:refresh-cw"></iconify-icon>
+</button>
+<button class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center" onclick="fitZoom('img-prediction')" title="适应显示">
+<iconify-icon icon="lucide:maximize-2"></iconify-icon>
+</button>
+</div>
+<div class="absolute bottom-4 left-4 pointer-events-none">
+<span class="px-3 py-1.5 bg-white/80 backdrop-blur rounded-full text-[10px] font-bold text-slate-500 border border-slate-200 shadow-sm uppercase tracking-wider">Deep Resource Prediction</span>
+</div>
+</div>
+<!-- 生成报告 -->
+<div class="tab-content hidden" id="tab-report">
+<div class="flex flex-col items-center justify-center py-12 text-center">
+<div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4">
+<iconify-icon class="text-3xl" icon="lucide:file-text"></iconify-icon>
+</div>
+<h3 class="text-lg font-bold text-slate-900 mb-2">分析报告已就绪</h3>
+<p class="text-sm text-slate-500 mb-6 max-w-sm">系统已整合所有共振分析数据、异常掩码图及深度预测结果。点击下方按钮即可生成最终 PDF 报告。</p>
+<div class="flex gap-4">
+<a class="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-semibold text-sm hover:bg-black transition-all shadow-lg shadow-slate-200" href="https://modao.cc/agent-py/workspace/69ff030f090066e13033e627/矿产预测系统浅色版_v16.html/report.html?render_html=true">
+                            查看预览
+                        </a>
+<button class="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center gap-2">
+<iconify-icon icon="lucide:download"></iconify-icon>
+                            下载完整报告
+                        </button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div></div></main>
+</div>
+<script>        let myChart = null;
+        const scales = {
+            'img-resonance': 1,
+            'img-mask': 1,
+            'img-prediction': 1
+        };
+
+        function changeZoom(imgId, delta) {
+            scales[imgId] = Math.max(0.1, scales[imgId] + delta);
+            updateImageTransform(imgId);
+        }
+
+        function resetZoom(imgId) {
+            scales[imgId] = 1;
+            updateImageTransform(imgId);
+        }
+
+        function fitZoom(imgId) {
+            const img = document.getElementById(imgId);
+            const container = img.parentElement;
+            const scaleX = (container.clientWidth - 32) / img.naturalWidth;
+            const scaleY = (container.clientHeight - 32) / img.naturalHeight;
+            scales[imgId] = Math.min(scaleX, scaleY, 1);
+            updateImageTransform(imgId);
+        }
+
+        function updateImageTransform(imgId) {
+            const img = document.getElementById(imgId);
+            if (img) {
+                img.style.transform = `scale(${scales[imgId]})`;
+            }
+        }
+
+        function switchResultTab(event, tabId) {
+            // Update buttons
+            const buttons = document.querySelectorAll('.tab-btn');
+            buttons.forEach(btn => {
+                btn.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600', 'font-semibold');
+                btn.classList.add('text-slate-500', 'font-medium');
+            });
+            event.currentTarget.classList.remove('text-slate-500', 'font-medium');
+            event.currentTarget.classList.add('text-blue-600', 'border-b-2', 'border-blue-600', 'font-semibold');
+
+            // Update contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.add('hidden'));
+            const activeContent = document.getElementById('tab-' + tabId);
+            if (activeContent) {
+                activeContent.classList.remove('hidden');
+            }
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 探测器复选框点击事件
+            document.querySelectorAll('.detector-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const input = this.querySelector('input[type="checkbox"]');
+                    if (input.disabled) return;
+                    input.checked = !input.checked;
+                    this.classList.toggle('selected', input.checked);
+                });
+            });
+
+            // Threshold value update
+            const thresholdInput = document.querySelector('input[type="range"]');
+            const thresholdValueDisplay = document.getElementById('thresholdValue');
+            if (thresholdInput && thresholdValueDisplay) {
+                thresholdInput.addEventListener('input', (e) => {
+                    thresholdValueDisplay.textContent = e.target.value;
+                });
+            }
+
+            // 模拟进度条动画
+            let progress = 35;
+            const bar = document.getElementById('progressBar');
+            if (bar) {
+                setInterval(() => {
+                    if (progress < 98) {
+                        progress += Math.random() * 2;
+                        bar.style.width = progress + '%';
+                    }
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>

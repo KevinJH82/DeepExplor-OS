@@ -1,0 +1,92 @@
+# 交付自检规则(权威来源:数据下载交付规则.md)
+# 被 postprocess/delivery_check.py 读取,作为"交付目录是否完整"的判定基准。
+#
+# 注意:
+#  - 文件夹 label 取 package.py 各 _package_* 的实际产出名(与规则文档的口语化
+#    命名略有出入:文档写 "Sentinel 2 L2A"/"Landsat 8 L2A"/"PRISMA",实际产出
+#    为 "Sentinel 2 L2"/"Landsat 8 L2"/"PRISMA L2D")。校验按实际产出名,避免
+#    为对齐文档而重命名既有交付/报告。
+#  - 规则文档第 6 条:搜索阶段无该卫星数据 / 某些波段无数据属正常,不判为缺失。
+#    校验器用 summary[sensor]==0 或 progress[sensor] 的 search/target==0 识别。
+
+# 顶层(区域目录)必备项
+top_level:
+  kml: true                         # <area>.kml 或 .ovkml(按 area stem 匹配)
+  projection_png:                   # 投影预览图;实际产出名为 satellite_overview.png
+  - 投影.png
+  - satellite_overview.png          # 任一存在即满足
+
+# 季节
+seasons:
+  summer:
+    label: data-矿权-夏季（6-8月）
+  winter:
+    label: data-矿权-冬季（11-3月）
+
+# 每个季节根下的派生影像文件(informational:只报告,不驱动 needs_attention/修复)
+season_files:
+- 地表温度.tif
+- 温度梯度.tif
+- 温度异常梯度.tif
+- OTCI.tiff
+
+# 每个季节根下的【必选】文件:缺失/截断即判故障并自动修复。
+# DEM 为 Copernicus DEM GLO-30 公开数据(无需账号),缺失时自检自动下载补全。
+required_season_files:
+- file: DEM.tif
+  raw_dir: dem            # 原始子目录(dem/srtm 都产出 DEM.tif)
+  min_bytes: 2048         # 小区块 DEM 仅数 KB,阈值需远低于默认 50KB,否则合法小图被误判截断
+  repair: dem_fetch       # 修复方式:有原始则补包,无原始则下载 Copernicus DEM 后补包
+
+# 默认截断阈值(字节);单传感器可覆盖
+min_bytes: 51200
+
+# 每个季节下的传感器文件夹(5)
+sensors:
+- id: aster
+  label: ASTER L2
+  raw_dir: aster
+  async: false
+  match: all_files
+  # 实际产出 8 个波段:B1/B2/B3N(VNIR,大)+ B10-B14(TIR,小约 40KB)。
+  # SWIR(B4-B9)因 ASTER SWIR 探测器 2008 年起失效,长期无数据 → 不列入必备。
+  min_bytes: 15000             # TIR 波段约 40KB,阈值需低于默认 50KB
+  files: [B1.tif, B2.tif, B3N.tif, B10.tif, B11.tif, B12.tif, B13.tif, B14.tif]
+
+- id: landsat
+  label: Landsat 8 L2
+  raw_dir: landsat
+  async: false
+  match: all_files
+  # L2 地表反射率 + 热红外实际产出集(B8 全色 / B9 卷云在 L2 中不出)
+  files: [B1.tif, B2.tif, B3.tif, B4.tif, B5.tif, B6.tif, B7.tif, B10.tif, B11.tif]
+
+- id: sentinel2
+  label: Sentinel 2 L2
+  raw_dir: sentinel2
+  async: false
+  match: band_range            # 必备 required,tolerate 存在与否都不判错
+  # 实际产出 11 个:B01-B08 + B11/B12 + B8A。B09(水汽)/B10(卷云)在 L2A
+  # 地表反射率产品中通常不输出 → 列入 tolerate,不判缺失。
+  required: [B01.tiff, B02.tiff, B03.tiff, B04.tiff, B05.tiff, B06.tiff,
+             B07.tiff, B08.tiff, B11.tiff, B12.tiff]
+  tolerate: [B8A.tiff, B09.tiff, B10.tiff]
+
+- id: enmap
+  label: EnMAP L2A
+  raw_dir: enmap
+  async: true
+  async_giveup_seconds: 259200     # 3 天,与 PRISMA 一致
+  match: all_files
+  files: [SPECTRAL_IMAGE_VNIR.tif, SPECTRAL_IMAGE_SWIR.tif, METADATA.XML]
+
+- id: prisma
+  label: PRISMA L2D
+  raw_dir: prisma
+  async: true
+  async_giveup_seconds: 259200
+  match: all_files
+  # 规则要求 .hdr,但当前 venv/子进程均无 h5py 无法生成,且无真实 PRISMA 数据
+  # 验证生成器 → 暂仅以 .he5 为必备,.hdr 列 tolerate(装好 h5py + 验证后提升为必备)。
+  files: [SPECTRAL_IMAGE.he5]
+  tolerate: [SPECTRAL_IMAGE.hdr]

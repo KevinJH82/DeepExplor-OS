@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>测试区域 — 甘肃白银铜矿区及祁连山断裂带</name>
+    <description>地质勘探测试KML：包含甘肃省白银市铜矿区附近区域，位于祁连山褶皱带北缘，发育有铜、铅、锌多金属矿化带</description>
+    <Placemark>
+      <name>白银铜矿区勘探范围</name>
+      <description>
+        位置：甘肃省白银市白银区
+        地质背景：北祁连加里东期岛弧带，发育块状硫化物型铜矿（VMS型）
+        主要矿体：铜、铅、锌、金、银多金属
+        坐标系：WGS84
+      </description>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+              104.00,36.40,0
+              104.50,36.40,0
+              104.50,36.70,0
+              104.00,36.70,0
+              104.00,36.40,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>

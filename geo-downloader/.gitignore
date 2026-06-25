@@ -1,0 +1,80 @@
+# ── 凭证与敏感信息 ──
+config/credentials.yaml
+key/
+
+# ── 数据产物 ──
+downloads/
+delivery/
+uploads/
+
+# ── AI 模型权重 ──
+models/*.pth
+models/*.pt
+models/*.onnx
+models/*.bin
+
+# ── 遥感数据格式（防止意外提交）──
+*.tif
+*.tiff
+*.nc
+*.hdf
+*.h5
+*.he5
+*.zip
+
+# ── Python ──
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# ── 虚拟环境 ──
+.venv/
+venv/
+env/
+
+# ── macOS ──
+.DS_Store
+
+# ── 编辑器 / IDE ──
+.idea/
+.vscode/
+*.swp
+*~
+
+# ── 日志 ──
+*.log
+
+# ── 运行时生成数据 ──
+.geo_tasks_persist.json
+.geo_tasks_persist.json.bak*
+.geo_notifications_persist.json
+config/download_stats.json
+
+# ── 探针/调试输出 ──
+scripts/_prisma_probe_out/
+
+# ── 本地临时测试脚本（仅项目根目录，含硬编码凭据） ──
+# 注意 leading slash：只匹配 geo-downloader/test_*.py，不影响 tests/ 子目录
+/test_*.py
+
+# ── 前端旧版备份 / 设计稿原稿 ──
+web/templates/*_old_backup.html
+web/templates/NewPages/
+web/templates/NewPages_extracted/
+web/templates/NewPages.zip
+
+# ── Claude Code 本地配置 / 覆盖率二进制 ──
+.claude/
+.coverage
+
+# ── 第三方前端 JS 离线备份（模板默认走 CDN，未引用本地副本） ──
+static/
+web/static/
+
+# ── 自动生成的测试/覆盖率 HTML（pytest --cov / pytest-html 随时重建） ──
+reports/coverage/
+reports/test_report*.html

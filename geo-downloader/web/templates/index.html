@@ -1,0 +1,1666 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>任务控制台 - DeepSearch Downloader</title>
+<script src="https://modao.cc/agent-py/static/source/js/tailwindcss.js"></script>
+<script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.js"></script>
+<script src="https://modao.cc/agent-py/static/source/js/echarts.min.js"></script>
+<script src="/static/notif.js" defer></script>
+<style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #fafafa; }
+        .sh-card { background: white; border: 1px solid #e4e4e7; border-radius: 0.5rem; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02); }
+        .sh-input { border: 1px solid #e4e4e7; border-radius: 0.375rem; padding: 0.5rem 0.75rem; font-size: 0.875rem; width: 100%; transition: all 0.2s; }
+        .sh-input:focus { outline: none; border-color: #2563eb; ring: 2px solid #dbeafe; }
+        .nav-item-active { background-color: #f4f4f5; color: #18181b; font-weight: 600; }
+        .sh-button-primary { background-color: #18181b; color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.5rem; transition: opacity 0.2s; }
+        .sh-button-primary:hover { opacity: 0.9; }
+        .sh-button-outline { background-color: white; border: 1px solid #e5e7eb; color: #18181b; padding: 0.5rem 1rem; border-radius: 0.375rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .sh-button-outline:hover { background-color: #f4f4f5; }
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); }
+        .log-container::-webkit-scrollbar { width: 6px; }
+        .log-container::-webkit-scrollbar-track { background: transparent; }
+        .log-container::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 3px; }
+        .log-container::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
+        /* ── 文件夹选择器 (Finder 风格) ──────────────────────────── */
+        .sh-fp-wrap { position: relative; }
+        .sh-fp-panel { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1px solid #e4e4e7; border-radius: 8px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); z-index: 50; max-height: 360px; display: flex; flex-direction: column; overflow: hidden; font-size: 13px; }
+        .sh-fp-roots { padding: 6px 10px; border-bottom: 1px solid #f4f4f5; display: flex; gap: 6px; flex-wrap: wrap; }
+        .sh-fp-chip { background: #fafafa; border: 1px solid #e4e4e7; border-radius: 6px; padding: 3px 9px; font-size: 11px; cursor: pointer; color: #52525b; transition: all 0.15s; user-select: none; }
+        .sh-fp-chip:hover { background: #f4f4f5; }
+        .sh-fp-chip.is-active { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .sh-fp-header { padding: 7px 10px; border-bottom: 1px solid #f4f4f5; display: flex; align-items: center; gap: 8px; color: #52525b; font-size: 12px; }
+        .sh-fp-back { background: none; border: 1px solid #e4e4e7; border-radius: 6px; padding: 2px 8px; font-size: 12px; cursor: pointer; color: #52525b; }
+        .sh-fp-back:hover:not(:disabled) { background: #f4f4f5; }
+        .sh-fp-back:disabled { opacity: 0.35; cursor: not-allowed; }
+        .sh-fp-crumb { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; flex: 1; min-width: 0; }
+        .sh-fp-crumb-seg { color: #2563eb; cursor: pointer; padding: 1px 4px; border-radius: 4px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sh-fp-crumb-seg:hover { background: #eff6ff; text-decoration: underline; }
+        .sh-fp-crumb-seg.is-last { color: #18181b; cursor: default; }
+        .sh-fp-crumb-seg.is-last:hover { background: transparent; text-decoration: none; }
+        .sh-fp-crumb-sep { color: #d4d4d8; font-size: 11px; }
+        .sh-fp-list { overflow-y: auto; flex: 1; padding: 4px 0; }
+        .sh-fp-row { padding: 7px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #18181b; transition: background 0.1s; }
+        .sh-fp-row:hover { background: #f4f4f5; }
+        .sh-fp-row.is-empty { color: #a1a1aa; cursor: default; font-style: italic; }
+        .sh-fp-row.is-empty:hover { background: transparent; }
+        .sh-fp-row.is-error { color: #dc2626; }
+        .sh-fp-row.is-error:hover { background: #fef2f2; }
+        .sh-fp-list::-webkit-scrollbar { width: 6px; }
+        .sh-fp-list::-webkit-scrollbar-track { background: transparent; }
+        .sh-fp-list::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 3px; }
+    </style>
+</head>
+<body class="min-h-screen">
+<!-- 侧边导航 -->
+<aside class="fixed left-0 top-0 h-screen w-64 border-r bg-white z-50">
+<div class="flex flex-col h-full">
+<div class="p-6">
+<div class="flex items-center gap-2 mb-8">
+<div class="bg-blue-600 text-white p-1.5 rounded-lg">
+<iconify-icon class="text-xl" icon="lucide:satellite"></iconify-icon>
+</div>
+<span class="font-bold text-lg tracking-tight uppercase">Deep-Explor</span>
+</div>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-md nav-item-active" href="index.html">
+<iconify-icon icon="lucide:layers"></iconify-icon>
+<span class="text-sm">任务控制台</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md text-zinc-500 hover:bg-zinc-100 transition-colors" href="architecture.html">
+<iconify-icon icon="lucide:database"></iconify-icon>
+<span class="text-sm">架构设置</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md text-zinc-500 hover:bg-zinc-100 transition-colors" href="delivery.html">
+<iconify-icon icon="lucide:package-check"></iconify-icon>
+<span class="text-sm">交付整理</span>
+</a>
+</nav>
+</div>
+<div class="mt-auto p-6 border-t">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">AD</div>
+<div class="flex-1 overflow-hidden">
+<p class="text-xs font-semibold truncate">Admin User</p>
+<p class="text-[10px] text-zinc-400 truncate">2026-05-11 登录</p>
+</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- 主内容区 -->
+<main class="ml-64 p-8">
+<header class="flex items-center justify-between mb-8">
+<div>
+<h1 class="text-2xl font-bold text-zinc-900 tracking-tight">任务控制台界面</h1>
+<p class="text-zinc-500 text-sm mt-1">配置 KML 区域、任务参数与卫星波段，启动自动化数据检索。</p>
+</div>
+<div class="flex items-center gap-4">
+<a href="http://192.168.112.18/2nd%20Page/index.html" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 transition-colors" title="返回二级子系统登陆页面">
+<iconify-icon icon="lucide:arrow-left"></iconify-icon>
+<span>返回上一级</span>
+</a>
+<div class="relative" id="notifWrap">
+<button id="notifBell" type="button"
+        class="relative p-2 rounded-md hover:bg-zinc-100 transition-colors"
+        title="消息中心">
+  <iconify-icon icon="lucide:bell" class="text-zinc-600 text-lg"></iconify-icon>
+  <span id="notifBadge" class="hidden absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 bg-red-500 text-white text-[10px] leading-4 text-center rounded-full font-medium">0</span>
+</button>
+<div id="notifPanel"
+     class="hidden absolute right-0 top-full mt-2 w-96 max-h-[28rem] bg-white border border-zinc-200 rounded-lg shadow-lg z-50 flex flex-col">
+  <div class="flex items-center justify-between px-4 py-2.5 border-b text-sm">
+    <span class="font-semibold text-zinc-900">消息中心 <span id="notifPanelUnread" class="text-zinc-500 font-normal"></span></span>
+    <button id="notifReadAllBtn" type="button" class="text-blue-600 hover:underline text-xs">全部已读</button>
+  </div>
+  <div id="notifList" class="flex-1 overflow-y-auto p-1">
+    <div id="notifEmpty" class="text-center text-xs text-zinc-400 py-6">暂无消息</div>
+  </div>
+  <div class="px-4 py-2 border-t flex justify-end">
+    <button id="notifClearReadBtn" type="button" class="text-xs text-zinc-500 hover:text-zinc-800">清空已读</button>
+  </div>
+</div>
+</div>
+<div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100 text-xs font-medium">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    系统就绪
+                </div>
+</div>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+<!-- 第一列: KML 区域与任务参数 -->
+<div class="space-y-6 flex flex-col">
+<!-- KML 区域文件 -->
+<section class="sh-card p-6">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-semibold text-zinc-900 flex items-center gap-2">
+<iconify-icon class="text-blue-600" icon="lucide:map"></iconify-icon>
+                            KML 区域文件
+                        </h3>
+</div>
+<div id="kmlZone" class="border-2 border-dashed border-zinc-200 rounded-xl p-8 flex flex-col items-center justify-center bg-zinc-50/30 hover:bg-blue-50/50 hover:border-blue-400 transition-all cursor-pointer group">
+<input id="kmlFileInput" type="file" accept=".kml,.ovkml,.kmz,.ovkmz,.xlsx,.xls" class="hidden"/>
+<div class="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+<iconify-icon class="text-2xl text-blue-500" icon="lucide:upload-cloud"></iconify-icon>
+</div>
+<p class="text-sm font-semibold text-zinc-700">拖入坐标文件，或 <span class="text-blue-600">点击选择</span></p>
+<p class="text-xs text-zinc-400 mt-1">支持 .kml / .ovkml / .kmz / .ovkmz / .xlsx / .xls 格式</p>
+</div>
+<div id="kmlSelected" class="hidden mt-3 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+<iconify-icon class="text-blue-600" icon="lucide:file-text"></iconify-icon>
+<span id="kmlFileName" class="flex-1 text-sm font-medium text-blue-700 truncate"></span>
+<span id="kmlFileSize" class="text-xs text-zinc-500 whitespace-nowrap"></span>
+<button id="kmlClearBtn" type="button" class="text-zinc-400 hover:text-red-500" title="清除">
+<iconify-icon icon="lucide:x"></iconify-icon>
+</button>
+</div>
+<div class="mt-4">
+<label class="text-[10px] font-bold text-zinc-400 uppercase mb-1.5 block tracking-widest">或手动输入路径 / 文件夹</label>
+<div class="relative">
+<input id="kmlPath" class="sh-input pr-10" placeholder="E:\Projects\Area_A\boundary.kml" type="text"/>
+<button id="kmlPathBrowseBtn" type="button" class="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600" title="选择文件">
+<iconify-icon icon="lucide:folder-open"></iconify-icon>
+</button>
+</div>
+</div>
+</section>
+<!-- 任务参数配置 -->
+<section class="sh-card p-6 flex-1 flex flex-col">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-semibold text-zinc-900 flex items-center gap-2">
+<iconify-icon class="text-blue-600" icon="lucide:settings-2"></iconify-icon>
+                            任务参数配置
+                        </h3>
+</div>
+<div class="space-y-4 flex-1">
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="text-xs font-medium text-zinc-500 mb-1.5 block" for="startDate">开始日期</label>
+<input id="startDate" class="sh-input" type="date" value="2026-01-01"/>
+</div>
+<div>
+<label class="text-xs font-medium text-zinc-500 mb-1.5 block" for="endDate">结束日期</label>
+<input id="endDate" class="sh-input" type="date" value="2026-05-11"/>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div>
+<div class="flex justify-between mb-1.5">
+<label class="text-xs font-medium text-zinc-500" for="cloudRange">最大云量 (%)</label>
+<span id="cloudLabel" class="text-xs font-bold text-blue-600">15%</span>
+</div>
+<input id="cloudRange" class="w-full h-1.5 bg-zinc-200 rounded-lg appearance-none cursor-pointer accent-blue-600" type="range" min="0" max="100" value="15"/>
+</div>
+<div>
+<label class="text-xs font-medium text-zinc-500 mb-1.5 block" for="maxItems">每传感器最多（景）</label>
+<input id="maxItems" class="sh-input" type="number" min="1" max="500" value="50"/>
+</div>
+</div>
+<div>
+<label class="text-xs font-medium text-zinc-500 mb-1.5 block" for="outputDir">下载输出目录</label>
+<div class="sh-fp-wrap">
+<input id="outputDir" class="sh-input" type="text" value="./downloads" placeholder="./downloads" autocomplete="off"/>
+</div>
+</div>
+<div>
+<label class="text-xs font-medium text-zinc-500 mb-1.5 block" for="deliveryDir">标准交付目录 (Output)</label>
+<div class="sh-fp-wrap">
+<input id="deliveryDir" class="sh-input" placeholder="留空则与下载目录相同" type="text" autocomplete="off"/>
+</div>
+</div>
+<div class="space-y-3 pt-2">
+<div class="flex items-center justify-between">
+<div>
+<div class="text-sm font-semibold text-zinc-900">裁剪到 KML 范围</div>
+<div class="text-[11px] text-zinc-500">下载后自动裁剪，减少存储占用</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input id="optClip" checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+</label>
+</div>
+<div class="flex items-center justify-between">
+<div>
+<div class="text-sm font-semibold text-zinc-900">计算衍生产品</div>
+<div class="text-[11px] text-zinc-500">地表温度 / 温度梯度 / 温度异常梯度 / OTCI</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input id="optDerive" checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+</label>
+</div>
+<div class="flex items-center justify-between">
+<div>
+<div class="text-sm font-semibold text-zinc-900">打包标准交付目录</div>
+<div class="text-[11px] text-zinc-500">按标准文件架构整理，保留原始下载数据</div>
+</div>
+<label class="relative inline-flex items-center cursor-pointer">
+<input id="optPackage" checked="" class="sr-only peer" type="checkbox"/>
+<div class="w-9 h-5 bg-zinc-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+</label>
+</div>
+</div>
+</div>
+</section>
+</div>
+<!-- 第二列: 卫星选项与执行任务 -->
+<div class="space-y-6 flex flex-col">
+<!-- 卫星与波段选项 -->
+<section class="sh-card p-6 flex-1 flex flex-col">
+<div class="flex items-center justify-between mb-6">
+<div>
+<h3 class="font-semibold text-zinc-900 flex items-center gap-2">
+<iconify-icon class="text-blue-600" icon="lucide:satellite"></iconify-icon>
+                                卫星与波段选项
+                            </h3>
+<p class="text-xs text-zinc-500 mt-1">按卫星类别进行选择，系统将根据类别自动配置数据源</p>
+</div>
+<label class="flex items-center gap-2 text-xs text-zinc-600 cursor-pointer shrink-0 select-none" for="vpnFilterToggle" title="只显示国内可直连、无需 VPN 的数据源，降低 VPN 依赖与下载成本">
+<input class="w-3.5 h-3.5 text-emerald-600 border-zinc-300 rounded focus:ring-emerald-500" id="vpnFilterToggle" type="checkbox"/>
+<span>仅显示免VPN数据源</span>
+</label>
+</div>
+<script id="sensorNetworkData" type="application/json">{{ sensor_network|tojson }}</script>
+<div id="sensorGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 items-start overflow-y-auto max-h-[500px] pr-2">
+<!-- 多光谱 -->
+<div class="border rounded-lg p-3 bg-zinc-50/50 flex flex-col gap-2 hover:border-blue-300 transition-all group">
+<div class="flex items-start gap-3">
+<input checked="" class="mt-1 w-4 h-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500 category-checkbox" data-target="sub-multispectral" id="cat-multispectral" type="checkbox"/>
+<label class="flex-1 cursor-pointer" for="cat-multispectral">
+<div class="font-bold text-sm text-zinc-800 group-hover:text-blue-600 transition-colors">多光谱</div>
+<div class="text-[11px] text-zinc-500">光学多光谱传感器</div>
+</label>
+</div>
+<div class="pl-7 pt-2 border-t border-zinc-200 mt-1 space-y-2" id="sub-multispectral">
+<div class="flex items-center gap-2"><input checked="" class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="sentinel2" id="sat-sentinel2" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-sentinel2" title="Sentinel-2 光学多光谱（ESA，10-60m，需 Copernicus 账号）">Sentinel-2 A/B</label></div>
+<div class="flex items-center gap-2"><input checked="" class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="landsat" id="sat-landsat" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-landsat" title="Landsat 8/9 光学多光谱（Planetary Computer，30m，无需账号）">Landsat 8/9</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="landsat7" id="sat-landsat7" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-landsat7" title="Landsat 7 ETM+（Planetary Computer，15-30m，无需账号）">Landsat 7 ETM+</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="aster" id="sat-aster" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-aster" title="ASTER L2（NASA，15-90m，需 NASA Earthdata 账号）">ASTER L2</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="aster_l1t" id="sat-aster_l1t" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-aster_l1t" title="ASTER L1T（NASA，15/90m，需 NASA Earthdata 账号）">ASTER L1T</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="modis" id="sat-modis" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-modis" title="MODIS 地表反射率/植被指数（NASA，250-500m，需 NASA Earthdata 账号）">MODIS</label></div>
+</div>
+</div>
+<!-- 高光谱 -->
+<div class="border rounded-lg p-3 bg-zinc-50/50 flex flex-col gap-2 hover:border-blue-300 transition-all group">
+<div class="flex items-start gap-3">
+<input class="mt-1 w-4 h-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500 category-checkbox" data-target="sub-hyperspectral" id="cat-hyperspectral" type="checkbox"/>
+<label class="flex-1 cursor-pointer" for="cat-hyperspectral">
+<div class="font-bold text-sm text-zinc-800 group-hover:text-blue-600 transition-colors">高光谱</div>
+<div class="text-[11px] text-zinc-500">高光谱（百波段以上）</div>
+</label>
+</div>
+<div class="hidden pl-7 pt-2 border-t border-zinc-200 mt-1 space-y-2" id="sub-hyperspectral">
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="emit" id="sat-emit" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-emit" title="EMIT 高光谱（NASA，60m，285 波段）">EMIT</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="enmap" id="sat-enmap" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-enmap" title="EnMAP L2A（DLR，30m，244 波段 420-2450nm）">EnMAP</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="prisma" id="sat-prisma" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-prisma" title="PRISMA L2D（ASI，30m，239 波段）">PRISMA</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="desis" id="sat-desis" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-desis" title="DESIS L2A（DLR/NASA，30m，235 波段）">DESIS</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="hyperion" id="sat-hyperion" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-hyperion" title="Hyperion EO-1 存档（NASA，30m，242 波段，2001-2017）">Hyperion EO-1</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="aviris" id="sat-aviris" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-aviris" title="AVIRIS-NG 机载（NASA JPL，~5m，432 波段）">AVIRIS-NG</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="zy1" id="sat-zy1" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-zy1" title="资源一号 02D AHSI（CRESDA，30m，166 波段）">ZY1-02D AHSI</label></div>
+</div>
+</div>
+<!-- 高分辨率 -->
+<div class="border rounded-lg p-3 bg-zinc-50/50 flex flex-col gap-2 hover:border-blue-300 transition-all group">
+<div class="flex items-start gap-3">
+<input class="mt-1 w-4 h-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500 category-checkbox" data-target="sub-highres" id="cat-highres" type="checkbox"/>
+<label class="flex-1 cursor-pointer" for="cat-highres">
+<div class="font-bold text-sm text-zinc-800 group-hover:text-blue-600 transition-colors">高分辨率</div>
+<div class="text-[11px] text-zinc-500">亚米级 / 米级商业卫星</div>
+</label>
+</div>
+<div class="hidden pl-7 pt-2 border-t border-zinc-200 mt-1 space-y-2" id="sub-highres">
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="planet" id="sat-planet" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-planet" title="PlanetScope（Planet Labs，3-5m，4/8 波段）">PlanetScope</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="spot67" id="sat-spot67" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-spot67" title="SPOT 6/7（Airbus，1.5m 全色 / 6m 多光谱）">SPOT 6/7</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="pleiades" id="sat-pleiades" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-pleiades" title="Pleiades 1A/1B（Airbus，0.5m 全色 / 2m 多光谱）">Pleiades 1A/1B</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="wv2" id="sat-wv2" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-wv2" title="WorldView-2（Maxar，0.46m 全色 / 1.85m 多光谱）">WorldView-2</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="wv3" id="sat-wv3" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-wv3" title="WorldView-3（Maxar，0.31m 全色 / 1.24m 多光谱）">WorldView-3</label></div>
+</div>
+</div>
+<!-- SAR雷达 -->
+<div class="border rounded-lg p-3 bg-zinc-50/50 flex flex-col gap-2 hover:border-blue-300 transition-all group">
+<div class="flex items-start gap-3">
+<input class="mt-1 w-4 h-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500 category-checkbox" data-target="sub-sar" id="cat-sar" type="checkbox"/>
+<label class="flex-1 cursor-pointer" for="cat-sar">
+<div class="font-bold text-sm text-zinc-800 group-hover:text-blue-600 transition-colors">SAR雷达</div>
+<div class="text-[11px] text-zinc-500">合成孔径雷达</div>
+</label>
+</div>
+<div class="hidden pl-7 pt-2 border-t border-zinc-200 mt-1 space-y-2" id="sub-sar">
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="sentinel1" id="sat-sentinel1" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-sentinel1" title="Sentinel-1 GRD（ESA/ASF，5-20m，C 波段）">Sentinel-1 GRD</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="alos" id="sat-alos" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-alos" title="ALOS PALSAR 档案（JAXA/ASF，L 波段，2006-2011）">ALOS PALSAR</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="alos2" id="sat-alos2" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-alos2" title="ALOS-2 PALSAR-2（JAXA/ASF，L 波段，1-100m，2014至今）">ALOS-2 PALSAR-2</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="opera" id="sat-opera" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-opera" title="OPERA RTC-S1 辐射地形校正（NASA/JPL，30m）">OPERA RTC-S1</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="nisar" id="sat-nisar" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-nisar" title="NISAR L 波段全极化（NASA/ISRO，3-25m，2024至今）">NISAR</label></div>
+</div>
+</div>
+<!-- 热红外 -->
+<div class="border rounded-lg p-3 bg-zinc-50/50 flex flex-col gap-2 hover:border-blue-300 transition-all group">
+<div class="flex items-start gap-3">
+<input class="mt-1 w-4 h-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500 category-checkbox" data-target="sub-tir" id="cat-tir" type="checkbox"/>
+<label class="flex-1 cursor-pointer" for="cat-tir">
+<div class="font-bold text-sm text-zinc-800 group-hover:text-blue-600 transition-colors">热红外</div>
+<div class="text-[11px] text-zinc-500">地表温度与热成像</div>
+</label>
+</div>
+<div class="hidden pl-7 pt-2 border-t border-zinc-200 mt-1 space-y-2" id="sub-tir">
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="ecostress" id="sat-ecostress" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-ecostress" title="ECOSTRESS 地表温度（NASA/ISS，70m）">ECOSTRESS</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="landsat_tirs" id="sat-landsat_tirs" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-landsat_tirs" title="Landsat 8/9 TIRS 热红外 + 地表温度（Planetary Computer，30m）">Landsat TIRS</label></div>
+</div>
+</div>
+<!-- 高程地形 -->
+<div class="border rounded-lg p-3 bg-zinc-50/50 flex flex-col gap-2 hover:border-blue-300 transition-all group">
+<div class="flex items-start gap-3">
+<input class="mt-1 w-4 h-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500 category-checkbox" data-target="sub-dem" id="cat-dem" type="checkbox"/>
+<label class="flex-1 cursor-pointer" for="cat-dem">
+<div class="font-bold text-sm text-zinc-800 group-hover:text-blue-600 transition-colors">高程地形</div>
+<div class="text-[11px] text-zinc-500">DEM 与地形产品</div>
+</label>
+</div>
+<div class="hidden pl-7 pt-2 border-t border-zinc-200 mt-1 space-y-2" id="sub-dem">
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="dem" id="sat-dem" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-dem" title="Copernicus DEM GLO-30（ESA，30m，无需账号）">Copernicus DEM GLO-30</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="srtm" id="sat-srtm" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-srtm" title="SRTM DEM（NASA，30m，AWS 直接下载，无需账号）">SRTM DEM</label></div>
+</div>
+</div>
+<!-- 激光测高 -->
+<div class="border rounded-lg p-3 bg-zinc-50/50 flex flex-col gap-2 hover:border-blue-300 transition-all group">
+<div class="flex items-start gap-3">
+<input class="mt-1 w-4 h-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500 category-checkbox" data-target="sub-lidar" id="cat-lidar" type="checkbox"/>
+<label class="flex-1 cursor-pointer" for="cat-lidar">
+<div class="font-bold text-sm text-zinc-800 group-hover:text-blue-600 transition-colors">激光测高</div>
+<div class="text-[11px] text-zinc-500">星载激光雷达</div>
+</label>
+</div>
+<div class="hidden pl-7 pt-2 border-t border-zinc-200 mt-1 space-y-2" id="sub-lidar">
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="gedi" id="sat-gedi" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-gedi" title="GEDI 激光测高（NASA/ISS，25m footprint）">GEDI</label></div>
+</div>
+</div>
+<!-- GEE 数据源 -->
+<div class="border rounded-lg p-3 bg-zinc-50/50 flex flex-col gap-2 hover:border-blue-300 transition-all group">
+<div class="flex items-start gap-3">
+<input class="mt-1 w-4 h-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500 category-checkbox" data-target="sub-gee" id="cat-gee" type="checkbox"/>
+<label class="flex-1 cursor-pointer" for="cat-gee">
+<div class="font-bold text-sm text-zinc-800 group-hover:text-blue-600 transition-colors">GEE数据源</div>
+<div class="text-[11px] text-zinc-500">Google Earth Engine</div>
+</label>
+</div>
+<div class="hidden pl-7 pt-2 border-t border-zinc-200 mt-1 space-y-2" id="sub-gee">
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="gee_sentinel2" id="sat-gee_sentinel2" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-gee_sentinel2" title="GEE Sentinel-2 L2A 地表反射率（10m，COPERNICUS/S2_SR_HARMONIZED）">GEE Sentinel-2 L2A</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="gee_landsat" id="sat-gee_landsat" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-gee_landsat" title="GEE Landsat 8/9 L2 地表反射率（30m）">GEE Landsat 8/9 L2</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="gee_modis" id="sat-gee_modis" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-gee_modis" title="GEE MODIS 日地表反射率（500m，MOD09GA 7 波段）">GEE MODIS MOD09GA</label></div>
+<div class="flex items-center gap-2"><input class="w-3.5 h-3.5 text-blue-600 border-zinc-300 rounded sat-checkbox" data-sensor="gee_custom" id="sat-gee_custom" type="checkbox"/><label class="text-xs text-zinc-600" for="sat-gee_custom" title="GEE 自定义数据集（用户指定 Collection ID + 波段）">GEE 自定义</label></div>
+</div>
+</div>
+</div>
+</section>
+<!-- 执行下载任务 -->
+<section class="sh-card p-6">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-semibold text-zinc-900 flex items-center gap-2">
+<iconify-icon class="text-blue-600" icon="lucide:zap"></iconify-icon>
+                            执行下载任务
+                        </h3>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<button class="sh-button-outline justify-center h-12 border-dashed border-2 hover:border-blue-500 hover:text-blue-600 transition-all" onclick="showModal('tidyModal')">
+<iconify-icon icon="lucide:folder-sync"></iconify-icon>
+                            整理交付
+                        </button>
+<button id="runBtn" type="button" class="sh-button-primary justify-center bg-blue-600 hover:bg-blue-500 border-none h-12 shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+<iconify-icon id="runBtnIcon" icon="lucide:play"></iconify-icon>
+<span id="runBtnLabel">开始下载</span>
+</button>
+</div>
+<button id="stopBtn" type="button" class="hidden mt-3 w-full sh-button-outline justify-center h-10 border-red-300 text-red-600 hover:bg-red-50 transition-all">
+<iconify-icon icon="lucide:square"></iconify-icon>
+<span class="ml-1">停止当前任务</span>
+</button>
+</section>
+</div>
+</div>
+<!-- 运行日志部分 -->
+<section class="sh-card overflow-hidden">
+<div class="p-4 border-b bg-zinc-50/50 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<iconify-icon class="text-blue-600" icon="lucide:terminal"></iconify-icon>
+<h3 class="font-semibold text-zinc-900">运行日志</h3>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1.5">
+<div id="statusDot" class="w-2 h-2 rounded-full bg-zinc-300"></div>
+<span id="statusLabel" class="text-[10px] text-zinc-500 uppercase font-medium">Idle</span>
+</div>
+<button id="logClearBtn" type="button" class="text-zinc-400 hover:text-zinc-600" title="清空日志">
+<iconify-icon icon="lucide:trash-2"></iconify-icon>
+</button>
+</div>
+</div>
+<!-- 整体下载进度条:任务有 __PROGRESS_EVENT__ 数据时显示,统计所有 sensor 的已下载/目标景数 -->
+<div id="overallProgress" class="hidden px-4 py-2.5 border-b bg-zinc-50/30 flex items-center gap-3 text-xs">
+  <iconify-icon class="text-blue-600 text-base shrink-0" icon="lucide:gauge"></iconify-icon>
+  <span class="text-zinc-600 shrink-0 font-medium">下载进度</span>
+  <div class="flex-1 h-2 rounded-full bg-zinc-200 overflow-hidden">
+    <div id="overallProgressBar" class="h-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-300" style="width: 0%"></div>
+  </div>
+  <span id="overallProgressText" class="text-zinc-700 font-mono tabular-nums shrink-0">0% (0/0)</span>
+  <span id="overallProgressDetail" class="text-zinc-400 shrink-0 hidden sm:inline"></span>
+</div>
+<div class="relative">
+<div id="logContainer" class="bg-zinc-950 p-4 font-mono text-xs leading-relaxed log-container overflow-y-auto max-h-[240px]">
+<div class="flex gap-3 mb-1 italic text-zinc-600">
+<span class="text-zinc-500" id="logPlaceholder">[尚未启动任务] 配置 KML 区域、传感器与参数，点击"开始下载"启动。</span>
+</div>
+</div>
+<button id="logJumpBtn" type="button"
+        class="hidden absolute right-3 bottom-3 z-10 px-2.5 py-1 rounded-full bg-zinc-800/90 text-zinc-100 text-[11px] hover:bg-zinc-700 flex items-center gap-1 shadow"
+        title="跳到底部并恢复跟随">
+<iconify-icon icon="lucide:arrow-down"></iconify-icon>
+跳到底部
+</button>
+</div>
+</section>
+</main>
+<!-- 整理交付文件模态框 -->
+<div class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" id="tidyModal">
+<div class="modal-overlay absolute inset-0"></div>
+<div class="bg-white rounded-xl shadow-2xl w-full max-w-xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+<div class="p-6 border-b flex items-center justify-between bg-zinc-50/50">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+<iconify-icon class="text-xl" icon="lucide:package-plus"></iconify-icon>
+</div>
+<h3 class="font-bold text-lg">整理交付文件</h3>
+</div>
+<button class="text-zinc-400 hover:text-zinc-900" onclick="hideModal('tidyModal')">
+<iconify-icon class="text-xl" icon="lucide:x"></iconify-icon>
+</button>
+</div>
+<div class="p-6 space-y-5">
+<div class="grid grid-cols-2 gap-4">
+<div class="col-span-2">
+<label class="text-xs font-semibold text-zinc-500 mb-1.5 block uppercase tracking-wider">已下载区域目录</label>
+<div class="flex gap-2">
+<select class="sh-input bg-zinc-50 flex-1">
+<option>-- 选择目标区域 --</option>
+<option>South_China_Sea_Grid_A1</option>
+<option>Himalaya_Regional_Project</option>
+<option>Yangtze_Delta_2026</option>
+</select>
+<button class="sh-button-outline px-3">
+<iconify-icon icon="lucide:refresh-cw"></iconify-icon>
+</button>
+</div>
+</div>
+<div class="col-span-2">
+<label class="text-xs font-semibold text-zinc-500 mb-1.5 block uppercase tracking-wider">KML 文件路径</label>
+<input class="sh-input" placeholder="留空时使用主页已上传/选择的 KML" type="text"/>
+</div>
+<div>
+<label class="text-xs font-semibold text-zinc-500 mb-1.5 block uppercase tracking-wider">交付目录</label>
+<input class="sh-input" placeholder="D:\Deliverables\2026_05" type="text"/>
+</div>
+<div>
+<label class="text-xs font-semibold text-zinc-500 mb-1.5 block uppercase tracking-wider">查找原始数据路径</label>
+<input class="sh-input" placeholder="D:\Downloads\Cache" type="text"/>
+</div>
+</div>
+<div class="bg-blue-50 p-4 rounded-lg flex gap-3">
+<iconify-icon class="text-blue-500 mt-0.5" icon="lucide:info"></iconify-icon>
+<p class="text-xs text-blue-700 leading-relaxed">
+                        该操作将按照预设的传感器架构，将离散的原始数据文件自动分类、重命名并归档至指定的交付目录，同时会生成对应的索引报告。
+                    </p>
+</div>
+</div>
+<div class="p-6 bg-zinc-50 border-t flex justify-end gap-3">
+<button class="sh-button-outline" onclick="hideModal('tidyModal')">取消</button>
+<button class="sh-button-primary bg-blue-600 hover:bg-blue-700">
+<iconify-icon icon="lucide:arrow-right-circle"></iconify-icon>
+                    开始整理
+                </button>
+</div>
+</div>
+</div>
+<!-- 异步任务面板 -->
+<div class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" id="asyncModal">
+<div class="modal-overlay absolute inset-0" onclick="closeAsyncPanel()"></div>
+<div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-200">
+<div class="p-6 border-b flex items-center justify-between bg-zinc-50/50">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center">
+<iconify-icon class="text-xl" icon="lucide:radio-tower"></iconify-icon>
+</div>
+<div>
+<h3 class="font-bold text-lg">异步任务</h3>
+<p class="text-xs text-zinc-500">等待数据中心备货(PRISMA / EnMAP),可手动停止超长任务</p>
+</div>
+</div>
+<button class="text-zinc-400 hover:text-zinc-900" onclick="closeAsyncPanel()">
+<iconify-icon class="text-xl" icon="lucide:x"></iconify-icon>
+</button>
+</div>
+<div class="p-4 max-h-[26rem] overflow-y-auto" id="asyncTaskList">
+<div class="text-center text-sm text-zinc-400 py-10">加载中…</div>
+</div>
+<div class="p-4 bg-zinc-50 border-t flex justify-between items-center">
+<span class="text-xs text-zinc-400">每 15 秒自动刷新</span>
+<div class="flex gap-3">
+<button class="sh-button-outline" onclick="loadAsyncTasks()">
+<iconify-icon icon="lucide:refresh-cw"></iconify-icon>刷新
+</button>
+<button class="sh-button-outline" onclick="closeAsyncPanel()">关闭</button>
+</div>
+</div>
+</div>
+</div>
+<script>
+        function showModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+        function hideModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+        // ── 异步任务面板 ──
+        let _asyncPollTimer = null;
+        function openAsyncPanel() {
+            showModal('asyncModal');
+            loadAsyncTasks();
+            if (_asyncPollTimer) clearInterval(_asyncPollTimer);
+            _asyncPollTimer = setInterval(loadAsyncTasks, 15000);
+        }
+        function closeAsyncPanel() {
+            hideModal('asyncModal');
+            if (_asyncPollTimer) { clearInterval(_asyncPollTimer); _asyncPollTimer = null; }
+        }
+        function _asyncEsc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+                ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+        function fmtElapsed(sec) {
+            sec = Math.max(0, Math.floor(sec || 0));
+            const d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60);
+            if (d > 0) return `${d}天 ${h}小时`;
+            if (h > 0) return `${h}小时 ${m}分`;
+            return `${m}分`;
+        }
+        async function loadAsyncTasks() {
+            const box = document.getElementById('asyncTaskList');
+            if (!box) return;
+            let data;
+            try {
+                const res = await fetch('/api/async-tasks', { cache: 'no-store' });
+                data = await res.json();
+            } catch (err) {
+                box.innerHTML = `<div class="text-center text-sm text-red-500 py-10">加载失败:${_asyncEsc(err.message)}</div>`;
+                return;
+            }
+            const tasks = (data && data.tasks) || [];
+            if (!tasks.length) {
+                box.innerHTML = '<div class="text-center text-sm text-zinc-400 py-10">暂无异步任务</div>';
+                return;
+            }
+            box.innerHTML = tasks.map(t => {
+                const created = t.created_at ? new Date(t.created_at * 1000).toLocaleString('zh-CN') : '—';
+                const chips = (t.sources || []).map(s => {
+                    const over = (s.elapsed_sec || 0) > 8 * 3600;
+                    const waited = `已等 ${fmtElapsed(s.elapsed_sec)}`;
+                    const oid = s.order_id ? `<span class="text-zinc-400">#${_asyncEsc(s.order_id)}</span>` : '';
+                    const ph = s.phase ? ` · ${_asyncEsc(s.phase)}` : '';
+                    const cnt = s.item_count ? ` · ${s.item_count} 景` : '';
+                    return `<div class="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-xs px-2 py-1 rounded bg-zinc-50 border border-zinc-100">
+                        <span class="font-semibold text-zinc-700">${_asyncEsc((s.sensor||'').toUpperCase())}</span>
+                        <span class="${over ? 'text-red-600 font-semibold' : 'text-zinc-500'}">${waited}${over ? ' ⚠ 超长' : ''}</span>
+                        <span class="text-zinc-400">${ph}${cnt}</span>
+                        ${oid}
+                    </div>`;
+                }).join('');
+                return `<div class="border border-zinc-200 rounded-lg p-3 mb-2.5">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="font-semibold text-sm text-zinc-900 truncate">${_asyncEsc(t.label || t.task_id)}</div>
+                            <div class="text-xs text-zinc-400 mt-0.5">创建于 ${created} · ${_asyncEsc(t.task_id)}</div>
+                        </div>
+                        <div class="flex gap-2 shrink-0">
+                            <button type="button" class="sh-button-outline"
+                                onclick="copyTaskDiagnostic('${_asyncEsc(t.task_id)}', this)">
+                                <iconify-icon icon="lucide:clipboard-copy"></iconify-icon>复制
+                            </button>
+                            <button type="button" class="sh-button-outline text-red-600 hover:bg-red-50 border-red-200"
+                                onclick="stopAsyncTask('${_asyncEsc(t.task_id)}', '${_asyncEsc((t.label||'').replace(/'/g,''))}')">
+                                <iconify-icon icon="lucide:circle-stop"></iconify-icon>停止等待
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-2 space-y-1.5">${chips || '<span class="text-xs text-zinc-400">无待办异步源</span>'}</div>
+                </div>`;
+            }).join('');
+        }
+        async function stopAsyncTask(taskId, label) {
+            if (!confirm(`确定停止「${label || taskId}」的异步等待吗?\n已下载的数据会保留,只是不再等待未到货的订单。`)) return;
+            try {
+                const res = await fetch(`/api/async-tasks/${encodeURIComponent(taskId)}/stop`, { method: 'POST' });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.ok) { alert('停止失败:' + (data.error || ('HTTP ' + res.status))); return; }
+            } catch (err) {
+                alert('停止失败:' + err.message); return;
+            }
+            await loadAsyncTasks();
+            refreshRunningCount();
+        }
+        // ── 复制任务诊断信息(粘贴给支持分析)──
+        async function copyTaskDiagnostic(taskId, btn) {
+            const orig = btn ? btn.innerHTML : null;
+            if (btn) { btn.disabled = true; btn.innerHTML = '<iconify-icon icon="lucide:loader"></iconify-icon>读取中'; }
+            try {
+                const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/diagnostic`, { cache: 'no-store' });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const d = await res.json();
+                const text = formatDiagnostic(d);
+                const ok = await copyText(text);
+                if (btn) {
+                    btn.innerHTML = ok ? '<iconify-icon icon="lucide:check"></iconify-icon>已复制'
+                                       : '<iconify-icon icon="lucide:clipboard"></iconify-icon>见弹窗';
+                }
+            } catch (err) {
+                if (btn) btn.innerHTML = '<iconify-icon icon="lucide:x"></iconify-icon>失败';
+                console.error('copyTaskDiagnostic', err);
+            } finally {
+                if (btn) setTimeout(() => { btn.disabled = false; btn.innerHTML = orig; }, 2000);
+            }
+        }
+        function formatDiagnostic(d) {
+            const L = [];
+            const created = d.created_at ? new Date(d.created_at * 1000).toLocaleString('zh-CN') : '—';
+            const ref = d.finished_at || (Date.now() / 1000);
+            const ran = d.created_at ? fmtElapsed(ref - d.created_at) : '—';
+            L.push(`## 下载任务诊断 · ${d.label || d.task_id}`);
+            L.push(`- 任务ID: ${d.task_id}  ·  状态: ${d.status}  ·  返回码: ${d.returncode == null ? '—' : d.returncode}  ·  PID: ${d.pid == null ? '—' : d.pid}`);
+            L.push(`- 创建: ${created}  ·  已运行: ${ran}`);
+            L.push(`- 传感器: ${(d.sensors || []).join(', ') || '—'}`);
+            L.push(`- 时间范围: ${d.start_date || '?'} ~ ${d.end_date || '?'}  ·  云量≤${d.cloud}  ·  max_items=${d.max_items}`);
+            L.push(`- 输出目录: ${d.output_dir || '—'}`);
+            L.push(`- 交付目录: ${d.delivery_dir || '—'}`);
+            L.push(`- KML: ${d.kml || '—'}`);
+            if ((d.async_sources || []).length) {
+                L.push('', '### 异步订单状态');
+                d.async_sources.forEach(s => {
+                    const over = (s.elapsed_sec || 0) > 8 * 3600 ? ' ⚠超长' : '';
+                    const mk = s.marker_exists ? '标记文件存在' : '标记文件缺失';
+                    L.push(`- ${(s.sensor || '').toUpperCase()}  order=${s.order_id || '—'}  提交=${s.submitted_at || '—'}  已等=${fmtElapsed(s.elapsed_sec)}${over}  ${s.item_count || 0}景  phase=${s.phase || '—'}  ${mk}`);
+                });
+            }
+            const prog = d.progress || {};
+            const keys = Object.keys(prog);
+            if (keys.length) {
+                L.push('', '### 进度');
+                keys.forEach(k => {
+                    const p = prog[k] || {};
+                    const det = [p.phase || '?'];
+                    if (p.target != null) det.push(`target=${p.target}`);
+                    if (p.done != null) det.push(`done=${p.done}`);
+                    L.push(`- ${k}: ${det.join(' · ')}`);
+                });
+            }
+            const logs = d.log_tail || [];
+            L.push('', `### 最近日志(${logs.length} 行)`, '```', ...(logs.length ? logs : ['(无日志)']), '```');
+            return L.join('\n');
+        }
+        // 健壮复制:优先 clipboard API,失败回退 textarea+execCommand,再不行弹窗手动复制
+        async function copyText(text) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                }
+            } catch (e) { /* 回退 */ }
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed'; ta.style.top = '-9999px';
+                document.body.appendChild(ta);
+                ta.focus(); ta.select();
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                if (ok) return true;
+            } catch (e) { /* 回退 */ }
+            window.prompt('自动复制失败,请手动复制(⌘C):', text);
+            return false;
+        }
+        function toggleView(view) {
+            console.log('Switching to view:', view);
+        }
+
+        // 监听分类复选框变化以切换显示子列表 + 联动子项
+        document.addEventListener('DOMContentLoaded', () => {
+            const categoryBoxes = document.querySelectorAll('.category-checkbox');
+            categoryBoxes.forEach(cat => {
+                cat.addEventListener('change', function() {
+                    const targetId = this.getAttribute('data-target');
+                    const targetEl = document.getElementById(targetId);
+                    if (this.checked) {
+                        targetEl.classList.remove('hidden');
+                        // 类别勾上时，若该类下没有任何传感器被选中，则默认全选
+                        const sats = targetEl.querySelectorAll('.sat-checkbox');
+                        const anyChecked = Array.from(sats).some(s => s.checked);
+                        if (!anyChecked) sats.forEach(s => { s.checked = true; });
+                    } else {
+                        // 取消类别时，连同该类下传感器一起取消
+                        targetEl.querySelectorAll('.sat-checkbox').forEach(s => { s.checked = false; });
+                        targetEl.classList.add('hidden');
+                    }
+                });
+            });
+
+            // 任一子传感器变化时，反向同步类别复选框
+            document.querySelectorAll('.sat-checkbox').forEach(sat => {
+                sat.addEventListener('change', function() {
+                    const sub = this.closest('[id^="sub-"]');
+                    if (!sub) return;
+                    const cat = document.querySelector(
+                        '.category-checkbox[data-target="' + sub.id + '"]'
+                    );
+                    if (!cat) return;
+                    const sats = sub.querySelectorAll('.sat-checkbox');
+                    cat.checked = Array.from(sats).some(s => s.checked);
+                    if (cat.checked) sub.classList.remove('hidden');
+                });
+            });
+
+            // ─── VPN 依赖徽章 + “仅显示免VPN” 筛选 ─────────────────────
+            (function setupVpnFilter() {
+                let net = {};
+                try {
+                    const el = document.getElementById('sensorNetworkData');
+                    net = JSON.parse((el && el.textContent) || '{}');
+                } catch (e) {
+                    console.warn('解析 sensorNetworkData 失败', e);
+                }
+
+                const rowOf = box => box.closest('.flex.items-center.gap-2') || box.parentElement;
+
+                // 给每个传感器行追加 免VPN / 需VPN 徽章
+                document.querySelectorAll('.sat-checkbox').forEach(box => {
+                    const meta = net[box.getAttribute('data-sensor')];
+                    if (!meta) return;
+                    const label = rowOf(box).querySelector('label');
+                    if (!label || label.querySelector('.vpn-badge')) return;
+                    const free = !meta.requires_vpn;
+                    const badge = document.createElement('span');
+                    badge.className = 'vpn-badge ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium '
+                        + (free ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700');
+                    badge.textContent = free ? '免VPN' : '需VPN';
+                    badge.title = meta.source || '';
+                    label.appendChild(badge);
+                });
+
+                // 顶部开关：开启时隐藏并取消勾选所有“需VPN”传感器，避免隐藏项仍被
+                // getSelectedSensors() 选中而触发 VPN 下载
+                const toggle = document.getElementById('vpnFilterToggle');
+                if (!toggle) return;
+                toggle.addEventListener('change', function () {
+                    const onlyFree = this.checked;
+                    document.querySelectorAll('.sat-checkbox').forEach(box => {
+                        const meta = net[box.getAttribute('data-sensor')];
+                        const needVpn = meta ? meta.requires_vpn : false;
+                        const row = rowOf(box);
+                        if (onlyFree && needVpn) {
+                            box.checked = false;
+                            if (row) row.style.display = 'none';
+                        } else if (row) {
+                            row.style.display = '';
+                        }
+                        // 复用既有联动：反向同步所属类别复选框状态
+                        box.dispatchEvent(new Event('change'));
+                    });
+                    // 某类别下已无可见传感器时，整张类别卡片一并隐藏
+                    document.querySelectorAll('[id^="sub-"]').forEach(sub => {
+                        const sats = Array.from(sub.querySelectorAll('.sat-checkbox'));
+                        const anyVisible = sats.some(s => rowOf(s).style.display !== 'none');
+                        const card = sub.closest('.border.rounded-lg');
+                        const cat = document.querySelector('.category-checkbox[data-target="' + sub.id + '"]');
+                        if (onlyFree && !anyVisible) {
+                            if (card) card.style.display = 'none';
+                            if (cat) cat.checked = false;
+                        } else if (card) {
+                            card.style.display = '';
+                        }
+                    });
+                });
+            })();
+
+            // 启动时：默认勾上多光谱类别下的 Sentinel-2 / Landsat
+            // （类别已 checked，子项默认 checked — 静态 HTML 已设置）
+            initKmlUploader();
+        });
+
+        // 暴露给后续提交流程：当前选中的传感器键名数组（与 main.py --sensor 一致）
+        window.getSelectedSensors = function () {
+            return Array.from(
+                document.querySelectorAll('.sat-checkbox:checked')
+            ).map(el => el.getAttribute('data-sensor'));
+        };
+
+        // ─── KML 区域文件：点击选择 / 拖拽上传 ────────────────────────
+        const KML_EXTS = ['kml', 'ovkml', 'kmz', 'ovkmz', 'xlsx', 'xls'];
+        let kmlServerPath = '';
+
+        function initKmlUploader() {
+            const zone = document.getElementById('kmlZone');
+            const input = document.getElementById('kmlFileInput');
+            if (!zone || !input) return;
+
+            zone.addEventListener('click', (e) => {
+                if (e.target === input || e.target.closest('#kmlSelected')) return;
+                input.value = '';
+                input.click();
+            });
+            input.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (file) handleKmlFile(file);
+                e.target.value = '';
+            });
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('border-blue-500', 'bg-blue-50/60');
+            });
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('border-blue-500', 'bg-blue-50/60');
+            });
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('border-blue-500', 'bg-blue-50/60');
+                const file = e.dataTransfer.files && e.dataTransfer.files[0];
+                if (file) handleKmlFile(file);
+            });
+
+            const clearBtn = document.getElementById('kmlClearBtn');
+            if (clearBtn) {
+                clearBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    clearKml();
+                });
+            }
+            const browseBtn = document.getElementById('kmlPathBrowseBtn');
+            if (browseBtn) {
+                browseBtn.addEventListener('click', () => {
+                    input.value = '';
+                    input.click();
+                });
+            }
+            const pathInput = document.getElementById('kmlPath');
+            if (pathInput) {
+                pathInput.addEventListener('input', () => {
+                    kmlServerPath = '';
+                    document.getElementById('kmlSelected').classList.add('hidden');
+                });
+            }
+        }
+
+        function handleKmlFile(file) {
+            const ext = (file.name.split('.').pop() || '').toLowerCase();
+            if (!KML_EXTS.includes(ext)) {
+                kmlToast('仅支持 .kml / .ovkml / .kmz / .ovkmz / .xlsx / .xls 文件', 'error');
+                return;
+            }
+            uploadKml(file);
+        }
+
+        async function uploadKml(file) {
+            const fd = new FormData();
+            fd.append('file', file);
+            try {
+                const res = await fetch('/api/upload-kml', { method: 'POST', body: fd });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.ok) {
+                    kmlToast('上传失败：' + (data.error || ('HTTP ' + res.status)), 'error');
+                    return;
+                }
+                kmlServerPath = data.path;
+                document.getElementById('kmlFileName').textContent = data.name;
+                document.getElementById('kmlFileSize').textContent = formatSize(file.size);
+                document.getElementById('kmlSelected').classList.remove('hidden');
+                const pathInput = document.getElementById('kmlPath');
+                if (pathInput) pathInput.value = data.path;
+                kmlToast(data.name + ' 上传成功', 'success');
+            } catch (err) {
+                kmlToast('上传出错：' + err.message, 'error');
+            }
+        }
+
+        function clearKml() {
+            kmlServerPath = '';
+            document.getElementById('kmlSelected').classList.add('hidden');
+            const input = document.getElementById('kmlFileInput');
+            if (input) input.value = '';
+            const pathInput = document.getElementById('kmlPath');
+            if (pathInput) pathInput.value = '';
+        }
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+        }
+
+        function kmlToast(msg, kind) {
+            let t = document.getElementById('kmlToast');
+            if (!t) {
+                t = document.createElement('div');
+                t.id = 'kmlToast';
+                t.style.cssText = 'position:fixed;top:20px;right:20px;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.15);transition:opacity .3s';
+                document.body.appendChild(t);
+            }
+            t.textContent = msg;
+            t.style.background = kind === 'error' ? '#fee2e2' : '#dcfce7';
+            t.style.color      = kind === 'error' ? '#991b1b' : '#166534';
+            t.style.border     = '1px solid ' + (kind === 'error' ? '#fca5a5' : '#86efac');
+            t.style.opacity = '1';
+            clearTimeout(t._timer);
+            t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3000);
+        }
+
+        window.getKmlValue = function() {
+            if (kmlServerPath) return kmlServerPath;
+            const el = document.getElementById('kmlPath');
+            return el ? el.value.trim() : '';
+        };
+
+        // ─── 任务执行：开始下载 / 停止 / SSE 日志流 ────────────────────
+        let currentTaskId = null;
+        let currentStream = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const runBtn = document.getElementById('runBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const cloudRange = document.getElementById('cloudRange');
+            const cloudLabel = document.getElementById('cloudLabel');
+            const logClear = document.getElementById('logClearBtn');
+
+            if (cloudRange && cloudLabel) {
+                cloudRange.addEventListener('input', () => {
+                    cloudLabel.textContent = cloudRange.value + '%';
+                });
+            }
+            if (logClear) logClear.addEventListener('click', clearLog);
+            if (runBtn)   runBtn.addEventListener('click', startDownload);
+
+            const logCont = document.getElementById('logContainer');
+            const jumpBtn = document.getElementById('logJumpBtn');
+            if (logCont) {
+                logCont.addEventListener('scroll', () => updateJumpButton(logCont));
+            }
+            if (jumpBtn && logCont) {
+                jumpBtn.addEventListener('click', () => {
+                    const sel = window.getSelection();
+                    if (sel) sel.removeAllRanges();
+                    logCont.scrollTop = logCont.scrollHeight;
+                    updateJumpButton(logCont);
+                });
+            }
+            if (stopBtn)  stopBtn.addEventListener('click', stopDownload);
+
+            // 页面刷新后重连正在跑的任务。后端 SSE 在每次连接时从 pos=0 重放，
+            // 用户能看到完整历史日志 + 后续实时输出。
+            (async () => {
+                try {
+                    const res = await fetch('/api/tasks', { cache: 'no-store' });
+                    if (!res.ok) return;
+                    const data = await res.json();
+                    const running = (data.tasks || [])
+                        .filter(t => t.status === 'running' && t.task_type === 'download')
+                        .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))[0];
+                    if (!running) return;
+                    currentTaskId = running.task_id;
+                    restoreFormFromTask(running);
+                    enterRunningView(running.task_id);
+                    appendLog('INFO', '检测到运行中任务 task_id=' + running.task_id
+                              + ' pid=' + running.pid + ',已恢复表单与日志流');
+                    openLogStream(running.task_id);
+                    setStreamActive(true);
+                } catch (e) {
+                    appendLog('WARN', '查询运行中任务失败：' + e.message);
+                } finally {
+                    refreshRunningCount();
+                }
+            })();
+        });
+
+        function collectTaskConfig() {
+            const sensors = window.getSelectedSensors();
+            const kml = (window.getKmlValue && window.getKmlValue()) || '';
+            const task = {
+                kml: kml,
+                sensor: sensors,
+                start: (document.getElementById('startDate') || {}).value || '',
+                end:   (document.getElementById('endDate')   || {}).value || '',
+                cloud: parseInt((document.getElementById('cloudRange') || {}).value || '15', 10),
+                max_items: parseInt((document.getElementById('maxItems') || {}).value || '50', 10),
+                output: (document.getElementById('outputDir') || {}).value.trim() || './downloads',
+                clip: !!(document.getElementById('optClip') || {}).checked,
+                no_derive: !(document.getElementById('optDerive') || {}).checked,
+                no_package: !(document.getElementById('optPackage') || {}).checked,
+            };
+            const deliveryDir = (document.getElementById('deliveryDir') || {}).value.trim();
+            if (deliveryDir) task.delivery_dir = deliveryDir;
+            return task;
+        }
+
+        function validateTask(task) {
+            const errs = [];
+            if (!task.kml) errs.push('未指定 KML 区域文件');
+            if (!task.sensor || task.sensor.length === 0) errs.push('未选择任何传感器');
+            if (!task.start || !task.end) errs.push('未填写起止日期');
+            if (task.start && task.end && task.start > task.end) errs.push('开始日期晚于结束日期');
+            if (isNaN(task.cloud) || task.cloud < 0 || task.cloud > 100) errs.push('云量阈值无效');
+            if (isNaN(task.max_items) || task.max_items < 1) errs.push('最大景数无效');
+            return errs;
+        }
+
+        async function startDownload() {
+            const task = collectTaskConfig();
+            const errs = validateTask(task);
+            if (errs.length) {
+                kmlToast('参数错误：' + errs.join('；'), 'error');
+                appendLog('ERROR', '参数错误：' + errs.join('；'));
+                return;
+            }
+            // ASTER L2 的 SWIR 短波红外波段(B4–B9)已于 2008 年 4 月永久失效：
+            // 起始日期在此之后将拿不到 B4–B9，仅有 VNIR(B1/B2/B3N)+ TIR(B10–B14)。
+            if (task.sensor && task.sensor.includes('aster') && task.start && task.start >= '2008-04-01') {
+                const ok = confirm(
+                    'ASTER L2 提示\n\n' +
+                    'ASTER 的 SWIR 短波红外波段（B4–B9）已于 2008 年 4 月永久失效。\n' +
+                    '你的开始日期为 ' + task.start + '（在 2008 年 4 月之后），因此本次 ASTER ' +
+                    '只能获取 VNIR（B1/B2/B3N）+ TIR（B10–B14），不含 B4–B9。\n\n' +
+                    'SWIR 是蚀变矿物/岩性识别的关键波段；如需 B4–B9，请把开始日期改到 2008-04 之前。\n\n' +
+                    '仍要继续（不含 SWIR）吗？'
+                );
+                if (!ok) {
+                    appendLog('INFO', '已取消：如需 ASTER SWIR（B4–B9），请将开始日期设为 2008-04 之前');
+                    return;
+                }
+                appendLog('WARN', 'ASTER SWIR（B4–B9）在 2008-04 之后无数据，本次仅含 VNIR+TIR');
+            }
+            // 预检阶段不切 stream active 状态 —— 防止用户误点 stopBtn 停掉别的任务
+            clearLog();
+            appendLog('INFO', '正在预检输出目录写权限…');
+
+            // 预检：避免 macOS TCC 拦截外置卷导致下载到一半才失败
+            try {
+                const probeBody = {output: task.output};
+                if (task.delivery_dir) probeBody.delivery_dir = task.delivery_dir;
+                const probeRes = await fetch('/api/check-output-writable', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(probeBody),
+                });
+                const probe = await probeRes.json().catch(() => ({}));
+                if (!probe.ok) {
+                    const failing = (probe.checked || []).filter(c => !c.writable);
+                    failing.forEach(c => {
+                        appendLog('ERROR', `${c.field}=${c.path} 不可写：${c.error}`);
+                        if (c.hint) appendLog('WARN', '提示：' + c.hint);
+                    });
+                    kmlToast('输出目录不可写，详见日志', 'error');
+                    return;
+                }
+                appendLog('INFO', '预检通过，正在提交任务…');
+            } catch (err) {
+                appendLog('WARN', '预检请求失败，跳过预检：' + err.message);
+            }
+
+            try {
+                const res = await fetch('/api/run', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({task: task}),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.ok) {
+                    const errMsg = data.error || ('HTTP ' + res.status);
+                    appendLog('ERROR', '任务提交失败：' + errMsg);
+                    if (res.status === 429) {
+                        kmlToast('已达到并发上限 (3/3),等任一任务跑完再来', 'error');
+                        refreshRunningCount();   // 让 runBtn 立即切到 'full' 状态
+                    } else {
+                        kmlToast('提交失败：' + errMsg, 'error');
+                    }
+                    return;
+                }
+                currentTaskId = data.task_id;
+                appendLog('INFO', '任务已启动：task_id=' + data.task_id + ' pid=' + data.pid);
+                appendLog('CMD', '$ ' + (data.argv || []).join(' '));
+                openLogStream(data.task_id);
+                setStreamActive(true);
+                refreshRunningCount();
+                kmlToast('任务已启动：' + data.task_id, 'success');
+            } catch (err) {
+                appendLog('ERROR', '请求异常：' + err.message);
+                kmlToast('请求异常：' + err.message, 'error');
+            }
+        }
+
+        async function stopDownload() {
+            if (!currentTaskId) return;
+            try {
+                const res = await fetch('/api/stop', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({task_id: currentTaskId}),
+                });
+                const data = await res.json().catch(() => ({}));
+                appendLog('INFO', '已发送停止请求：' + (data.ok ? 'OK' : (data.error || 'fail')));
+            } catch (err) {
+                appendLog('ERROR', '停止失败：' + err.message);
+            } finally {
+                refreshRunningCount();
+                exitRunningView();
+            }
+        }
+
+        function openLogStream(taskId) {
+            if (currentStream) {
+                try { currentStream.close(); } catch (e) {}
+            }
+            // 切换/打开任务流时,清掉旧任务的进度状态再从 /api/status 拉新任务的快照
+            progressMap.clear();
+            renderOverallProgress();
+            loadInitialProgress(taskId);
+            const es = new EventSource('/api/stream?task_id=' + encodeURIComponent(taskId));
+            currentStream = es;
+            es.onmessage = (ev) => {
+                const raw = ev.data;
+                if (raw === '__END__') {
+                    appendLog('INFO', '任务已结束');
+                    es.close();
+                    currentStream = null;
+                    setStreamActive(false);
+                    refreshRunningCount();
+                    exitRunningView();
+                    return;
+                }
+                if (!raw || raw.trim() === '') return;
+                if (raw.startsWith('__PROGRESS__')) {
+                    upsertProgressLine(raw.replace('__PROGRESS__', '').trim());
+                    return;
+                }
+                if (raw.startsWith('__PROGRESS_EVENT__')) {
+                    try {
+                        const evt = JSON.parse(raw.slice('__PROGRESS_EVENT__'.length));
+                        applyProgressEvent(evt);
+                    } catch (e) { /* 容错:JSON 错就忽略,不进日志 */ }
+                    return;
+                }
+                appendLog(detectLevel(raw), raw);
+            };
+            es.onerror = () => {
+                appendLog('WARN', 'SSE 连接异常，将自动重连…');
+            };
+        }
+
+        function detectLevel(line) {
+            const s = line.toUpperCase();
+            if (s.includes('ERROR') || s.includes('FAIL') || s.includes('TRACEBACK')) return 'ERROR';
+            if (s.includes('WARN'))  return 'WARN';
+            if (s.includes('QUERY') || s.includes('SEARCH')) return 'QUERY';
+            return 'INFO';
+        }
+
+        // setStreamActive: 仅切日志面板对应任务的视觉状态(图标 + stopBtn 可见性),
+        // runBtn 不再 disable —— 并发上限由后端 /api/run 返回 429 兜底
+        function setStreamActive(active) {
+            const stopBtn = document.getElementById('stopBtn');
+            const icon = document.getElementById('runBtnIcon');
+            const lbl  = document.getElementById('runBtnLabel');
+            if (icon) icon.setAttribute('icon', active ? 'lucide:loader-2' : 'lucide:play');
+            if (lbl)  lbl.textContent = active ? '运行中…' : '开始下载';
+            if (stopBtn) stopBtn.classList.toggle('hidden', !active);
+        }
+
+        // ─── 刷新后恢复任务上下文 ──────────────────────────────
+        // restoreFormFromTask: 把 /api/tasks 返回的字段填回 DOM
+        function restoreFormFromTask(task) {
+            if (!task) return;
+            if (task.kml) {
+                const kmlPath = document.getElementById('kmlPath');
+                if (kmlPath) kmlPath.value = task.kml;
+                const kmlFileName = document.getElementById('kmlFileName');
+                if (kmlFileName) kmlFileName.textContent = task.kml.split('/').pop() || task.kml;
+                const kmlFileSize = document.getElementById('kmlFileSize');
+                if (kmlFileSize) kmlFileSize.textContent = '(已上传)';
+                const kmlSelected = document.getElementById('kmlSelected');
+                if (kmlSelected) kmlSelected.classList.remove('hidden');
+            }
+            const sensors = Array.isArray(task.sensors) ? task.sensors : [];
+            document.querySelectorAll('.sat-checkbox').forEach(cb => {
+                cb.checked = sensors.includes(cb.getAttribute('data-sensor'));
+            });
+            const setVal = (id, val) => {
+                const el = document.getElementById(id);
+                if (el && val !== undefined && val !== null && val !== '') {
+                    el.value = String(val);
+                }
+            };
+            setVal('startDate',  task.start_date);
+            setVal('endDate',    task.end_date);
+            setVal('cloudRange', task.cloud);
+            setVal('maxItems',   task.max_items);
+            setVal('outputDir',  task.output_dir);
+            setVal('deliveryDir', task.delivery_dir);
+        }
+
+        // enterRunningView: 插入软提示 banner,表单仍可编辑 —— runBtn 状态由 setRunButtonState 管
+        function enterRunningView(taskId) {
+            let banner = document.getElementById('restoreBanner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'restoreBanner';
+                banner.className = 'sh-card border border-blue-200 bg-blue-50 text-blue-800 px-4 py-2.5 mb-4 flex items-start gap-3 text-sm';
+                banner.innerHTML = '<iconify-icon icon="lucide:info" class="text-blue-600 text-lg mt-0.5"></iconify-icon>'
+                    + '<span class="flex-1">已恢复任务 <b id="restoreBannerTaskId"></b> 的运行视图(后台进行中)。'
+                    + '修改参数点 <b>开始下载</b> 会启动新任务(当前 <span id="restoreBannerSlots">…</span>),不影响该任务。'
+                    + '要中止当前任务请点 <b>停止任务</b>。</span>';
+                const main = document.querySelector('main');
+                const header = main && main.querySelector('header');
+                if (header && header.parentNode) {
+                    header.parentNode.insertBefore(banner, header.nextSibling);
+                }
+            }
+            const span = document.getElementById('restoreBannerTaskId');
+            if (span) span.textContent = taskId || '';
+            refreshRunningCount();   // 进入视图后立刻刷新 slots + runBtn 状态
+        }
+
+        // exitRunningView: 移除 banner,把 runBtn 交回 idle 状态(再让 refreshRunningCount 修正)
+        function exitRunningView() {
+            const banner = document.getElementById('restoreBanner');
+            if (banner) banner.remove();
+            setRunButtonState('idle');
+            refreshRunningCount();
+        }
+
+        // setRunButtonState: 单一入口管 runBtn 的 label / icon / disabled 三态
+        //   idle                    —— 没在 running view 或 N=0:开始下载
+        //   running-view-with-room  —— 在 running view 且 N<3:启动新任务 (N/3)
+        //   full                    —— N>=3:运行队列已满
+        function setRunButtonState(state, n) {
+            const btn  = document.getElementById('runBtn');
+            const icon = document.getElementById('runBtnIcon');
+            const lbl  = document.getElementById('runBtnLabel');
+            if (!btn || !icon || !lbl) return;
+            if (state === 'full') {
+                btn.disabled = true;
+                icon.setAttribute('icon', 'lucide:ban');
+                lbl.textContent = '运行队列已满 (3/3)';
+            } else if (state === 'running-view-with-room') {
+                btn.disabled = false;
+                icon.setAttribute('icon', 'lucide:plus');
+                lbl.textContent = `启动新任务 (${n}/3)`;
+            } else {  // idle
+                btn.disabled = false;
+                icon.setAttribute('icon', 'lucide:play');
+                lbl.textContent = '开始下载';
+            }
+        }
+
+        // refreshRunningCount: 查 /api/tasks 统计 running download 数,更新 chip 和 runBtn 状态
+        async function refreshRunningCount() {
+            try {
+                const res = await fetch('/api/tasks', { cache: 'no-store' });
+                if (!res.ok) return;
+                const data = await res.json();
+                const downloads = (data.tasks || []).filter(t => t.task_type === 'download');
+                const n = downloads.filter(t => t.status === 'running').length;
+                const m = downloads.filter(t => t.status === 'polling').length;
+                const dot = document.getElementById('statusDot');
+                const label = document.getElementById('statusLabel');
+                if (dot && label) {
+                    if (n === 0 && m === 0) {
+                        dot.className = 'w-2 h-2 rounded-full bg-zinc-300';
+                        label.textContent = 'Idle';
+                    } else {
+                        dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+                        const parts = [];
+                        if (n > 0) parts.push(`运行中 ${n}/3`);
+                        if (m > 0) parts.push(`<button type="button" onclick="openAsyncPanel()" class="underline decoration-dotted underline-offset-2 hover:text-blue-600 cursor-pointer">等异步 ${m}</button>`);
+                        label.innerHTML = parts.join(' · ');
+                    }
+                }
+                // 同步 banner 里的 N/3 计数(若处于 running view)
+                const slots = document.getElementById('restoreBannerSlots');
+                if (slots) slots.textContent = `${n}/3`;
+                // 联动 runBtn 状态
+                const inRunningView = !!document.getElementById('restoreBanner');
+                if (n >= 3) {
+                    setRunButtonState('full', n);
+                } else if (inRunningView) {
+                    setRunButtonState('running-view-with-room', n);
+                } else {
+                    setRunButtonState('idle', n);
+                }
+            } catch (e) { /* 静默 */ }
+        }
+
+        // 消息中心实装在 /static/notif.js,三页共享(通过下面的 <script src> 加载)
+
+        const LOG_NEAR_BOTTOM_PX = 32;
+        const MAX_LOG_LINES = 2000;
+        const progLines = new Map();   // fname → DOM wrap element
+        const progressMap = new Map(); // sensor → {phase, target, done, ...} (整体进度聚合源)
+
+        function isNearBottom(c) {
+            return (c.scrollHeight - c.scrollTop - c.clientHeight) < LOG_NEAR_BOTTOM_PX;
+        }
+
+        function hasSelectionInside(c) {
+            const sel = window.getSelection();
+            if (!sel || sel.isCollapsed) return false;
+            return sel.anchorNode && c.contains(sel.anchorNode);
+        }
+
+        function updateJumpButton(c) {
+            const btn = document.getElementById('logJumpBtn');
+            if (!btn) return;
+            if (isNearBottom(c)) btn.classList.add('hidden');
+            else                 btn.classList.remove('hidden');
+        }
+
+        function clearLog() {
+            const c = document.getElementById('logContainer');
+            if (c) c.innerHTML = '';
+            progLines.clear();
+            progressMap.clear();
+            renderOverallProgress();
+            updateJumpButton(c || {scrollHeight: 0, scrollTop: 0, clientHeight: 0});
+        }
+
+        // ── 整体下载进度条 ──────────────────────────────────────
+        // 聚合所有 sensor 的 target/done,渲染顶部一条总进度条。
+        // 数据来源:SSE __PROGRESS_EVENT__ 增量 + /api/status 初始恢复。
+        function applyProgressEvent(evt) {
+            const sensor = evt && evt.sensor;
+            if (!sensor) return;
+            const cur = progressMap.get(sensor) || {};
+            for (const k in evt) {
+                if (k !== 'sensor') cur[k] = evt[k];
+            }
+            progressMap.set(sensor, cur);
+            renderOverallProgress();
+        }
+
+        function renderOverallProgress() {
+            const box  = document.getElementById('overallProgress');
+            const bar  = document.getElementById('overallProgressBar');
+            const text = document.getElementById('overallProgressText');
+            const det  = document.getElementById('overallProgressDetail');
+            if (!box || !bar || !text) return;
+
+            if (progressMap.size === 0) {
+                box.classList.add('hidden');
+                return;
+            }
+            box.classList.remove('hidden');
+
+            let total = 0, done = 0;
+            let nPending = 0, nError = 0, nDone = 0, nRunning = 0;
+            progressMap.forEach((p) => {
+                if (typeof p.target === 'number') total += p.target;
+                if (typeof p.done   === 'number') done  += p.done;
+                if (p.phase === 'pending') nPending++;
+                else if (p.phase === 'error') nError++;
+                else if (p.phase === 'done')  nDone++;
+                else if (p.phase === 'start' || p.phase === 'search') nRunning++;
+            });
+            const pct = total > 0 ? Math.min(100, Math.round(done * 100 / total)) : 0;
+            bar.style.width = pct + '%';
+            text.textContent = pct + '% (' + done + '/' + total + ')';
+
+            const parts = [];
+            if (nDone)    parts.push('✓ ' + nDone);
+            if (nRunning) parts.push('⏳ ' + nRunning);
+            if (nPending) parts.push('⌛ ' + nPending);
+            if (nError)   parts.push('✗ ' + nError);
+            if (det) det.textContent = parts.length ? '  ·  ' + parts.join('  ') : '';
+        }
+
+        async function loadInitialProgress(taskId) {
+            // 页面刷新或重连时:从 /api/status 拉一次,把已持久化的 task.progress 填回 progressMap
+            if (!taskId) return;
+            try {
+                const r = await fetch('/api/status');
+                if (!r.ok) return;
+                const j = await r.json();
+                const t = (j.tasks || []).find(x => x.task_id === taskId);
+                if (t && t.progress) {
+                    Object.keys(t.progress).forEach(s => {
+                        progressMap.set(s, t.progress[s] || {});
+                    });
+                    renderOverallProgress();
+                }
+            } catch (e) { /* 静默 */ }
+        }
+
+        function appendLog(level, msg, opts) {
+            const c = document.getElementById('logContainer');
+            if (!c) return null;
+            const ph = document.getElementById('logPlaceholder');
+            if (ph && ph.parentElement) ph.parentElement.remove();
+
+            // Why: 必须在 appendChild 之前测量，否则新行已撑大 scrollHeight，
+            // isNearBottom 永远为 false，follow-tail 失效。
+            const shouldFollow = isNearBottom(c) && !hasSelectionInside(c);
+
+            const colors = {
+                INFO:  'text-emerald-400',
+                ERROR: 'text-red-400',
+                WARN:  'text-amber-400',
+                QUERY: 'text-blue-400',
+                PROG:  'text-cyan-400',
+                CMD:   'text-purple-400',
+            };
+            const wrap = document.createElement('div');
+            wrap.className = 'flex gap-3 mb-1';
+            if (opts && opts.progKey) wrap.dataset.progKey = opts.progKey;
+            const t = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            const ts = '[' + t.getFullYear() + '-' + pad(t.getMonth()+1) + '-' + pad(t.getDate())
+                     + ' ' + pad(t.getHours()) + ':' + pad(t.getMinutes()) + ':' + pad(t.getSeconds()) + ']';
+            wrap.innerHTML =
+                '<span class="text-zinc-500 shrink-0">' + ts + '</span>' +
+                '<span class="' + (colors[level] || 'text-zinc-400') + ' font-bold shrink-0">[' + level + ']</span>' +
+                '<span class="text-zinc-300 break-all" data-log-msg>' + escapeHtml(msg) + '</span>';
+            c.appendChild(wrap);
+
+            while (c.childElementCount > MAX_LOG_LINES) {
+                const old = c.firstElementChild;
+                if (old && old.dataset && old.dataset.progKey) {
+                    progLines.delete(old.dataset.progKey);
+                }
+                c.removeChild(old);
+            }
+
+            if (shouldFollow) c.scrollTop = c.scrollHeight;
+            updateJumpButton(c);
+            return wrap;
+        }
+
+        function upsertProgressLine(rawMsg) {
+            // rawMsg 形如 "S2B_MSIL2A_..._20260:|47"
+            const idx = rawMsg.lastIndexOf('|');
+            if (idx < 0) { appendLog('PROG', rawMsg); return; }
+            const fname = rawMsg.slice(0, idx);
+            const pct   = rawMsg.slice(idx + 1);
+            const display = fname + ' ' + pct + '%';
+            const existing = progLines.get(fname);
+            if (existing && existing.isConnected) {
+                const msgSpan = existing.querySelector('[data-log-msg]');
+                if (msgSpan) msgSpan.textContent = display;
+                return;  // 不滚动、不动 jump 按钮，保持用户视野稳定
+            }
+            const el = appendLog('PROG', display, { progKey: fname });
+            if (el) progLines.set(fname, el);
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, function(c) {
+                return ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[c];
+            });
+        }
+
+        // ── 文件夹选择器 (Finder 风格) ──────────────────────────────
+        function createFolderPicker(inputEl) {
+            if (!inputEl) return;
+            const wrap = inputEl.closest('.sh-fp-wrap');
+            if (!wrap) return;
+
+            let panel = null;
+            let roots = [];         // [{label,path,kind}]
+            let currentPath = '';   // 当前面板停留的绝对路径
+            let currentRoot = '';   // 命中的根的绝对路径
+
+            const fetchJson = async (url) => {
+                const r = await fetch(url);
+                if (!r.ok) {
+                    let detail = '';
+                    try { detail = (await r.json()).detail || ''; } catch (e) {}
+                    throw new Error(`HTTP ${r.status} ${detail}`);
+                }
+                return r.json();
+            };
+
+            const ensureRoots = async () => {
+                if (roots.length) return roots;
+                const j = await fetchJson('/api/folder-roots');
+                roots = j.roots || [];
+                return roots;
+            };
+
+            const browse = async (path) => {
+                try {
+                    const j = await fetchJson(`/api/browse-folder?path=${encodeURIComponent(path)}`);
+                    currentPath = j.path;
+                    currentRoot = j.in_root;
+                    inputEl.value = j.path;
+                    render(j);
+                } catch (e) {
+                    console.warn('[folder-picker]', e.message);
+                    renderError(e.message);
+                }
+            };
+
+            const renderRootsBar = () => {
+                return `<div class="sh-fp-roots">` +
+                    roots.map(r => {
+                        const active = r.path === currentRoot ? ' is-active' : '';
+                        return `<span class="sh-fp-chip${active}" data-path="${escapeHtml(r.path)}">${escapeHtml(r.label)}</span>`;
+                    }).join('') +
+                    `</div>`;
+            };
+
+            const renderCrumb = (data) => {
+                // 把 currentPath 相对 in_root 切段
+                const root = data.in_root;
+                const rootLabel = (roots.find(r => r.path === root) || {}).label || root;
+                let segs = [{ label: rootLabel, path: root, isLast: data.path === root }];
+                if (data.path !== root) {
+                    const rel = data.path.substring(root.length).replace(/^\/+/, '');
+                    const parts = rel.split('/').filter(Boolean);
+                    let acc = root;
+                    parts.forEach((p, i) => {
+                        acc = acc.replace(/\/$/, '') + '/' + p;
+                        segs.push({ label: p, path: acc, isLast: i === parts.length - 1 });
+                    });
+                }
+                const segHtml = segs.map(s =>
+                    `<span class="sh-fp-crumb-seg${s.isLast ? ' is-last' : ''}" data-path="${escapeHtml(s.path)}">${escapeHtml(s.label)}</span>`
+                ).join('<span class="sh-fp-crumb-sep">/</span>');
+                const backDisabled = data.parent ? '' : ' disabled';
+                const backPath = data.parent || '';
+                return `<div class="sh-fp-header">
+                    <button class="sh-fp-back" data-path="${escapeHtml(backPath)}"${backDisabled}>← 上级</button>
+                    <div class="sh-fp-crumb">${segHtml}</div>
+                </div>`;
+            };
+
+            const renderList = (data) => {
+                if (!data.dirs.length) {
+                    return `<div class="sh-fp-list"><div class="sh-fp-row is-empty">(空目录)</div></div>`;
+                }
+                return `<div class="sh-fp-list">` +
+                    data.dirs.map(d =>
+                        `<div class="sh-fp-row" data-path="${escapeHtml(d.path)}">
+                            <span>📁</span><span>${escapeHtml(d.name)}</span>
+                        </div>`
+                    ).join('') +
+                    `</div>`;
+            };
+
+            const render = (data) => {
+                ensurePanel();
+                panel.innerHTML = renderRootsBar() + renderCrumb(data) + renderList(data);
+                panel.style.display = 'flex';
+            };
+
+            const renderError = (msg) => {
+                ensurePanel();
+                panel.innerHTML = renderRootsBar() +
+                    `<div class="sh-fp-list"><div class="sh-fp-row is-error">⚠ ${escapeHtml(msg)}</div></div>`;
+                panel.style.display = 'flex';
+            };
+
+            const ensurePanel = () => {
+                if (panel) return;
+                panel = document.createElement('div');
+                panel.className = 'sh-fp-panel';
+                panel.style.display = 'none';
+                wrap.appendChild(panel);
+                panel.addEventListener('mousedown', (e) => {
+                    // 阻止 mousedown 冒泡到 document,避免触发关闭逻辑前丢失点击
+                    e.stopPropagation();
+                });
+                panel.addEventListener('click', (e) => {
+                    const target = e.target.closest('[data-path]');
+                    if (!target) return;
+                    const p = target.getAttribute('data-path');
+                    if (!p || target.hasAttribute('disabled')) return;
+                    browse(p);
+                });
+            };
+
+            const open = async () => {
+                await ensureRoots();
+                const initial = inputEl.value.trim() || (roots[0] && roots[0].path) || './downloads';
+                await browse(initial);
+            };
+
+            const close = () => {
+                if (panel) panel.style.display = 'none';
+            };
+
+            inputEl.addEventListener('focus', () => { open(); });
+            inputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const v = inputEl.value.trim();
+                    if (v) browse(v);
+                } else if (e.key === 'Escape') {
+                    close();
+                    inputEl.blur();
+                }
+            });
+            // panel 外点击关闭(全局监听,只挂一次即可,这里挂在 wrap 上)
+            document.addEventListener('mousedown', (e) => {
+                if (!wrap.contains(e.target)) close();
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const outEl = document.getElementById('outputDir');
+            const delEl = document.getElementById('deliveryDir');
+            if (outEl) createFolderPicker(outEl);
+            if (delEl) createFolderPicker(delEl);
+        });
+    </script>
+</body>
+</html>

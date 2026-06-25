@@ -1,0 +1,10 @@
+#!/bin/sh
+# 阻止意外提交凭证/密钥文件
+for f in $(git diff --cached --name-only); do
+  case "$f" in
+    config/credentials.yaml|key/*)
+      echo "❌ 拒绝提交敏感文件: $f"
+      exit 1
+      ;;
+  esac
+done

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Upload</title>
+</head>
+<body>
+    <h1>Upload Files</h1>
+
+    <h2>Upload ROI File</h2>
+    <form action="http://127.0.0.1:8080/api/upload" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="type" value="roi">
+        <input type="file" name="file">
+        <button type="submit">Upload ROI</button>
+    </form>
+
+    <h2>Upload Data Directory</h2>
+    <form action="http://127.0.0.1:8080/api/upload" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="type" value="data_dir">
+        <input type="file" name="file" webkitdirectory directory multiple>
+        <button type="submit">Upload Data</button>
+    </form>
+
+    <h2>Start Analysis</h2>
+    <form action="http://127.0.0.1:8080/api/start_analysis" method="post" enctype="application/json">
+        <input type="hidden" name="mineral_type" value="gold">
+        <button type="submit">Start Analysis</button>
+    </form>
+</body>
+</html>

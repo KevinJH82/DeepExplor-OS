@@ -1,0 +1,417 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="flex h-screen w-full">
+
+<!-- 左侧控制面板 -->
+<aside class="w-80 border-r border-slate-200 bg-white flex flex-col h-full shadow-sm z-10">
+    <!-- Logo -->
+    <div class="p-6 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+            <div class="p-1.5 bg-blue-600 rounded-lg text-white">
+                <iconify-icon class="text-base" icon="lucide:layers"></iconify-icon>
+            </div>
+            <h1 class="text-base font-bold tracking-tight text-slate-900">Deep Explor OS</h1>
+        </div>
+    </div>
+
+    <!-- 滚动内容区 -->
+    <div class="flex-1 overflow-y-auto sidebar-scroll p-6 space-y-6">
+
+        <!-- 任务名称 -->
+        <section>
+            <label class="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
+                <iconify-icon class="text-slate-500" icon="lucide:tag"></iconify-icon>
+                任务名称（可选）
+            </label>
+            <input class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                   placeholder="输入本次分析任务的名称..." type="text" id="task_name">
+        </section>
+
+        <!-- 数据文件上传 -->
+        <section>
+            <div class="flex items-center justify-between mb-3">
+                <label class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <iconify-icon class="text-blue-500" icon="lucide:file-archive"></iconify-icon>
+                    数据文件上传 <span class="text-[10px] font-normal text-slate-400">（可选）</span>
+                </label>
+                <span class="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded font-mono">.ZIP</span>
+            </div>
+            <div class="file-upload-area border-2 border-dashed border-slate-200 rounded-xl p-6 transition-all hover:border-blue-400 hover:bg-blue-50/30 group cursor-pointer text-center"
+                 data-upload-type="data_dir">
+                <iconify-icon class="text-3xl text-slate-300 group-hover:text-blue-500 mb-2" icon="lucide:upload-cloud"></iconify-icon>
+                <p class="text-xs text-slate-500 leading-relaxed">点击或拖拽上传压缩包文件</p>
+                <p class="text-[10px] text-slate-400 mt-1 italic">留空则按 ROI 自动从交付库匹配拉取;上传则优先用上传数据</p>
+                <div class="mt-3">
+                    <button class="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-all"
+                            onclick="document.getElementById('data_dir_input').click()">选择文件</button>
+                    <input type="file" id="data_dir_input" data-upload-type="data_dir" style="display: none;"
+                           accept=".zip">
+                </div>
+                <div class="mt-3 text-start">
+                    <small class="upload-status text-slate-400">未上传</small>
+                    <div class="file-info text-emerald-600 text-xs"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ROI 坐标文件 -->
+        <section>
+            <div class="flex items-center justify-between mb-3">
+                <label class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <iconify-icon class="text-emerald-500" icon="lucide:map-pin"></iconify-icon>
+                    ROI 坐标文件
+                </label>
+                <span class="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded font-mono">KML / OVKML / XLSX / CSV</span>
+            </div>
+            <div class="file-upload-area border border-slate-200 rounded-lg p-3 bg-slate-50 transition-all hover:bg-white cursor-pointer"
+                 data-upload-type="roi_file">
+                <div class="flex items-center gap-3">
+                    <iconify-icon class="text-xl text-emerald-600" icon="lucide:file-spreadsheet"></iconify-icon>
+                    <div class="flex-1 overflow-hidden">
+                        <p class="text-xs font-medium text-slate-700 truncate">选择坐标定义文件</p>
+                    </div>
+                    <button class="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                            onclick="document.getElementById('roi_file_input').click()">浏览</button>
+                    <input type="file" id="roi_file_input" data-upload-type="roi_file"
+                           accept=".xlsx,.xls,.csv,.ovkml,.kml" style="display: none;">
+                </div>
+                <div class="mt-2 text-start">
+                    <small class="upload-status text-slate-400">未上传</small>
+                    <div class="file-info text-emerald-600 text-xs"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 探测器选择 -->
+        <section>
+            <label class="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
+                <iconify-icon class="text-indigo-500" icon="lucide:cpu"></iconify-icon>
+                探测器选择
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+                <div class="detector-checkbox selected flex flex-col items-center justify-center p-3 rounded-xl border border-blue-600 bg-blue-600 cursor-pointer transition-all hover:shadow-md group" data-detector="red_edge">
+                    <input type="checkbox" value="red_edge" checked class="hidden">
+                    <iconify-icon class="text-xl text-white mb-1" icon="lucide:zap"></iconify-icon>
+                    <span class="text-[10px] font-bold text-white">RedEdge（红边）</span>
+                </div>
+                <div class="detector-checkbox selected flex flex-col items-center justify-center p-3 rounded-xl border border-blue-600 bg-blue-600 cursor-pointer transition-all hover:shadow-md group" data-detector="intrinsic">
+                    <input type="checkbox" value="intrinsic" checked class="hidden">
+                    <iconify-icon class="text-xl text-white mb-1" icon="lucide:zap"></iconify-icon>
+                    <span class="text-[10px] font-bold text-white">Intrinsic（本征）</span>
+                </div>
+                <div class="detector-checkbox flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 bg-white cursor-pointer transition-all hover:border-blue-300 hover:bg-blue-50/30 group" data-detector="slow_vars">
+                    <input type="checkbox" value="slow_vars" class="hidden">
+                    <iconify-icon class="text-xl text-slate-400 group-hover:text-blue-500 mb-1" icon="lucide:zap"></iconify-icon>
+                    <span class="text-[10px] font-bold text-slate-600 group-hover:text-blue-600">SlowVars（慢变量）</span>
+                </div>
+                <div class="detector-checkbox opacity-40 flex flex-col items-center justify-center p-3 rounded-xl border border-slate-100 bg-slate-50 cursor-not-allowed group" data-detector="known_anomaly">
+                    <input type="checkbox" value="known_anomaly" id="known_anomaly_checkbox" disabled class="hidden">
+                    <iconify-icon class="text-xl text-slate-300 mb-1" icon="lucide:zap"></iconify-icon>
+                    <span class="text-[10px] font-bold text-slate-400">KnownAnomaly（KML）</span>
+                </div>
+            </div>
+
+            <!-- 融合模式 -->
+            <div class="flex items-center gap-2 mt-3 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                <input class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" id="fusion_mode" checked>
+                <span class="text-xs text-slate-600">叠加地表背景（综合融合）</span>
+            </div>
+
+            <!-- 外部系统接入(默认关;勾选后自动从邻居系统按 ROI 匹配结果) -->
+            <div class="flex items-center gap-2 mt-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                <input class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" type="checkbox" id="use_alteration">
+                <span class="text-xs text-slate-600">接入蚀变分析（geo-analyser：升级地表潜力 + 靶区旁证重排）</span>
+            </div>
+            <div class="flex items-center gap-2 mt-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                <input class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" type="checkbox" id="use_structural">
+                <span class="text-xs text-slate-600">接入地质构造解译（geo-stru：注入深部断裂因子 fault_activity）</span>
+            </div>
+        </section>
+
+        <!-- KML 异常数据 -->
+        <section>
+            <label class="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
+                <iconify-icon class="text-orange-500" icon="lucide:database"></iconify-icon>
+                KML 已知异常数据
+            </label>
+            <div class="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                <input class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" type="checkbox" id="use_kml" onchange="toggleKMLUpload()">
+                <span class="text-xs text-slate-600">启用 KML/KMZ 已知异常数据</span>
+            </div>
+            <div class="file-upload-area mt-2 border border-slate-200 rounded-lg p-3 bg-slate-50 transition-all hover:bg-white cursor-pointer"
+                 data-upload-type="kml_file" id="kml_upload_area" style="display: none;">
+                <div class="flex items-center gap-3">
+                    <iconify-icon class="text-xl text-orange-500" icon="lucide:map"></iconify-icon>
+                    <div class="flex-1">
+                        <p class="text-xs text-slate-500">拖拽 KML/KMZ 文件到此处</p>
+                    </div>
+                    <button class="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                            onclick="document.getElementById('kml_file_input').click()">选择文件</button>
+                    <input type="file" id="kml_file_input" data-upload-type="kml_file"
+                           accept=".kml,.kmz" style="display: none;">
+                </div>
+                <div class="mt-2 text-start">
+                    <small class="upload-status text-slate-400">未上传</small>
+                    <div class="file-info text-emerald-600 text-xs"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 分析参数 -->
+        <section>
+            <label class="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
+                <iconify-icon class="text-slate-500" icon="lucide:settings-2"></iconify-icon>
+                分析参数设定
+            </label>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[11px] text-slate-500 mb-1.5">目标矿种</label>
+                    <select class="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-slate-600 focus:ring-2 focus:ring-blue-500 focus:outline-none" id="mineral_type">
+                        <option value="">请选择矿种</option>
+                        {% for key, mineral in minerals.items() %}
+                        <option value="{{ key }}">{{ mineral.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <div class="flex justify-between mb-1.5 text-[11px] text-slate-500">
+                        <span>KMZ 置信度阈值</span>
+                        <span class="font-mono" id="threshold_value">0.6</span>
+                    </div>
+                    <input class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                           type="range" id="kmz_threshold" min="0.1" max="1.0" step="0.1" value="0.6">
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- 底部运行控制 -->
+    <div class="p-6 bg-slate-50 border-t border-slate-200">
+        <div id="progress_container" style="display: none;">
+            <div class="flex justify-between items-end mb-2">
+                <span class="text-xs font-semibold text-slate-700">分析进度</span>
+                <span class="text-[10px] text-slate-400 font-mono" id="progress_text">0%</span>
+            </div>
+            <div class="h-2 w-full bg-slate-200 rounded-full overflow-hidden mb-4">
+                <div class="h-full bg-blue-600 transition-all duration-500 rounded-full" id="progress_bar" style="width: 0%;"></div>
+            </div>
+        </div>
+        <div id="progress_text_container" style="display: none;"></div>
+
+        <div class="grid grid-cols-1 gap-2">
+            <button class="w-full bg-slate-900 hover:bg-black text-white py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-slate-200 active:scale-95"
+                    id="run_button" onclick="startAnalysis()">
+                <iconify-icon class="text-lg" icon="lucide:play-circle"></iconify-icon>
+                开始运行
+            </button>
+            <div class="grid grid-cols-2 gap-2">
+                <button class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-xl font-semibold text-xs flex items-center justify-center gap-1 transition-all active:scale-95"
+                        onclick="clearUploads()">
+                    <iconify-icon icon="lucide:refresh-cw"></iconify-icon>
+                    重置
+                </button>
+                <button class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2 rounded-xl font-semibold text-xs flex items-center justify-center gap-1 transition-all active:scale-95"
+                        onclick="downloadResults(currentTaskId)">
+                    <iconify-icon icon="lucide:download"></iconify-icon>
+                    下载结果
+                </button>
+            </div>
+        </div>
+    </div>
+</aside>
+
+<!-- 右侧主内容区 -->
+<main class="flex-1 flex flex-col h-full relative">
+    <!-- 顶部状态栏 -->
+    <header class="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-8">
+        <div class="flex items-center gap-4">
+            <h2 class="text-lg font-bold text-slate-900 uppercase tracking-wider">矿产深部探测系统</h2>
+        </div>
+        <div class="flex items-center gap-4">
+            <span class="status-indicator" id="status_indicator"></span>
+            <span class="text-xs text-slate-500" id="status_text">就绪</span>
+            <a href="javascript:history.back()" class="text-xs text-slate-500 hover:text-blue-600 flex items-center gap-1 transition-all">
+                <iconify-icon icon="lucide:arrow-left"></iconify-icon>
+                返回上一级
+            </a>
+        </div>
+    </header>
+
+    <!-- 内容区域 -->
+    <div class="flex-1 p-6 overflow-y-auto bg-[#F8FAFC]">
+        <div class="max-w-7xl mx-auto">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <!-- 标签页按钮 -->
+                <div class="border-b border-slate-100 flex px-2 overflow-x-auto">
+                    <button class="tab-btn active px-6 py-4 text-sm text-blue-600 shrink-0 transition-all" id="log_tab" onclick="switchResultTab(event, 'log')">运行日志</button>
+                    <button class="tab-btn px-6 py-4 text-sm text-slate-500 hover:text-slate-900 shrink-0 transition-all" id="resonance_tab" onclick="switchResultTab(event, 'resonance')">共振参数</button>
+                    <button class="tab-btn px-6 py-4 text-sm text-slate-500 hover:text-slate-900 shrink-0 transition-all" id="fusion_tab" onclick="switchResultTab(event, 'mask')">掩码集成</button>
+                    <button class="tab-btn px-6 py-4 text-sm text-slate-500 hover:text-slate-900 shrink-0 transition-all" id="prediction_tab" onclick="switchResultTab(event, 'prediction')">深部预测</button>
+                </div>
+
+                <div class="p-6">
+                    <!-- 运行日志 -->
+                    <div class="tab-content" id="tab-log">
+                        <div class="log-container" id="log_container">
+                            <div class="log-entry info">[系统] 矿产预测系统已就绪</div>
+                            <div class="log-entry info">[系统] 请在左侧配置参数并开始分析</div>
+                        </div>
+                    </div>
+
+                    <!-- 共振参数 -->
+                    <div class="tab-content hidden" id="tab-resonance">
+                        <div class="relative w-full h-[500px] bg-slate-50 rounded-xl overflow-hidden group border border-slate-100 img-viewer">
+                            <div class="absolute inset-0 flex items-center justify-center overflow-auto p-4">
+                                <img id="resonance_image"
+                                     src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect fill='%23f1f5f9' width='800' height='400'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%2394a3b8' font-size='16'%3E共振参数图%3C/text%3E%3C/svg%3E"
+                                     alt="共振参数图">
+                            </div>
+                            <div class="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <button onclick="zoomImage('resonance_image', 1.2)" title="放大" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:zoom-in"></iconify-icon>
+                                </button>
+                                <button onclick="zoomImage('resonance_image', 0.8)" title="缩小" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:zoom-out"></iconify-icon>
+                                </button>
+                                <button onclick="resetImage('resonance_image')" title="重置" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:refresh-cw"></iconify-icon>
+                                </button>
+                                <button onclick="toggleZoom('resonance_image')" title="适应显示" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:maximize-2"></iconify-icon>
+                                </button>
+                                <button onclick="downloadImage('resonance_image')" title="下载图片" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:download"></iconify-icon>
+                                </button>
+                            </div>
+                            <div class="absolute bottom-4 left-4 pointer-events-none">
+                                <span class="px-3 py-1.5 bg-white/80 backdrop-blur rounded-full text-[10px] font-bold text-slate-500 border border-slate-200 shadow-sm uppercase tracking-wider">Resonance Parameters</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 掩码集成 -->
+                    <div class="tab-content hidden" id="tab-mask">
+                        <div class="relative w-full h-[500px] bg-slate-50 rounded-xl overflow-hidden group border border-slate-100 img-viewer">
+                            <div class="absolute inset-0 flex items-center justify-center overflow-auto p-4">
+                                <img id="fusion_image"
+                                     src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect fill='%23f1f5f9' width='800' height='400'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%2394a3b8' font-size='16'%3E掩码集成图%3C/text%3E%3C/svg%3E"
+                                     alt="掩码集成图">
+                            </div>
+                            <div class="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <button onclick="zoomImage('fusion_image', 1.2)" title="放大" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:zoom-in"></iconify-icon>
+                                </button>
+                                <button onclick="zoomImage('fusion_image', 0.8)" title="缩小" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:zoom-out"></iconify-icon>
+                                </button>
+                                <button onclick="resetImage('fusion_image')" title="重置" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:refresh-cw"></iconify-icon>
+                                </button>
+                                <button onclick="toggleZoom('fusion_image')" title="适应显示" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:maximize-2"></iconify-icon>
+                                </button>
+                                <button onclick="downloadImage('fusion_image')" title="下载图片" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:download"></iconify-icon>
+                                </button>
+                            </div>
+                            <div class="absolute bottom-4 left-4 pointer-events-none">
+                                <span class="px-3 py-1.5 bg-white/80 backdrop-blur rounded-full text-[10px] font-bold text-slate-500 border border-slate-200 shadow-sm uppercase tracking-wider">Mask Integration</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 深部预测 -->
+                    <div class="tab-content hidden" id="tab-prediction">
+                        <div class="relative w-full h-[500px] bg-slate-50 rounded-xl overflow-hidden group border border-slate-100 img-viewer">
+                            <div class="absolute inset-0 flex items-center justify-center overflow-auto p-4">
+                                <img id="prediction_image"
+                                     src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect fill='%23f1f5f9' width='800' height='400'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%2394a3b8' font-size='16'%3E深部预测图%3C/text%3E%3C/svg%3E"
+                                     alt="深部预测图">
+                            </div>
+                            <div class="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <button onclick="zoomImage('prediction_image', 1.2)" title="放大" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:zoom-in"></iconify-icon>
+                                </button>
+                                <button onclick="zoomImage('prediction_image', 0.8)" title="缩小" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:zoom-out"></iconify-icon>
+                                </button>
+                                <button onclick="resetImage('prediction_image')" title="重置" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:refresh-cw"></iconify-icon>
+                                </button>
+                                <button onclick="toggleZoom('prediction_image')" title="适应显示" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:maximize-2"></iconify-icon>
+                                </button>
+                                <button onclick="downloadImage('prediction_image')" title="下载图片" class="p-2.5 bg-white/90 backdrop-blur rounded-lg shadow-md text-slate-700 hover:bg-white border border-slate-200 flex items-center justify-center">
+                                    <iconify-icon icon="lucide:download"></iconify-icon>
+                                </button>
+                            </div>
+                            <div class="absolute bottom-4 left-4 pointer-events-none">
+                                <span class="px-3 py-1.5 bg-white/80 backdrop-blur rounded-full text-[10px] font-bold text-slate-500 border border-slate-200 shadow-sm uppercase tracking-wider">Deep Prediction</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // 初始化矿物类型
+    fetch('/api/mineral_types')
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('mineral_type');
+            select.innerHTML = '<option value="">请选择矿种</option>';
+            Object.keys(data).forEach(key => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = data[key].name;
+                select.appendChild(option);
+            });
+        });
+
+    // 切换 KML 上传
+    function toggleKMLUpload() {
+        const checkbox = document.getElementById('use_kml');
+        const uploadArea = document.getElementById('kml_upload_area');
+        const knownAnomalyCheckbox = document.getElementById('known_anomaly_checkbox');
+        const kaWrapper = knownAnomalyCheckbox.closest('.detector-checkbox');
+
+        if (checkbox.checked) {
+            uploadArea.style.display = 'block';
+            knownAnomalyCheckbox.disabled = false;
+            kaWrapper.classList.remove('opacity-40', 'cursor-not-allowed');
+            kaWrapper.classList.add('cursor-pointer');
+        } else {
+            uploadArea.style.display = 'none';
+            knownAnomalyCheckbox.disabled = true;
+            knownAnomalyCheckbox.checked = false;
+            kaWrapper.classList.add('opacity-40', 'cursor-not-allowed');
+            kaWrapper.classList.remove('cursor-pointer', 'selected');
+        }
+    }
+
+    // 更新阈值显示
+    document.getElementById('kmz_threshold').addEventListener('input', function(e) {
+        document.getElementById('threshold_value').textContent = e.target.value;
+    });
+
+    // 探测器复选框点击事件
+    document.querySelectorAll('.detector-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('click', function(e) {
+            e.preventDefault();
+            const input = this.querySelector('input[type="checkbox"]');
+            if (input.disabled) return;
+            input.checked = !input.checked;
+            this.classList.toggle('selected', input.checked);
+        });
+    });
+</script>
+{% endblock %}

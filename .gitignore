@@ -1,0 +1,36 @@
+# ── 密钥 / 凭证(严禁入库) ──
+.env
+**/.env
+**/credentials.yaml
+**/config/credentials.yaml
+
+# ── 门户运行期数据(用户库/会话/KML) ──
+geo-portal/backend/_data/
+
+# ── 运行期产物 ──
+**/task_store.db
+*.db
+**/_traces/
+**/.run-logs/
+**/*.bak
+**/*.bak-*
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+.venv/
+**/.venv/
+*.egg-info/
+
+# ── 前端 ──
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+
+# ── 工具本地配置 ──
+**/.claude/settings.local.json
+
+# ── 其它 ──
+.DS_Store
+*.log
