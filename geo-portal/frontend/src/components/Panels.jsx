@@ -22,6 +22,26 @@ function StatusBadge({ status, children }) {
   return <span className={`badge ${statusTone(status)}`}>{children || statusText(status)}</span>
 }
 
+function HudPanel({ label, children }) {
+  const [pinned, setPinned] = useState(false)
+  return (
+    <div className={`hud glass ${pinned ? 'pinned' : ''}`} tabIndex={0}>
+      <span className="hud-handle">{label}</span>
+      <button
+        type="button"
+        className="hud-pin"
+        title={pinned ? '取消固定面板' : '固定面板'}
+        aria-label={pinned ? '取消固定面板' : '固定面板'}
+        aria-pressed={pinned}
+        onClick={() => setPinned((v) => !v)}
+      >
+        {pinned ? '●' : '○'}
+      </button>
+      {children}
+    </div>
+  )
+}
+
 function MiniList({ title, items }) {
   const vals = (items || []).filter(Boolean)
   return (
@@ -241,17 +261,19 @@ function PlanPanel() {
   return (
     <div className="work glass">
       <h4>新建勘探任务 · {current?.name}</h4>
-      <Upload {...uploadProps}>
-        <div className={`drop ${kml ? 'ready' : ''}`}>
-          {kml ? (
-            <>
-              <b>✓ 项目 ROI 已绑定</b>
-              <span>{kml}</span>
-              <em>编排将直接使用该 KML，点击可替换 ROI</em>
-            </>
-          ) : '⬆ 上传 KML / KMZ / ovKML / CSV / XLSX'}
-        </div>
-      </Upload>
+      <div className="plan-roi-upload">
+        <Upload {...uploadProps}>
+          <div className={`drop ${kml ? 'ready' : ''}`}>
+            {kml ? (
+              <>
+                <b>✓ 项目 ROI 已绑定</b>
+                <span>{kml}</span>
+                <em>编排将直接使用该 KML，点击可替换 ROI</em>
+              </>
+            ) : '⬆ 上传 KML / KMZ / ovKML / CSV / XLSX'}
+          </div>
+        </Upload>
+      </div>
       <div className="kv">
         <span>交付库</span>
         {delivery ? (
@@ -319,6 +341,9 @@ function DataPanel() {
   const { stages, setActive, setStage, runStageReal, selectedSources, run: runRecord, evidencePlan, generateEvidencePlan } = useWorkflow()
   const { traceId } = useProject()
   const st = stages.data || {}
+  const dlSub = st.sub_tasks?.downloader || {}
+  const sensors = Array.isArray(dlSub.sensors) ? dlSub.sensors : []
+  const activeSensor = dlSub.active_sensor || ''
   const planSources = runRecord?.plan ? dataSourcesFromPlan(runRecord.plan) : { keys: [] }
   const effectiveSources = mergeSourceKeys(selectedSources || [], planSources.keys || [])
   const rs = effectiveSources.filter((k) => SOURCE_SERVICES[k] === 'downloader')
@@ -331,47 +356,66 @@ function DataPanel() {
     const liveData = useWorkflow.getState().stages.data || st
     const subTasks = { ...(liveData.sub_tasks || {}) }
     if (rs.length || subTasks.downloader) {
-      subTasks.downloader = { ...(subTasks.downloader || {}), status: rs.length ? 'completed' : 'skipped' }
+      subTasks.downloader = { ...(subTasks.downloader || {}), status: rs.length ? 'completed' : 'skipped', required: !!rs.length }
     }
     if (dc.length || subTasks.datacolle) {
-      subTasks.datacolle = { ...(subTasks.datacolle || {}), status: dc.length ? 'completed' : 'skipped' }
+      subTasks.datacolle = { ...(subTasks.datacolle || {}), status: dc.length ? 'completed' : 'skipped', required: !!dc.length }
     }
-    // InSAR 异步(HyP3 可数小时),不阻塞数据阶段:标记为非必需的异步处理,结果在证据阶段单独加载
     if (insar.length || subTasks.insar) {
-      subTasks.insar = { ...(subTasks.insar || {}), status: 'running', required: false, reason: 'InSAR 异步处理,证据阶段加载' }
+      const cur = subTasks.insar || {}
+      subTasks.insar = {
+        ...cur,
+        status: insar.length ? (['completed', 'skipped'].includes(cur.status) ? cur.status : 'pending') : 'skipped',
+        required: !!insar.length,
+        reason: insar.length ? 'InSAR 数据准备已纳入数据阶段门控' : 'InSAR 未选择',
+      }
     }
-    setStage('data', { status: 'completed', progress: 100, sub_tasks: subTasks })
+    const requiredDone = Object.values(subTasks).every((t) => !t?.required || ['completed', 'skipped'].includes(t.status))
+    const patch = requiredDone
+      ? { status: 'completed', progress: 100, sub_tasks: subTasks, error: '' }
+      : { status: 'running', progress: Math.min(99, liveData.progress || 0), sub_tasks: subTasks }
+    setStage('data', patch)
     syncStage(traceId, 'data', { sub_tasks: subTasks })
-    try { await generateEvidencePlan(traceId) } catch {}
+    if (requiredDone) {
+      try { await generateEvidencePlan(traceId) } catch {}
+    }
+    return requiredDone
+  }
+  // 数据链:downloader → datacolle → insar → finishData。提到组件作用域,run() 与 resumeData() 共用。
+  const runInsar = () => {
+    if (!insar.length) return finishData()
+    return runStageReal(traceId, 'data', 'insar', {
+      onDone: finishData,
+      params: { sources: insar.join(','), phase: 'data' },
+    })
+  }
+  const runDatacolle = () => {
+    if (!dc.length) return runInsar()
+    return runStageReal(traceId, 'data', 'datacolle', {
+      onDone: runInsar,
+      params: { sources: dc.join(',') },
+    })
   }
   const run = async () => {
-    // InSAR 异步且耗时(HyP3 数小时),不阻塞主链:并行发起作为提前量,数据阶段不等它完成;
-    // 其形变结果在证据阶段由 InSAR 证据层单独加载/轮询。
-    let insarTaskId = stages.data?.sub_tasks?.insar?.task_id || ''
-    if (insar.length) {
-      try {
-        insarTaskId = (await api.startSvc(traceId, 'insar', { sources: insar.join(',') })).task_id || ''
-      } catch {}
-      const subTasks = {
-        ...(stages.data?.sub_tasks || {}),
-        insar: { status: insarTaskId ? 'running' : 'pending', required: false, reason: insarTaskId ? 'InSAR 异步处理中' : 'InSAR 尚未启动', task_id: insarTaskId },
-      }
-      setStage('data', { sub_tasks: subTasks })
-      syncStage(traceId, 'data', { sub_tasks: subTasks })
-    }
-    const runDatacolle = () => {
-      if (!dc.length) return finishData()
-      return runStageReal(traceId, 'data', 'datacolle', {
-        onDone: finishData,
-        params: { sources: dc.join(',') },
-      })
-    }
     if (!rs.length) return runDatacolle()
     return runStageReal(traceId, 'data', 'downloader', {
       onDone: runDatacolle,
       params: { sensors: rs.join(',') },
     })
   }
+  // 重开/刷新后续接:数据阶段仍 running 时,把仍在跑的子任务接回轮询并续跑后续链路,
+  // 避免"下载其实已完成、门户却卡在 running"(前端停止轮询导致状态没同步)。
+  useEffect(() => {
+    if (st.status !== 'running' || !traceId) return
+    const subs = (useWorkflow.getState().stages.data || {}).sub_tasks || {}
+    const poll = useWorkflow.getState().pollStage
+    const dl = subs.downloader, dcS = subs.datacolle, inS = subs.insar
+    if (dl?.status === 'running' && dl.task_id) poll(traceId, 'data', 'downloader', dl.task_id, { onDone: runDatacolle })
+    else if (dcS?.status === 'running' && dcS.task_id) poll(traceId, 'data', 'datacolle', dcS.task_id, { onDone: runInsar })
+    else if (inS?.status === 'running' && inS.task_id) poll(traceId, 'data', 'insar', inS.task_id, { onDone: finishData })
+    else if (dl && ['completed', 'skipped'].includes(dl.status)) runDatacolle()  // 某环节已完成但链路没收尾 → 续跑
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traceId])
   const enterEvidence = async () => {
     if (!evidencePlan) {
       try {
@@ -385,11 +429,26 @@ function DataPanel() {
     setActive('evidence')
   }
   return (
-    <div className="hud glass">
+    <HudPanel label="数据准备">
       <h5>数据准备</h5>
       <div style={{ marginBottom: 6 }}><StatusBadge status={st.status} /></div>
       <div className="kv"><span>遥感下载(downloader)</span><b>{st.status === 'completed' ? '✓' : `${st.progress || 0}%`}</b></div>
       <div className="gauge"><i style={{ width: `${st.progress || 0}%` }} /></div>
+      {st.status === 'running' && sensors.length > 0 && (
+        <div style={{ margin: '8px 0 2px' }}>
+          {sensors.map((s) => {
+            const isActive = !s.finished && s.label === activeSensor
+            return (
+              <div key={s.sensor} className="kv" style={{ padding: '3px 0', fontSize: 11.5 }}>
+                <span>{s.finished ? '✓' : isActive ? '⬇' : '○'} {s.label}</span>
+                <b className={s.finished ? 'ok' : isActive ? 'run' : 'wt'}>
+                  {s.finished ? '完成' : isActive ? '下载中…' : '排队'}
+                </b>
+              </div>
+            )
+          })}
+        </div>
+      )}
       <div className="kv" style={{ marginTop: 6 }}><span>遥感源</span><b>{rs.length} 项</b></div>
       <div className="kv"><span>InSAR 数据</span><b>{insar.length ? `${insar.length} 项` : '未选'}</b></div>
       <div className="kv"><span>data-colle 资料</span><b>{dc.length ? `${dc.length} 项(物探/化探)` : '未选'}</b></div>
@@ -398,19 +457,14 @@ function DataPanel() {
         <button className="pbtn" onClick={enterEvidence}>{evidencePlan ? '进入 2D 证据 →' : '生成证据编排 →'}</button>
       ) : st.status === 'running' ? (
         <>
-          <button className="pbtn" disabled>数据准备中…（{st.progress || 0}%）</button>
-          {/* 同步数据源已到 100% 但服务状态尚未回报 completed(如下载异步尾巴/InSAR)时,允许手动进入证据 */}
-          {(st.progress || 0) >= 90 && (
-            <button className="pbtn ghost" style={{ marginTop: 6 }}
-              onClick={async () => { await finishData(); setActive('evidence') }}>
-              数据已就绪 → 标记完成并进入证据
-            </button>
-          )}
+          <button className="pbtn" disabled>
+            {activeSensor ? `⬇ ${activeSensor} 下载中…（${st.progress || 0}%）` : `数据准备中…（${st.progress || 0}%）`}
+          </button>
         </>
       ) : (
         <button className="pbtn" onClick={run}>▶ 开始下载 / 用交付库</button>
       )}
-    </div>
+    </HudPanel>
   )
 }
 // ③ 证据子tab
@@ -486,7 +540,7 @@ function EvidenceHud() {
   }
 
   return (
-    <div className="hud glass">
+    <HudPanel label="证据面板">
       <h5>图层 · 证据</h5>
       {!evidencePlan && (
         <button className="pbtn" onClick={refreshPlan}>生成证据编排单</button>
@@ -551,16 +605,16 @@ function EvidenceHud() {
       {!started && !evidencePlan && <button className="pbtn" onClick={() => runEvidencesReal(traceId)}>▶ 并行运行所选证据</button>}
       {!started && evidencePlan && <button className="pbtn" onClick={executePlan}>▶ 执行证据编排</button>}
       {started && (evidencePlan ? runnablePlanTasks.length > 0 : pending.length > 0) && (
-        <button className="pbtn" disabled={running}
+        <button className="pbtn"
           onClick={() => (evidencePlan ? runnablePlanTasks : pending).forEach((e) => runOneEvidenceReal(traceId, e.key))}>
-          {running ? '证据生成中…' : `▶ 继续运行未完成证据 (${evidencePlan ? runnablePlanTasks.length : pending.length})`}
+          ▶ 继续运行未完成证据 ({evidencePlan ? runnablePlanTasks.length : pending.length})
         </button>
       )}
       <button className="pbtn" disabled={!canFuse}
         onClick={() => { syncStage(traceId, 'evidence'); setActive('model3d') }}>
         {canFuse ? `≥${gateMin} 证据完成 → 融合 3D` : (missingRequiredLabels ? `缺少关键证据:${missingRequiredLabels}` : `需 ≥${gateMin} 证据`)}
       </button>
-    </div>
+    </HudPanel>
   )
 }
 
@@ -591,7 +645,7 @@ function Model3DHud() {
     }
   }
   return (
-    <div className="hud glass">
+    <HudPanel label="3D建模">
       <h5>靶点 #{top?.rank ?? 3} {real && <span style={{ color: 'var(--ok)', fontSize: 10 }}>真实</span>}</h5>
       <div style={{ marginBottom: 6 }}><StatusBadge status={st.status} /></div>
       <div className="big">{top ? Number(top.score).toFixed(2) : '0.82'}</div>
@@ -636,7 +690,7 @@ function Model3DHud() {
         ? <button className="pbtn" onClick={() => runStageReal(traceId, 'model3d', 'model3d', { onDone: () => syncStage(traceId, 'model3d'), params: modelParams() })} disabled={st.status === 'running'}>
             {st.status === 'running' ? '融合中…' : (st.status === 'failed' ? '↻ 重试 3D 融合' : '▶ 运行 3D 融合')}</button>
         : <button className="pbtn" onClick={() => setActive('drill')}>进入 AI 布孔 →</button>}
-    </div>
+    </HudPanel>
   )
 }
 
@@ -675,7 +729,7 @@ function DrillHud() {
     } finally { setDlDrill(false) }
   }
   return (
-    <div className="hud glass">
+    <HudPanel label="AI布孔">
       <h5>AI 布孔 + 闭环</h5>
       <div style={{ marginBottom: 6 }}><StatusBadge status={st.status} /></div>
       <div className="kv"><span>计划孔</span><b>{nHoles || '—'}</b></div>
@@ -709,7 +763,7 @@ function DrillHud() {
             <button className="pbtn" onClick={rerun}>♻ 回灌重算(同 trace_id)</button>
             <button className="pbtn" onClick={() => setActive('report')}>生成报告 →</button>
           </>}
-    </div>
+    </HudPanel>
   )
 }
 
@@ -745,7 +799,7 @@ function ReportHud() {
     }
   }
   return (
-    <div className="hud glass">
+    <HudPanel label="综合报告">
       <h5>综合报告</h5>
       <div style={{ marginBottom: 6 }}><StatusBadge status={st.status} /></div>
       <div className="kv"><span>地理+8类资料</span><b style={{ color: 'var(--ok)' }}>✓</b></div>
@@ -764,8 +818,11 @@ function ReportHud() {
             <button className="pbtn" onClick={() => downloadReport('pptx')} disabled={!!reportDownloading}>
               {reportDownloading === 'pptx' ? '下载中…' : '⬇ 下载 报告.pptx'}
             </button>
+            <button className="pbtn ghost" disabled={!!reportDownloading}
+              onClick={() => runStageReal(traceId, 'report', 'reporter', { onDone: () => syncStage(traceId, 'report') })}
+              title="若下载提示产物已丢失(服务重启等),点此重新生成报告">↻ 重新生成报告</button>
           </div>}
-    </div>
+    </HudPanel>
   )
 }
 

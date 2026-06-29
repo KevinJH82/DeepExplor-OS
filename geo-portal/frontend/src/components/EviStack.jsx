@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useWorkflow } from '../store'
 import { EVIDENCES } from '../lib/stages'
 
@@ -9,10 +10,23 @@ export default function EviStack() {
   const active = useWorkflow((s) => s.active)
   const evidences = useWorkflow((s) => s.evidences)
   const selected = useWorkflow((s) => s.selectedEvidence)
+  const [pinned, setPinned] = useState(false)
   if (active !== 'evidence' && active !== 'model3d') return null
+  const label = active === 'model3d' ? '证据融合' : '证据层'
   return (
-    <div className="evi glass">
-      <h6>{active === 'model3d' ? '证据融合' : '证据层'}</h6>
+    <div className={`evi glass ${pinned ? 'pinned' : ''}`} tabIndex={0}>
+      <span className="evi-handle">{label}</span>
+      <button
+        type="button"
+        className="evi-pin"
+        title={pinned ? '取消固定面板' : '固定面板'}
+        aria-label={pinned ? '取消固定面板' : '固定面板'}
+        aria-pressed={pinned}
+        onClick={() => setPinned((v) => !v)}
+      >
+        {pinned ? '●' : '○'}
+      </button>
+      <h6>{label}</h6>
       {EVIDENCES.filter((e) => selected.includes(e.key)).map((e) => {
         const st = evidences[e.key] || {}
         return (

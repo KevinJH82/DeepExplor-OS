@@ -7,6 +7,7 @@ P0 起:
 - RBAC 四级角色 + 按项目授权的服务端校验(沿用,接口不变)。
 密钥与 TTL 全部来自 config.Settings(缺失 PORTAL_JWT_SECRET 则启动失败)。
 """
+import secrets
 import time
 import uuid
 
@@ -24,6 +25,20 @@ _ph = PasswordHasher()  # argon2id,参数走库内 OWASP 默认
 # 四级角色 + 项目角色
 TENANT_ROLES = {"platform_admin", "org_admin", "member"}
 PROJECT_ROLES = {"geologist", "viewer", "external"}
+
+
+# 去除易混字符(0/O、1/l/I),供生成初始口令用
+_PW_ALPHABET = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def gen_password(n: int = 14) -> str:
+    """生成强随机初始口令:≥12 位,含大小写字母+数字,至少各一类,避免易混字符。"""
+    n = max(12, n)
+    while True:
+        pw = "".join(secrets.choice(_PW_ALPHABET) for _ in range(n))
+        if (any(c.islower() for c in pw) and any(c.isupper() for c in pw)
+                and any(c.isdigit() for c in pw)):
+            return pw
 
 
 # ─── 口令哈希 ──────────────────────────────────────────────

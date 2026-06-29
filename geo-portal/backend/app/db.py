@@ -162,6 +162,33 @@ class AdapterTask(Base):
     updated_at: Mapped[str] = mapped_column(String)
 
 
+class AccountApplication(Base):
+    """登录页「申请账号」提交的开户申请。匿名提交 → 管理员审核 → 通过即建 User。
+    租户在审核通过时才确定(默认审核管理员所在租户),故此表不预存 tenant_id。"""
+    __tablename__ = "account_applications"
+    id: Mapped[str] = mapped_column(String, primary_key=True)            # app_xxxxxxxxxx
+    email: Mapped[str] = mapped_column(String, index=True)
+    applicant: Mapped[str] = mapped_column(String, default="")           # 申请人姓名
+    org_name: Mapped[str] = mapped_column(String, default="")            # 单位/组织(自由文本)
+    phone: Mapped[str] = mapped_column(String, default="")
+    purpose: Mapped[str] = mapped_column(String, default="")             # 用途说明
+    desired_username: Mapped[str] = mapped_column(String, default="")    # 期望用户名(审核可改)
+    status: Mapped[str] = mapped_column(String, default="pending", index=True)  # pending/approved/rejected
+    reason: Mapped[str] = mapped_column(String, default="")              # 拒绝原因
+    created_at: Mapped[str] = mapped_column(String, index=True)
+    reviewed_at: Mapped[str] = mapped_column(String, default="")
+    reviewed_by: Mapped[str] = mapped_column(String, default="")         # 审核人 user_id
+    created_user_id: Mapped[str] = mapped_column(String, default="")     # 通过后建的 user id
+
+    def as_dict(self):
+        return {"id": self.id, "email": self.email, "applicant": self.applicant,
+                "org_name": self.org_name, "phone": self.phone, "purpose": self.purpose,
+                "desired_username": self.desired_username, "status": self.status,
+                "reason": self.reason, "created_at": self.created_at,
+                "reviewed_at": self.reviewed_at, "reviewed_by": self.reviewed_by,
+                "created_user_id": self.created_user_id}
+
+
 _engine = None
 _Session = None
 

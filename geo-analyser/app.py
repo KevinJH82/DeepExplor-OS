@@ -753,6 +753,15 @@ def _apply_structural_prior(score, shape, transform, crs, roi_geojson, weight=0.
         layers = _sw.load_structural_layers(bbox, shape, transform, crs)
         if not layers or layers.get('distance') is None:
             return score
+        # 地形辐射(光照)校正:用 geo-stru 坡度/坡向(或山体阴影兜底)压制阴/阳坡假蚀变,
+        # 再做构造控矿加权。任一缺失则 minnaert_correction 内部降级,不影响后续。
+        if layers.get('aspect') is not None or layers.get('hillshade') is not None:
+            score = _sw.minnaert_correction(
+                score, slope_deg=layers.get('slope'), aspect_deg=layers.get('aspect'),
+                hillshade=layers.get('hillshade'))
+            app.logger.info(
+                f"已应用 geo-stru 地形光照校正 (AOI={layers.get('aoi_name')}, "
+                f"aspect={'有' if layers.get('aspect') is not None else '无'})")
         prox = _sw.proximity_from_distance(layers['distance'])
         out = _sw.apply_structural_weighting(score, prox, weight=weight)
         app.logger.info(f"已叠加 geo-stru 构造控矿先验 (AOI={layers.get('aoi_name')}, weight={weight})")

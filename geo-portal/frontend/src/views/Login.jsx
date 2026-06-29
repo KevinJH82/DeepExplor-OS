@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Input, Button, message } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../store'
+import ApplyAccountModal from '../components/ApplyAccountModal'
 
 export default function Login() {
   const nav = useNavigate()
@@ -9,6 +10,7 @@ export default function Login() {
   const [u, setU] = useState('admin')
   const [p, setP] = useState('admin')
   const [loading, setLoading] = useState(false)
+  const [applyOpen, setApplyOpen] = useState(false)
 
   const submit = async () => {
     setLoading(true)
@@ -44,9 +46,15 @@ export default function Login() {
             onChange={(e) => setP(e.target.value)} onPressEnter={submit} style={{ marginBottom: 22 }} />
           <Button type="primary" size="large" block loading={loading} onClick={submit}
             className="login-btn">登 录</Button>
+          <div className="login-apply">
+            还没有账号?
+            <a onClick={() => setApplyOpen(true)}>申请账号</a>
+          </div>
           <div className="login-foot">DeepExplor · 深层探索智能系统 © 2026</div>
         </div>
       </div>
+
+      <ApplyAccountModal open={applyOpen} onClose={() => setApplyOpen(false)} />
     </div>
   )
 }

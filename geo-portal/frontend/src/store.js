@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import * as api from './api/portal'
 import { setAccessToken } from './api/client'
 import { STAGES, EVIDENCES, DEFAULT_SOURCE_KEYS, ALL_EVIDENCE_KEYS, SOURCE_SERVICES } from './lib/stages'
-import { loadSliceTexture } from './lib/sliceTexture'
+import { loadSliceTexture, loadEvidenceRaster } from './lib/sliceTexture'
 
 // ── 认证 ──
 // access token 存内存(client.js),refresh 是 HttpOnly cookie。
@@ -30,6 +30,17 @@ export const useAuth = create((set) => ({
     try { await api.logout() } catch {}
     setAccessToken(null)
     set({ user: null })
+  },
+}))
+
+// ── 管理员角标:全局待审账号申请数(TopBar 轮询 + 审核后刷新)──
+export const useAdminBadge = create((set) => ({
+  pending: 0,
+  async refresh() {
+    try {
+      const list = await api.adminListApplications('pending')
+      set({ pending: Array.isArray(list) ? list.length : 0 })
+    } catch { /* 非管理员/未登录:静默,不影响界面 */ }
   },
 }))
 
@@ -440,6 +451,17 @@ function mergeEvidencePlanStatuses(evidences, evidencePlan = {}) {
   return next
 }
 
+function hydrateCompletedEvidenceLayers(get, evidencePlan = {}) {
+  ;(evidencePlan.evidence_tasks || []).forEach((task) => {
+    if (task.enabled === false || task.status !== 'completed' || !task.task_id) return
+    const ev = EVIDENCES.find((e) => e.key === task.key)
+    if (!ev) return
+    const cur = get().evidences[task.key] || {}
+    if (cur.layerUrl || cur.layerLoading || cur.noLayer) return
+    get().loadEvidenceLayer(task.key, ev.svc, task.task_id)
+  })
+}
+
 // 证据阶段:所选证据全部 settled 则标完成
 function checkEvidenceSettle(get) {
   const evs = get().evidences
@@ -484,7 +506,13 @@ export const useWorkflow = create((set, get) => ({
   evidencePlan: null,                 // 数据后生成的证据二级编排单
   model3d: { taskId: null, targets: null, slices: [], stats: null, slicePngs: [] }, // 真实产物
   drill: { taskId: null, holes: null, feedback: null }, // 真实钻孔
-  reset() { set({ active: 'plan', stages: freshStages(), evidences: freshEvidences(), focusEvidence: null, selectedEvidence: [...ALL_EVIDENCE_KEYS], selectedSources: [...DEFAULT_SOURCE_KEYS], sourceMeta: {}, run: null, evidencePlan: null, model3d: { taskId: null, targets: null, slices: [], stats: null, slicePngs: [] }, drill: { taskId: null, holes: null, feedback: null } }) },
+  datacolleEvidence: null,            // 本 ROI 的 data-colle 成矿模型+文献佐证(证据链叙事卡片)
+  reset() { set({ active: 'plan', stages: freshStages(), evidences: freshEvidences(), focusEvidence: null, selectedEvidence: [...ALL_EVIDENCE_KEYS], selectedSources: [...DEFAULT_SOURCE_KEYS], sourceMeta: {}, run: null, evidencePlan: null, datacolleEvidence: null, model3d: { taskId: null, targets: null, slices: [], stats: null, slicePngs: [] }, drill: { taskId: null, holes: null, feedback: null } }) },
+  async loadDatacolleEvidence(traceId) {
+    if (!traceId) return
+    try { set({ datacolleEvidence: await api.getDatacolleEvidence(traceId) }) }
+    catch { set({ datacolleEvidence: null }) }
+  },
   setSelection(patch) { set(patch) },
   setEvidencePlan(plan) {
     set((s) => {
@@ -532,6 +560,7 @@ export const useWorkflow = create((set, get) => ({
     if (!traceId) return null
     const plan = await api.makeEvidencePlan(traceId)
     get().setEvidencePlan(plan)
+    hydrateCompletedEvidenceLayers(get, plan)
     set((s) => ({ run: s.run ? { ...s.run, evidence_plan: plan } : s.run }))
     return plan
   },
@@ -539,6 +568,7 @@ export const useWorkflow = create((set, get) => ({
     if (!traceId || !plan) return null
     const saved = await api.patchEvidencePlan(traceId, plan)
     get().setEvidencePlan(saved)
+    hydrateCompletedEvidenceLayers(get, saved)
     set((s) => ({ run: s.run ? { ...s.run, evidence_plan: saved } : s.run }))
     return saved
   },
@@ -696,6 +726,8 @@ export const useWorkflow = create((set, get) => ({
     })
     // 重载后:对"运行中且有 taskId"的证据恢复轮询(尤其 InSAR 数小时异步,用户离开再回来)
     const traceId = run?.trace_id
+    // 一次性拉取本 ROI 的 data-colle 成矿/文献证据(非阻塞,供证据链叙事卡片)
+    get().loadDatacolleEvidence(traceId)
     if (traceId) {
       EVIDENCES.forEach((e) => {
         const cur = nextEvidences[e.key]
@@ -703,6 +735,7 @@ export const useWorkflow = create((set, get) => ({
           get().pollEvidenceTask(traceId, e.key, e.svc, cur.taskId)
         }
       })
+      if (evidencePlan) hydrateCompletedEvidenceLayers(get, evidencePlan)
     }
     const modelTaskId = stages.model3d?.taskId
       || stages.model3d?.task_id
@@ -758,7 +791,14 @@ export const useWorkflow = create((set, get) => ({
         // 适配器服务:产物路径异构,经 BFF 统一取代表性栅格(无栅格则 404 → 抛错)
         const projectId = useProject.getState().current?.id
         const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : ''
-        tex = await loadSliceTexture(`/api/adapter-raster/${taskId}${qs}`)
+        const r = await loadEvidenceRaster(`/api/adapter-raster/${taskId}${qs}`)
+        tex = r.dataURL
+        // 裁到 AOI 退化 → BFF 回退区域级原图,记录真实范围 + 标注供 Canvas 按真实范围摆放
+        if (r.scope === 'regional' && r.bounds) {
+          get().setEvidence(key, { regional: true, regionalBounds: r.bounds, regionalNote: r.note || '区域级' })
+        } else {
+          get().setEvidence(key, { regional: false, regionalBounds: undefined, regionalNote: '' })
+        }
       } else {
         let meta = null
         for (const name of ['metadata.json', 'manifest.json']) {
@@ -845,20 +885,53 @@ export const useWorkflow = create((set, get) => ({
       return
     }
     setStage(id, { taskId })
+    if (id === 'data') {
+      const subs = { ...(get().stages.data?.sub_tasks || {}) }
+      subs[service] = {
+        ...(subs[service] || {}),
+        status: 'running',
+        progress: 3,
+        required: true,
+        task_id: taskId,
+        reason: service === 'insar' ? 'InSAR 数据准备中' : (subs[service]?.reason || ''),
+      }
+      setStage('data', { sub_tasks: subs })
+      api.patchStage(traceId, 'data', { sub_tasks: subs }).catch(() => {})
+    }
     if (service === 'model3d') get().setM3d({ taskId })
-    let synth = 3
+    get().pollStage(traceId, id, service, taskId, { onDone })
+  },
+
+  // 轮询一个【已启动】的任务直到终态(不再 startSvc),供 runStageReal 与"重开续接"复用。
+  pollStage(traceId, id, service, taskId, { onDone } = {}) {
+    const { setStage } = get()
+    setStage(id, { status: 'running', taskId })
+    const useSynth = service !== 'insar' && service !== 'downloader'  // 下载用真实分传感器进度,不再假性爬条
+    const interval = service === 'insar' ? 8000 : 1600
+    let synth = Math.max(3, get().stages[id]?.progress || 3)
     const poll = async () => {
       if (get().stages[id]?.status !== 'running') return
-      synth = Math.min(92, synth + 7)
-      let done = false, failed = false, realp = 0, errMsg = '', download = null
+      if (useSynth) synth = Math.min(92, synth + 7)
+      let done = false, failed = false, realp = 0, errMsg = '', download = null, warning = '', note = '', noLayer = false, sensors = null, active = ''
       try {
         const s = await api.svcStatus(traceId, service, taskId)
         realp = s.progress || 0
         download = s.download || null
+        warning = s.warning || ''
+        note = s.note || ''
+        noLayer = !!s.no_layer
+        sensors = s.sensors || null
+        active = s.active_sensor || ''
         if (s.status === 'completed') done = true
         else if (s.status === 'failed') { failed = true; errMsg = s.error || s.raw || '' }
       } catch { /* 瞬时错误,继续轮询 */ }
       if (done) {
+        if (id === 'data') {
+          const subs = { ...(get().stages.data?.sub_tasks || {}) }
+          subs[service] = { ...(subs[service] || {}), status: 'completed', progress: 100, required: true, task_id: taskId, warning, note: '', no_layer: noLayer, sensors, active_sensor: '' }
+          setStage('data', { sub_tasks: subs })
+          api.patchStage(traceId, 'data', { sub_tasks: subs }).catch(() => {})
+        }
         setStage(id, { status: 'completed', progress: 100, taskId, download })
         if (traceId) {
           api.patchStage(traceId, id, { status: 'completed', progress: 100, taskId, download }).catch(() => {})
@@ -868,16 +941,23 @@ export const useWorkflow = create((set, get) => ({
         onDone && onDone(); return
       }
       if (failed) {
-        if (id === 'data' && service === 'insar') {
-          setStage(id, { status: 'running', error: errMsg || 'InSAR 暂无可用形变产物, 已继续数据准备' })
-          onDone && onDone()
-          return
+        if (id === 'data') {
+          const subs = { ...(get().stages.data?.sub_tasks || {}) }
+          subs[service] = { ...(subs[service] || {}), status: 'failed', progress: realp || 0, required: true, task_id: taskId, error: errMsg }
+          setStage('data', { sub_tasks: subs })
+          api.patchStage(traceId, 'data', { sub_tasks: subs }).catch(() => {})
         }
         setStage(id, { status: 'failed', error: errMsg })
         return
       }
-      setStage(id, { progress: Math.max(synth, realp) })
-      setTimeout(poll, 1600)
+      const progress = useSynth ? Math.max(synth, realp) : Math.max(10, realp)
+      if (id === 'data') {
+        const subs = { ...(get().stages.data?.sub_tasks || {}) }
+        subs[service] = { ...(subs[service] || {}), status: 'running', progress, required: true, task_id: taskId, note, warning, sensors, active_sensor: active }
+        setStage('data', { sub_tasks: subs })
+      }
+      setStage(id, { progress })
+      setTimeout(poll, interval)
     }
     poll()
   },
@@ -899,7 +979,7 @@ export const useWorkflow = create((set, get) => ({
     })
     let taskId
     try {
-      taskId = (await api.startSvc(traceId, ev.svc, {})).task_id
+      taskId = (await api.startSvc(traceId, ev.svc, ev.svc === 'insar' ? { phase: 'evidence' } : {})).task_id
     } catch (e) {
       // 服务起不来 → 如实报失败(不再回退模拟"完成");失败框已有 重试/降级/跳过
       const msg = e?.response?.data?.detail || e?.message || '服务不可达'

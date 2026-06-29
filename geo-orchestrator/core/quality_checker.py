@@ -69,6 +69,7 @@ class QualityChecker:
     _BROKERS = {
         "geo-analyser": ("commons.analyser_broker", "find_alteration_for_bbox", "analyser"),
         "geo-stru": ("commons.structural_broker", "find_structural_for_bbox", "stru"),
+        "geo-stru-insar-fusion": ("commons.insar_fusion_broker", "find_insar_fusion_for_bbox", "stru"),
         "geo-geophys": ("commons.geophys_broker", "find_geophys_for_bbox", "geophys"),
         "geo-geochem": ("commons.geochem_broker", "find_geochem_for_bbox", "geochem"),
         "geo-model3d": ("commons.model3d_broker", "find_model3d_for_bbox", "model3d"),
@@ -118,6 +119,29 @@ class QualityChecker:
                              metrics={"n_lineaments": n, "density_mean": density},
                              flags={"weak_structure": weak},
                              note=f"线性体 {n} 条" + ("（不足，构造证据弱）" if weak else ""))
+
+    def _check_geo_stru_insar_fusion(self, entry) -> QualityReport:
+        fs = entry.get("fusion_stats") or {}
+        sq = fs.get("signal_quality")
+        n_active = fs.get("n_active_consistent_lineaments")
+        n_clusters = fs.get("n_subsidence_clusters")
+        if sq is None and n_active is None:
+            return QualityReport("geo-stru-insar-fusion", Q_UNKNOWN, note="无 fusion_stats")
+        metrics = {"signal_quality": sq, "n_active_lineaments": n_active,
+                   "n_subsidence_clusters": n_clusters}
+        if sq == "insufficient":
+            return QualityReport("geo-stru-insar-fusion", Q_POOR, metrics=metrics,
+                                 flags={"insufficient_temporal": True},
+                                 note="时序覆盖不足，形变信号不可靠")
+        if (n_active or 0) < 1:
+            return QualityReport("geo-stru-insar-fusion", Q_WEAK, metrics=metrics,
+                                 flags={"no_active_lineaments": True},
+                                 note="无活动一致线性体，活动构造证据弱")
+        has_2d = isinstance(sq, str) and sq.endswith("2d")
+        return QualityReport("geo-stru-insar-fusion", Q_GOOD, metrics=metrics,
+                             flags={"has_2d_decomposition": has_2d,
+                                    "subsidence_detected": (n_clusters or 0) > 0},
+                             note=f"活动线性体 {n_active} 条，沉降区 {n_clusters} 个，信号质量 {sq}")
 
     def _check_geo_geophys(self, entry) -> QualityReport:
         euler = (entry.get("model_stats") or {}).get("euler") or {}

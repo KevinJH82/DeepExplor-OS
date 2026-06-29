@@ -134,6 +134,20 @@ class Config:
         'min_lineaments': 1,                # 稀疏门控:n_lineaments < 此值则跳过
     }
 
+    # InSAR 融合接入(geo-stru insar_fusion):实测活动断裂增强深部 fault_activity。
+    # 默认关 —— 无 insar_fusion 产物时不影响既有行为。实测活动构造权重高于纯解译(STRUCTURAL)。
+    INSAR_FUSION = {
+        'enabled': False,
+        'inject_into_faultactivity': True,  # 进深部 slow_vars fault_activity(实测活动断裂)
+        'results_root': os.environ.get('GEO_STRU_RESULTS',
+                                       '/opt/deepexplor-services/geo-stru/results'),
+        'auto_discover': True,              # enabled 时按 ROI 自动匹配 insar_fusion run
+        'min_roi_overlap': 0.15,           # 跨系统匹配的 ROI 空间重叠下限
+        'lineaments_weight': 0.6,          # 实测>解译:高于 STRUCTURAL.lineament_weight(0.5)
+        'signal_quality_filter': 'ok',     # 'ok'|'ok+2d'|None(不过滤);低于此质量则跳过
+        'min_active_lineaments': 1,        # 稀疏门控:n_active_consistent_lineaments < 此值跳过
+    }
+
     @staticmethod
     def create_directories():
         """创建必要的目录"""

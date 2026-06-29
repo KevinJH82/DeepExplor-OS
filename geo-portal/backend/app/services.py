@@ -31,7 +31,7 @@ SERVICE_META = {
     "stru":         {"stage": "evidence", "label": "构造", "kind": "evidence"},
     "geophys":      {"stage": "evidence", "label": "物探", "kind": "evidence"},
     "geochem":      {"stage": "evidence", "label": "化探", "kind": "evidence"},
-    "insar":        {"stage": "evidence", "label": "形变", "kind": "evidence"},
+    "insar":        {"stage": "data", "label": "InSAR 数据", "kind": "data"},
     "slowvars":     {"stage": "evidence", "label": "七慢变量", "kind": "evidence"},
     "exploration":  {"stage": "evidence", "label": "深部探测", "kind": "evidence"},
     "model3d":      {"stage": "model3d", "label": "3D融合建模", "kind": "model3d"},

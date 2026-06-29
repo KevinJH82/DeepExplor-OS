@@ -10,10 +10,9 @@ function jet(t) {
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)]
 }
 
-// 解码一张深度切片 GeoTIFF → 上色透明热力图 dataURL(低值/NaN 透明)
-export async function loadSliceTexture(url) {
-  const resp = await client.get(url, { responseType: 'arraybuffer' })
-  const tiff = await fromArrayBuffer(resp.data)
+// 把 GeoTIFF arraybuffer 渲染为上色透明热力图 dataURL(低值/NaN 透明)
+async function renderTiff(arrayBuffer) {
+  const tiff = await fromArrayBuffer(arrayBuffer)
   const image = await tiff.getImage()
   const w = image.getWidth(), h = image.getHeight()
   const [data] = await image.readRasters()
@@ -38,4 +37,22 @@ export async function loadSliceTexture(url) {
   }
   ctx.putImageData(img, 0, 0)
   return canvas.toDataURL()
+}
+
+// 深度切片等:只要 dataURL
+export async function loadSliceTexture(url) {
+  const resp = await client.get(url, { responseType: 'arraybuffer' })
+  return renderTiff(resp.data)
+}
+
+// 证据栅格:同时读取 BFF 的 scope/bounds 头(裁空回退区域级时需按真实范围摆放 + 标注)
+export async function loadEvidenceRaster(url) {
+  const resp = await client.get(url, { responseType: 'arraybuffer' })
+  const dataURL = await renderTiff(resp.data)
+  const h = resp.headers || {}
+  const scope = h['x-raster-scope'] || h['X-Raster-Scope'] || 'aoi'
+  const note = h['x-raster-note'] || h['X-Raster-Note'] || ''
+  const raw = h['x-raster-bounds'] || h['X-Raster-Bounds'] || ''
+  const bounds = raw ? raw.split(',').map(Number).filter((n) => Number.isFinite(n)) : null
+  return { dataURL, scope, note, bounds: bounds && bounds.length === 4 ? bounds : null }
 }

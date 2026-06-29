@@ -102,6 +102,7 @@ _BROKER_SOURCES = [
     ("commons.model3d_broker", "scan_model3d_outputs", "geo-model3d", "model3d"),
     ("commons.drill_broker", "scan_drill_outputs", "geo-drill", "drill"),
     ("commons.structural_broker", "scan_structural_aois", "geo-stru", "structural"),
+    ("commons.insar_fusion_broker", "scan_insar_fusion_outputs", "geo-stru", "structural"),
     ("commons.insar_broker", "scan_insar_outputs", "geo-insar", "insar"),
     ("commons.geophys_broker", "scan_geophys_outputs", "geo-geophys", "geophys"),
     ("commons.geochem_broker", "scan_geochem_outputs", "geo-geochem", "geochem"),
@@ -140,6 +141,7 @@ def harvest_from_brokers(roots: Optional[Dict[str, str]] = None,
             products = e.get("products") or {}
             # 各 broker stats 键不一：model_stats/structural_stats/stats/statistics
             metrics = (e.get("model_stats") or e.get("structural_stats")
+                       or e.get("fusion_stats")
                        or e.get("stats") or e.get("statistics") or {})
             run_id = e.get("run_id")
             if writer is not None:

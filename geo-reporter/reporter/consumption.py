@@ -81,6 +81,7 @@ def _geochem_text(c):       return ds.fetch_geochem_summary_text(c.min_lon, c.mi
 def _geochem_public(c):     return ds.fetch_geochem_public_text(c.min_lon, c.min_lat, c.max_lon, c.max_lat)
 def _alteration(c):         return ds.fetch_alteration_local(c.min_lon, c.min_lat, c.max_lon, c.max_lat)
 def _insar(c):              return ds.fetch_insar_local(c.lat, c.lon, c.min_lon, c.min_lat, c.max_lon, c.max_lat)
+def _insar_fusion(c):       return ds.fetch_insar_fusion_text(c.min_lon, c.min_lat, c.max_lon, c.max_lat)
 def _slowvars(c):           return ds.fetch_slowvars_text(c.min_lon, c.min_lat, c.max_lon, c.max_lat)
 def _datacolle(section):    return lambda c: ds.fetch_datacolle_section(section, c.min_lon, c.min_lat, c.max_lon, c.max_lat)
 
@@ -89,6 +90,7 @@ def _model3d_figs(c):       return ds._geo_model3d_figures(c.bbox)
 def _geophys_figs(c):       return ds._geo_geophys_figures(c.bbox)
 def _geochem_figs(c):       return ds._geo_geochem_figures(c.bbox)
 def _insar_figs(c):         return ds._geo_insar_figures(c.bbox)
+def _insar_fusion_figs(c):  return ds._geo_insar_fusion_figures(c.bbox)
 def _slowvars_figs(c):      return ds._geo_slowvars_figures(c.bbox)
 
 
@@ -147,6 +149,10 @@ CHAPTER_CONTRACT: Dict[str, ChapterSpec] = {
             TextSource("geo-model3d:modeling", LEVEL_LOCAL, _model3d_summary),
             TextSource("geo-deposits", LEVEL_LOCAL, _deposits),
             TextSource("data-colle:geology", LEVEL_LOCAL, _datacolle("geology")),
+            # data-colle 成矿研判 + 区域文献要点（旧实现被丢弃的解释性章节）——
+            # 注入地质章证据，使「第2章」承载成矿模型/控矿要素/指示元素，填补证据链空洞。
+            TextSource("data-colle:metallogenic_analysis", LEVEL_LOCAL, _datacolle("metallogenic_analysis")),
+            TextSource("data-colle:literature", LEVEL_LOCAL, _datacolle("literature")),
         ],
         figures=[FigureSource("geo-stru", _stru_figs),
                  FigureSource("geo-model3d", _model3d_figs)],
@@ -171,8 +177,10 @@ CHAPTER_CONTRACT: Dict[str, ChapterSpec] = {
         figures=[FigureSource("geo-analyser", _alteration_figs)],
     ),
     "insar_deformation": ChapterSpec(
-        text=[TextSource("geo-insar", LEVEL_LOCAL, _insar)],
-        figures=[FigureSource("geo-insar", _insar_figs)],
+        text=[TextSource("geo-insar", LEVEL_LOCAL, _insar),
+              TextSource("geo-stru:insar_fusion", LEVEL_LOCAL, _insar_fusion)],
+        figures=[FigureSource("geo-insar", _insar_figs),
+                 FigureSource("geo-stru:insar_fusion", _insar_fusion_figs)],
     ),
     "slow_variables": ChapterSpec(
         text=[TextSource("geo-7slow", LEVEL_LOCAL, _slowvars)],

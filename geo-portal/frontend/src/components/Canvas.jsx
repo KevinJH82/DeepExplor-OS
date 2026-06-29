@@ -7,6 +7,24 @@ import * as api from '../api/portal'
 
 const Terrain3D = lazy(() => import('./Terrain3D'))   // 懒加载隔离 three 体积(仅 3D 阶段加载)
 
+// 区域级回退:画布框代表区域级范围(rb),栅格铺满;AOI(bbox)作为小框标在其内的真实相对位置。
+// 这样用户能看到区域场(信号多在 AOI 外),并知道自己的 AOI 落在哪、为何 AOI 内是空的。
+function aoiMarkerStyle(rb, bbox) {
+  const a = (bbox || []).map(Number)
+  if (!rb || rb.length !== 4 || a.length !== 4) return null
+  const [rLonMin, rLatMin, rLonMax, rLatMax] = rb
+  const rLonW = rLonMax - rLonMin, rLatH = rLatMax - rLatMin
+  if (!(rLonW > 0) || !(rLatH > 0)) return null
+  const [aLonMin, aLatMin, aLonMax, aLatMax] = a
+  return {
+    position: 'absolute',
+    left: `${((aLonMin - rLonMin) / rLonW) * 100}%`,
+    top: `${((rLatMax - aLatMax) / rLatH) * 100}%`,
+    width: `${Math.max(1.2, ((aLonMax - aLonMin) / rLonW) * 100)}%`,
+    height: `${Math.max(1.2, ((aLatMax - aLatMin) / rLatH) * 100)}%`,
+  }
+}
+
 const SOURCE_ITEMS = DATA_SOURCES.flatMap((g) => g.items.map((item) => ({ ...item, group: g.group, note: g.note })))
 const SOURCE_TO_EVIDENCE = {
   sentinel2: ['analyser', 'stru'],
@@ -33,6 +51,7 @@ export default function Canvas() {
   const evidencePlan = useWorkflow((s) => s.evidencePlan)
   const focus = useWorkflow((s) => s.focusEvidence)
   const setFocus = useWorkflow((s) => s.setFocusEvidence)
+  const setEvidenceVis = useWorkflow((s) => s.setEvidenceVis)
   const runOne = useWorkflow((s) => s.runOneEvidenceReal)
   const loadEvidenceLayer = useWorkflow((s) => s.loadEvidenceLayer)
   const current = useProject((s) => s.current)
@@ -79,8 +98,18 @@ export default function Canvas() {
       model3d: m3d,
       target: sel,
       run,
-    }).filter((s) => ['project', 'target', 'risk'].includes(s.key))
+    }).filter((s) => ['context', 'target', 'risk'].includes(s.key))
   }, [current, evidenceRows, m3d, run, sel])
+  const targetPanelSide = useMemo(() => {
+    if (sel?._panelSide === 'left' || sel?._panelSide === 'right') return sel._panelSide
+    const lon = Number(sel?.lon)
+    const minLon = Number(bbox?.[0])
+    const maxLon = Number(bbox?.[2])
+    if (Number.isFinite(lon) && Number.isFinite(minLon) && Number.isFinite(maxLon)) {
+      return lon <= (minLon + maxLon) / 2 ? 'left' : 'right'
+    }
+    return 'left'
+  }, [sel, bbox])
   const plannedSources = useMemo(() => (run?.plan ? dataSourcesFromPlan(run.plan) : { keys: [], meta: {} }), [run])
   const effectiveSources = useMemo(
     () => Array.from(new Set([...(selectedSources || []), ...(plannedSources.keys || [])])),
@@ -109,14 +138,18 @@ export default function Canvas() {
           <div className="mapbox">
           <div className="aoi">
             <span className="lab">{current?.name || 'AOI'}</span>
-            {/* ROI 真实卫星底图(垫底):证据栅格叠在其上,避免投在空画布显得假 */}
-            {active === 'evidence' && roiBase && (
+            {/* ROI 真实卫星底图(垫底):证据栅格叠在其上,避免投在空画布显得假。
+                区域级回退时框=区域范围,AOI 卫星底图范围不符 → 隐藏避免误导 */}
+            {active === 'evidence' && roiBase && !EVIDENCES.some((e) => {
+              const ev = evidences[e.key]
+              return ev?.layerUrl && ev.visible !== false && ev.regional && (!focus || evidences[focus]?.regional)
+            }) && (
               <img src={roiBase} alt="ROI 卫星底图" style={{
                 position: 'absolute', inset: 0, width: '100%', height: '100%',
                 objectFit: 'fill', pointerEvents: 'none', borderRadius: 6,
               }} />
             )}
-            {/* ③证据:真实证据栅格叠加(铺满 AOI);聚焦时只看该层 */}
+            {/* ③证据:真实证据栅格叠加(铺满框);区域级回退时框=区域范围,栅格同样铺满 */}
             {active === 'evidence' && EVIDENCES.map((e) => {
               const ev = evidences[e.key]
               if (!ev?.layerUrl || ev.visible === false) return null
@@ -128,6 +161,24 @@ export default function Canvas() {
                 }} />
               )
             })}
+            {/* 区域级回退:框=区域范围 → 在其内标出 AOI 小框 + 角标,说明本 AOI 内无有效信号 */}
+            {active === 'evidence' && (() => {
+              const reg = EVIDENCES.map((e) => evidences[e.key]).find(
+                (ev) => ev?.layerUrl && ev.visible !== false && ev.regional && (!focus || evidences[focus]?.regional))
+              if (!reg) return null
+              const mk = aoiMarkerStyle(reg.regionalBounds, bbox)
+              return (
+                <>
+                  {mk && <div style={{ ...mk, border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(217,146,31,.9), 0 0 10px rgba(0,0,0,.5)', pointerEvents: 'none' }}>
+                    <span style={{ position: 'absolute', top: -16, left: 0, fontSize: 10, color: '#fff', whiteSpace: 'nowrap', textShadow: '0 1px 3px #000' }}>AOI</span>
+                  </div>}
+                  <div style={{ position: 'absolute', left: 8, top: 8, padding: '3px 9px', borderRadius: 6, fontSize: 11,
+                    background: 'rgba(217,146,31,.92)', color: '#fff', pointerEvents: 'none', maxWidth: '92%' }}>
+                    区域级回退 · 本 AOI 内无有效信号(白框=你的 AOI)
+                  </div>
+                </>
+              )
+            })()}
             {active === 'evidence' && (() => {
               const validKeys = EVIDENCES.map((e) => e.key)
               const selectedKeys = (selectedEvidence?.length ? selectedEvidence : validKeys).filter((k) => validKeys.includes(k))
@@ -176,6 +227,7 @@ export default function Canvas() {
             bbox={bbox} projectId={projectId} model3d={m3d} drill={drill} evidences={evidences}
             focusEvidence={focus}
             onFocusEvidence={setFocus}
+            onSetEvidenceVis={setEvidenceVis}
             showDrill={showDrill} report={active === 'report'}
             selectedIndex={sel?._i}
             onSelectTarget={(data, i) => setSel({ ...data, _i: i })}
@@ -185,11 +237,32 @@ export default function Canvas() {
 
       {sel && (
         <div className="glass" style={{
-          position: 'fixed', left: 18, bottom: 96, width: 300, maxHeight: 'calc(100vh - 140px)', overflow: 'auto', padding: 14, zIndex: 19,
+          position: 'fixed',
+          ...(targetPanelSide === 'left' ? { left: 18 } : { right: 18 }),
+          top: '56%',
+          transform: 'translateY(-50%)',
+          width: 300,
+          maxHeight: 'calc(100vh - 220px)',
+          overflow: 'auto',
+          padding: 14,
+          zIndex: 19,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
             <h5 style={{ margin: 0, color: '#13324d' }}>靶点 #{sel.rank} {sel.demo && <span style={{ color: 'var(--mut)', fontSize: 10 }}>示意</span>}</h5>
-            <span onClick={() => setSel(null)} style={{ marginLeft: 'auto', cursor: 'pointer', color: 'var(--mut)' }}>✕</span>
+            <button type="button" onClick={() => setSel(null)} aria-label="关闭靶点详情" title="关闭"
+              style={{
+                marginLeft: 'auto',
+                width: 26,
+                height: 26,
+                borderRadius: 999,
+                border: '1px solid rgba(40,90,160,.18)',
+                background: 'rgba(255,255,255,.72)',
+                color: '#607a9a',
+                cursor: 'pointer',
+                fontSize: 15,
+                lineHeight: '22px',
+                fontFamily: 'inherit',
+              }}>×</button>
           </div>
           <div className="kv"><span>有利度评分</span><b>{Number(sel.score).toFixed(3)}</b></div>
           <div className="kv"><span>深度</span><b>{sel.depth_m} m</b></div>
@@ -203,20 +276,6 @@ export default function Canvas() {
                 <b>{s.title}</b>
                 {s.lines.slice(0, 2).map((line, i) => <p key={`${s.key}-${i}`}>{line}</p>)}
               </section>
-            ))}
-          </div>
-          <h5 style={{ margin: '12px 0 8px', color: '#13324d' }}>证据链</h5>
-          <div className="target-chain">
-            {evidenceRows.map((r) => (
-              <div className="target-ev" key={r.key}>
-                <div>
-                  <b>{r.label}</b>
-                  <span>{r.relation}</span>
-                </div>
-                <strong className={r.contribution === '强支撑' ? 'support strong' : r.contribution === '缺失' ? 'support weak' : 'support'}>
-                  {r.contribution}
-                </strong>
-              </div>
             ))}
           </div>
         </div>

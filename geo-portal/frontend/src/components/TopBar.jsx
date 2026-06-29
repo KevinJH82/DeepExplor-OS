@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Dropdown, Popover, Popconfirm, message } from 'antd'
-import { useAuth, useProject } from '../store'
+import { Dropdown, Popover, Popconfirm, Badge, message } from 'antd'
+import { useAuth, useProject, useAdminBadge } from '../store'
 import * as api from '../api/portal'
 
 export default function TopBar({ crumb, traceId }) {
@@ -11,13 +11,25 @@ export default function TopBar({ crumb, traceId }) {
   const current = useProject((s) => s.current)
   const switchRun = useProject((s) => s.switchRun)
   const [runs, setRuns] = useState([])
+  const pending = useAdminBadge((s) => s.pending)
+  const refreshBadge = useAdminBadge((s) => s.refresh)
 
   const isAdmin = ['org_admin', 'platform_admin'].includes(user?.tenant_role)
+  // 管理员:全局轮询待审账号申请数(任意页面都能看到角标)
+  useEffect(() => {
+    if (!isAdmin) return
+    refreshBadge()
+    const id = setInterval(refreshBadge, 60000)
+    return () => clearInterval(id)
+  }, [isAdmin, refreshBadge])
+
   const items = [
     { key: 'role', label: `角色:${roleLabel(user?.tenant_role)}`, disabled: true },
     { key: 'tenant', label: `租户:${user?.tenant_name || ''}`, disabled: true },
     { type: 'divider' },
-    ...(isAdmin ? [{ key: 'admin', label: '用户管理' }] : []),
+    ...(isAdmin ? [{ key: 'admin', label: (
+      <span>用户管理{pending > 0 && <Badge count={pending} size="small" style={{ marginLeft: 8 }} />}</span>
+    ) }] : []),
     { key: 'logout', label: '退出登录' },
   ]
 
@@ -67,7 +79,9 @@ export default function TopBar({ crumb, traceId }) {
         if (key === 'logout') { logout(); nav('/login') }
         else if (key === 'admin') { nav('/admin') }
       } }}>
-        <div className="av">{(user?.display || 'U').slice(0, 1)}</div>
+        <Badge count={isAdmin ? pending : 0} size="small" title="待审账号申请">
+          <div className="av">{(user?.display || 'U').slice(0, 1)}</div>
+        </Badge>
       </Dropdown>
     </div>
   )

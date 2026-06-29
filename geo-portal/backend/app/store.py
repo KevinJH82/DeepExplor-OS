@@ -38,6 +38,7 @@ def _seed() -> dict:
         "members": [],        # {user_id, project_id, role, expires_at}
         "runs": {},           # trace_id -> run
         "refresh_tokens": {}, # jti -> {user_id, expires_at, revoked}
+        "account_applications": {},  # app_id -> 开户申请
     }
 
 
@@ -55,6 +56,7 @@ def _load() -> dict:
     # 向后兼容:旧 DB 可能缺新键
     db.setdefault("refresh_tokens", {})
     db.setdefault("audit_log", [])
+    db.setdefault("account_applications", {})
     return db
 
 
@@ -384,6 +386,63 @@ def touch_last_login(user_id: str) -> None:
         if u:
             u["last_login_at"] = _now()
             _save(db)
+
+
+def set_user_email(user_id: str, email: str) -> bool:
+    with _lock:
+        db = _load()
+        u = db["users"].get(user_id)
+        if not u:
+            return False
+        u["email"] = email or None
+        _save(db)
+        return True
+
+
+# ─── 账号申请(开户审核流) ──────────────────────────────────
+def create_application(email: str, applicant: str = "", org_name: str = "",
+                       phone: str = "", purpose: str = "",
+                       desired_username: str = "") -> dict:
+    with _lock:
+        db = _load()
+        aid = _new_id("app")
+        a = {"id": aid, "email": email, "applicant": applicant, "org_name": org_name,
+             "phone": phone, "purpose": purpose, "desired_username": desired_username,
+             "status": "pending", "reason": "", "created_at": _now(),
+             "reviewed_at": "", "reviewed_by": "", "created_user_id": ""}
+        db.setdefault("account_applications", {})[aid] = a
+        _save(db)
+        return a
+
+
+def list_applications(status: str = None) -> list:
+    with _lock:
+        rows = list((_load().get("account_applications", {}) or {}).values())
+    if status:
+        rows = [a for a in rows if a.get("status") == status]
+    return sorted(rows, key=lambda x: x.get("created_at", ""), reverse=True)
+
+
+def get_application(app_id: str):
+    with _lock:
+        return (_load().get("account_applications", {}) or {}).get(app_id)
+
+
+def update_application(app_id: str, patch: dict):
+    with _lock:
+        db = _load()
+        a = db.get("account_applications", {}).get(app_id)
+        if not a:
+            return None
+        a.update(patch or {})
+        _save(db)
+        return a
+
+
+def count_pending_applications_by_email(email: str) -> int:
+    with _lock:
+        rows = (_load().get("account_applications", {}) or {}).values()
+    return sum(1 for a in rows if a.get("email") == email and a.get("status") == "pending")
 
 
 # ─── refresh token 吊销表(jti) ─────────────────────────────

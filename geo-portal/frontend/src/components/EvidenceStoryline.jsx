@@ -4,12 +4,12 @@ import { buildEvidenceRows } from '../lib/evidenceChain'
 import { buildProjectNarrative, buildProjectSummary } from '../lib/geologyNarrative'
 
 const ACTIVE_BY_STAGE = {
-  plan: ['project', 'data'],
-  data: ['data'],
-  evidence: ['structure', 'alteration', 'geo', 'risk'],
+  plan: ['context', 'logic'],
+  data: ['context', 'logic'],
+  evidence: ['chain', 'risk'],
   model3d: ['target', 'risk'],
-  drill: ['target'],
-  report: ['project', 'target', 'risk'],
+  drill: ['target', 'next'],
+  report: ['context', 'chain', 'target', 'next', 'risk'],
 }
 
 export default function EvidenceStoryline() {
@@ -20,6 +20,7 @@ export default function EvidenceStoryline() {
   const selectedSources = useWorkflow((s) => s.selectedSources)
   const model3d = useWorkflow((s) => s.model3d)
   const run = useWorkflow((s) => s.run)
+  const datacolle = useWorkflow((s) => s.datacolleEvidence)
   const current = useProject((s) => s.current)
   const setStoryMode = (next) => {
     setMode(next)
@@ -33,15 +34,15 @@ export default function EvidenceStoryline() {
   if (!current || active === 'plan') return null
 
   const rows = buildEvidenceRows(evidences, selectedEvidence)
-  const sections = buildProjectNarrative({ current, evidenceRows: rows, selectedSources, model3d, run })
-  const summary = buildProjectSummary({ current, evidenceRows: rows, selectedSources, model3d, run })
+  const narrativeInput = { current, evidenceRows: rows, selectedSources, model3d, run, datacolle }
+  const sections = buildProjectNarrative(narrativeInput)
+  const summary = buildProjectSummary(narrativeInput)
   const activeKeys = ACTIVE_BY_STAGE[active] || []
   const lineLimit = (key) => {
-    if (key === 'project' || key === 'data') return 3
-    if (key === 'structure') return 4
-    if (key === 'target') return 4
-    if (key === 'risk') return 3
-    return 2
+    if (key === 'context' || key === 'logic') return 4
+    if (key === 'chain' || key === 'target') return 6
+    if (key === 'next' || key === 'risk') return 4
+    return 3
   }
 
   if (mode === 'hidden') {

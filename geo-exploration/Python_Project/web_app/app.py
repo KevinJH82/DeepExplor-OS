@@ -171,6 +171,7 @@ def start_analysis():
         # 外部系统接入配置:默认取 Config,请求可逐键覆盖(默认全关 → 零行为变更)
         alteration_cfg = {**Config.ALTERATION, **(data.get('alteration') or {})}
         structural_cfg = {**Config.STRUCTURAL, **(data.get('structural') or {})}
+        insar_fusion_cfg = {**Config.INSAR_FUSION, **(data.get('insar_fusion') or {})}
         # 交付库自动取数配置(请求可覆盖 season 等)
         delivery_cfg = {**Config.DELIVERY, **(data.get('delivery') or {})}
 
@@ -244,6 +245,7 @@ def start_analysis():
                     'out_dir': os.path.join(Config.UPLOAD_FOLDER, f"results_{task_id}"),
                     'alteration': task_config.get('alteration', {}),
                     'structural': task_config.get('structural', {}),
+                    'insar_fusion': task_config.get('insar_fusion', {}),
                     'delivery': task_config.get('delivery', {}),
                     'tenant_id': task_config.get('tenant_id'),
                 }
@@ -300,6 +302,7 @@ def start_analysis():
             'kmz_threshold': kmz_threshold,
             'alteration': alteration_cfg,
             'structural': structural_cfg,
+            'insar_fusion': insar_fusion_cfg,
             'delivery': delivery_cfg,
             'tenant_id': request.headers.get('X-Tenant-Id')
         }

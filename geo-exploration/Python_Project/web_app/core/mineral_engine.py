@@ -323,6 +323,18 @@ class MineralEngine:
                 if fault_lineament is not None:
                     self.log(f"  -> 构造将注入深部 slow_vars.fault_activity(权重 {scfg.get('lineament_weight', 0.5)})")
 
+            # 6.7 自动检测并加载 geo-stru insar_fusion 实测活动断裂(可选,缺失则降级)
+            # 实测形变梯度(活动构造)增强深部 fault_activity,优先级/权重高于纯地形解译。
+            icfg = config.get('insar_fusion', {}) or {}
+            fault_lineament_insar, insar_fusion_meta = self._load_insar_fusion(
+                lonGrid, latGrid, inROI.shape, lonROI, latROI, icfg)
+            if fault_lineament_insar is not None:
+                self.log(f"InSAR融合活动断裂匹配成功(AOI={insar_fusion_meta.get('aoi_name')},"
+                         f"信号={insar_fusion_meta.get('signal_quality')},活动线性体={insar_fusion_meta.get('n_active')}),"
+                         f"将注入深部 fault_activity(权重 {icfg.get('lineaments_weight', 0.6)})")
+            elif bool(icfg.get('enabled', False)):
+                self.log(f"未匹配 insar_fusion 活动断裂({(insar_fusion_meta or {}).get('skip_reason')}),跳过")
+
             # 7. 构建数据上下文
             data_context = {
                 'data_dir': data_dir,
@@ -353,6 +365,10 @@ class MineralEngine:
                 # D 部分:深部注入通道(仅 enabled+inject 时非 None)+ 权重透传给 slow_vars
                 'fault_lineament': fault_lineament,
                 'lineament_weight': float(scfg.get('lineament_weight', 0.5)),
+                # geo-stru insar_fusion 实测活动断裂(可选):增强深部 fault_activity
+                'fault_lineament_insar': fault_lineament_insar,
+                'lineament_weight_insar': float(icfg.get('lineaments_weight', 0.6)),
+                'insar_fusion_meta': insar_fusion_meta,
             }
 
             self.log("真实数据加载完成")
@@ -505,6 +521,76 @@ class MineralEngine:
         if best and best[0] >= min_overlap:
             return best[1], best[0]
         return None, 0.0
+
+    def _load_insar_fusion(self, lonGrid, latGrid, ref_shape, lonROI, latROI, icfg):
+        """geo-stru insar_fusion 实测活动断裂(velocity_gradient)→ 注入深部 fault_activity。
+
+        经 commons.insar_fusion_broker 按 ROI bbox 发现融合产物,做信号质量/活动断裂数门控,
+        再用 CRS 感知重投影对齐到分析格网,|velocity_gradient| 归一化为 [0,1] 活动度。
+        默认关;任何缺失/失败都返回 (None, {skip_reason}),不影响既有分析。
+
+        Returns: (active_fault[0,1] | None, meta)
+        """
+        if not icfg or not bool(icfg.get('enabled', False)):
+            return None, {'skip_reason': 'disabled'}
+        try:
+            import sys as _sys
+            for repo in ('/opt/Project/deepexplor-services', '/opt/deepexplor-services'):
+                if repo not in _sys.path:
+                    _sys.path.insert(0, repo)
+            from commons.insar_fusion_broker import find_insar_fusion_for_bbox, get_product_path
+        except Exception as e:
+            return None, {'skip_reason': f'broker_import_failed: {e}'}
+        if lonROI is None or latROI is None or len(lonROI) == 0:
+            return None, {'skip_reason': 'no_roi'}
+        bbox = (float(np.min(lonROI)), float(np.min(latROI)),
+                float(np.max(lonROI)), float(np.max(latROI)))
+        root = icfg.get('results_root')
+        try:
+            entries = (find_insar_fusion_for_bbox(bbox, root) if root
+                       else find_insar_fusion_for_bbox(bbox))
+        except Exception as e:
+            return None, {'skip_reason': f'discover_failed: {e}'}
+        if not entries:
+            return None, {'skip_reason': 'no_match'}
+        entry = entries[0]
+        fs = entry.get('fusion_stats') or {}
+
+        # 信号质量门控:'ok' 接受 ok/ok+2d;'ok+2d' 要求 2D 分解;None 不过滤
+        want_q = icfg.get('signal_quality_filter')
+        sq = fs.get('signal_quality')
+        if want_q and sq is not None:
+            if want_q == 'ok' and not str(sq).startswith('ok'):
+                return None, {'skip_reason': f'signal_quality={sq}', 'aoi_name': entry.get('aoi_name')}
+            if want_q == 'ok+2d' and sq != 'ok+2d':
+                return None, {'skip_reason': f'signal_quality={sq}', 'aoi_name': entry.get('aoi_name')}
+        # 活动断裂稀疏门控
+        n_active = fs.get('n_active_consistent_lineaments')
+        min_active = int(icfg.get('min_active_lineaments', 1))
+        if n_active is not None and n_active < min_active:
+            return None, {'skip_reason': f'n_active={n_active}<{min_active}',
+                          'aoi_name': entry.get('aoi_name')}
+
+        vg = get_product_path(entry, 'velocity_gradient')
+        if not vg:
+            return None, {'skip_reason': 'no_velocity_gradient', 'aoi_name': entry.get('aoi_name')}
+        try:
+            from utils.geo_bridge_common import reproject_to_grid
+            arr = reproject_to_grid(vg, lonGrid, latGrid, ref_shape,
+                                    inROI=None, resampling='bilinear')
+        except Exception as e:
+            return None, {'skip_reason': f'reproject_failed: {e}', 'aoi_name': entry.get('aoi_name')}
+
+        a = np.abs(np.asarray(arr, dtype=np.float32))
+        finite = np.isfinite(a)
+        if finite.any():
+            lo, hi = np.percentile(a[finite], [2, 98])
+            if hi > lo:
+                a = np.clip((a - lo) / (hi - lo), 0.0, 1.0)
+        a = np.where(np.isfinite(arr), a, np.nan).astype(np.float32)
+        meta = {'aoi_name': entry.get('aoi_name'), 'signal_quality': sq,
+                'n_active': n_active, 'run_id': entry.get('run_id')}
+        return a, meta
 
     def _load_structural(self, data_dir: str, ref_shape, ref_tif_path: str = None,
                          lonGrid=None, latGrid=None, scfg=None, extra_candidates=None):

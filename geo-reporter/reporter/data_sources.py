@@ -314,6 +314,86 @@ def _geo_stru_figures(bbox) -> List[dict]:
     return figs
 
 
+# geo-stru insar_fusion(InSAR 形变×构造融合)图件；同根扫描,经 insar_fusion_broker 发现。
+GEO_INSAR_FUSION_OUTPUTS = GEO_STRU_OUTPUTS
+_GEO_INSAR_FUSION_MAPS = [
+    ("overlay_png", "InSAR 形变-构造融合叠合图"),
+    ("rose_deformation_png", "地表形变线性体方向玫瑰图"),
+    ("timeseries_png", "重点沉降区时间序列形变图"),
+]
+
+
+def _geo_insar_fusion_figures(bbox) -> List[dict]:
+    """取 geo-stru insar_fusion 对本研究区的形变-构造融合图件(本地实证补充);无则返回空。"""
+    _import_commons()
+    try:
+        from commons.insar_fusion_broker import find_insar_fusion_for_bbox, get_product_path
+    except Exception as e:
+        print(f"[Figures] geo-stru insar_fusion import 失败：{e}")
+        return []
+    try:
+        matches = find_insar_fusion_for_bbox(bbox, GEO_INSAR_FUSION_OUTPUTS, tenant_id=current_tenant())
+    except Exception as e:
+        print(f"[Figures] geo-stru insar_fusion 查询失败：{e}")
+        return []
+    if not matches:
+        return []
+    entry = matches[0]
+    aoi = entry.get("aoi_name", "")
+    figs: List[dict] = []
+    for key, caption in _GEO_INSAR_FUSION_MAPS:
+        p = get_product_path(entry, key)
+        if p:
+            figs.append({"path": p,
+                         "caption": f"{caption}（{aoi}，geo-stru InSAR 融合）",
+                         "source": "geo-insar-fusion"})
+    return figs
+
+
+def fetch_insar_fusion_text(min_lon, min_lat, max_lon, max_lat) -> List[str]:
+    """从 geo-stru insar_fusion 读本研究区地表活动形变/采空沉降/活动断裂的本地实证叙事。
+
+    数据来源于 geo-stru 构造-形变耦合分析(优先于网络资料)；无产物返回 []。
+    """
+    _import_commons()
+    try:
+        from commons.insar_fusion_broker import find_insar_fusion_for_bbox
+    except Exception:
+        return []
+    try:
+        matches = find_insar_fusion_for_bbox(
+            (min_lon, min_lat, max_lon, max_lat),
+            GEO_INSAR_FUSION_OUTPUTS, tenant_id=current_tenant())
+    except Exception:
+        return []
+    if not matches:
+        return []
+    entry = matches[0]
+    fs = entry.get("fusion_stats") or {}
+    ip = entry.get("insar_provenance") or {}
+    lines = [f"【本地地表活动形变 — geo-stru InSAR 融合，研究区：{entry.get('aoi_name', '')}】"
+             f"（来源：geo-stru 构造-形变耦合分析，本地实证）"]
+    if ip:
+        dr = ip.get("date_range") or ["?", "?"]
+        lines.append(f"- 数据源：{ip.get('source_insar', '?')}，轨道 {ip.get('orbit_direction', '?')}，"
+                     f"时间 {dr[0]}–{dr[-1]}，景数 {ip.get('n_acquisitions', '?')}")
+    v = fs.get("los_velocity_mm_yr") or {}
+    if v:
+        lines.append(f"- LOS 形变速率：范围 {v.get('min', '?')}–{v.get('max', '?')} mm/年，"
+                     f"均值 {v.get('mean', '?')} mm/年")
+    if fs.get("n_deformation_lineaments") is not None:
+        lines.append(f"- 形变线性体 {fs.get('n_deformation_lineaments')} 条，"
+                     f"其中活动一致线性体 {fs.get('n_active_consistent_lineaments', '?')} 条")
+    if fs.get("n_subsidence_clusters") is not None:
+        lines.append(f"- 沉降聚集区 {fs.get('n_subsidence_clusters')} 个"
+                     f"（沉降阈值 {fs.get('subsidence_threshold_mm_yr', '?')} mm/年）")
+    if fs.get("signal_quality"):
+        lines.append(f"- 信号质量评价：{fs.get('signal_quality')}")
+    if entry.get("data_caveat"):
+        lines.append(f"- 数据说明：{entry['data_caveat']}")
+    return ["\n".join(lines)]
+
+
 GEO_MODEL3D_OUTPUTS = _ROOT + "/geo-model3d/results"
 
 # geo-model3d 三维立体成矿预测图：(metadata.products 键, 图注)
@@ -713,6 +793,55 @@ def fetch_datacolle_section(section_id: str, min_lon, min_lat, max_lon, max_lat)
     header = (f"【本地资料 - data-colle 子系统标准输出，AOI: {entry.get('aoi_name')}，"
               f"目标矿种: {entry.get('mineral','?')}】(优先于 Web 搜索，可直接引用)\n")
     return [header + text]
+
+
+def _datacolle_first_entry(min_lon, min_lat, max_lon, max_lat):
+    """取与本研究区相交、最新一次 data-colle 成果条目（无则 None）。"""
+    _import_commons()
+    try:
+        from commons.datacolle_broker import find_datacolle_for_bbox
+    except Exception:
+        return None
+    matches = find_datacolle_for_bbox(_bbox(min_lon, min_lat, max_lon, max_lat),
+                                      DATACOLLE_OUTPUTS, tenant_id=current_tenant())
+    return matches[0] if matches else None
+
+
+def fetch_datacolle_metallogenic(min_lon, min_lat, max_lon, max_lat) -> dict:
+    """读 data-colle 结构化成矿先验 {best_model, best_model_fit_score, model_count,
+    pathfinder_elements}（来自 summary.json metallogenic）。无则空 dict。"""
+    entry = _datacolle_first_entry(min_lon, min_lat, max_lon, max_lat)
+    return (entry.get("metallogenic") or {}) if entry else {}
+
+
+def fetch_datacolle_papers(min_lon, min_lat, max_lon, max_lat) -> List[dict]:
+    """读 data-colle 区域学术文献 papers[]（title/year/authors/doi/cited_by/abstract/url）。
+
+    **保持来源顺序**（prospector 已按被引降序排好，论文要点中的 [n] 内联引用即对应此序号）——
+    不得再排序，否则 [n] 与清单序号错位。仅按 doi/title 去重。无则 []。"""
+    entry = _datacolle_first_entry(min_lon, min_lat, max_lon, max_lat)
+    if not entry:
+        return []
+    seen, out = set(), []
+    for p in (entry.get("papers") or []):
+        if not isinstance(p, dict):
+            continue
+        key = (p.get("doi") or p.get("title") or "").strip()
+        if key and key in seen:
+            continue
+        if key:
+            seen.add(key)
+        out.append(p)
+    return out
+
+
+def fetch_datacolle_literature(min_lon, min_lat, max_lon, max_lat) -> str:
+    """读 data-colle「论文要点提炼」原文（成矿时代/控矿要素/指示元素/典型矿床/找矿建议，
+    保留 [n] 内联引用，n 对应 fetch_datacolle_papers 的清单序号）。无则 ''。"""
+    entry = _datacolle_first_entry(min_lon, min_lat, max_lon, max_lat)
+    if not entry:
+        return ""
+    return (entry.get("sections") or {}).get("literature", "") or ""
 
 
 def fetch_alteration_local(min_lon, min_lat, max_lon, max_lat) -> List[str]:

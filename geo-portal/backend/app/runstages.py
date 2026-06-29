@@ -107,3 +107,51 @@ def normalize_stages(plan: dict) -> dict:
 
     _finalize_stage_status(stages)
     return {k: stages[k] for k in STAGE_ORDER if k in stages}
+
+
+# ─── 项目卡片进度概要 ──────────────────────────────────────
+_EXEC_STAGES = ["data", "evidence", "model3d", "drill", "report"]
+_STAGE_LABEL = {"data": "数据", "evidence": "证据", "model3d": "3D建模",
+                "drill": "布孔", "report": "报告"}
+_DONE = {"completed", "skipped", "degraded"}   # 视为"已通过"的状态
+
+
+def summarize_progress(stages: dict) -> dict:
+    """从 run.stages 提炼出项目卡片用的进度概要(纯函数,对缺失/异常 stages 安全)。
+
+    处理"重跑导致的非单调进度":某未完成阶段后面还有已完成阶段(下游绿、上游灰)时,
+    给该阶段打 reordered 标记,当前状态置 'reordered'(前端显示"已重新操作"而非矛盾的"等待X")。
+    当前阶段判定优先级:全部完成 > 失败 > 进行中 > 乱序 > 等待。
+    """
+    stages = stages or {}
+    items = [{"id": s, "label": _STAGE_LABEL[s],
+              "status": (stages.get(s) or {}).get("status") or "pending",
+              "progress": int((stages.get(s) or {}).get("progress") or 0)}
+             for s in _EXEC_STAGES]
+    n = len(items)
+    done = sum(1 for it in items if it["status"] in _DONE)
+    furthest = max((i for i, it in enumerate(items) if it["status"] in _DONE), default=-1)
+    for i, it in enumerate(items):
+        it["reordered"] = (it["status"] not in _DONE) and (i < furthest)
+    reordered_any = any(it["reordered"] for it in items)
+
+    all_done = done == n
+    failed = next((it for it in items if it["status"] == "failed"), None)
+    running = next((it for it in items if it["status"] == "running"), None)
+    first_pending = next((it for it in items if it["status"] not in _DONE), None)
+    if all_done:
+        cur, cstatus = items[-1], "completed"
+    elif failed:
+        cur, cstatus = failed, "failed"
+    elif running:
+        cur, cstatus = running, "running"
+    elif reordered_any:
+        cur, cstatus = first_pending, "reordered"
+    else:
+        cur, cstatus = first_pending, "pending"
+
+    frac = (cur["progress"] / 100.0) if cstatus == "running" else 0
+    percent = 100 if all_done else round((done + frac) / n * 100)
+    return {"stages": items, "current": cur["id"], "current_label": cur["label"],
+            "current_status": cstatus, "percent": percent, "done": done, "total": n,
+            "all_done": all_done, "reordered": reordered_any}

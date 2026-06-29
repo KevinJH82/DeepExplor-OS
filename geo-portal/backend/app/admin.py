@@ -119,6 +119,15 @@ class TenantIn(BaseModel):
     quota_gb: int = 0
 
 
+@router.get("/tenants")
+def list_tenants(user=Depends(auth.require_org_admin)):
+    """租户列表。platform_admin 看全部(供审核时改选归属);org_admin 仅本租户。"""
+    rows = store.list_tenants()
+    if user["tenant_role"] != "platform_admin":
+        rows = [t for t in rows if t["id"] == user["tenant_id"]]
+    return [{"id": t["id"], "name": t.get("name", "")} for t in rows]
+
+
 @router.post("/tenants")
 def create_tenant(body: TenantIn, request: Request, user=Depends(auth.require_platform_admin)):
     t = store.create_tenant(body.name, body.quota_gb)
@@ -126,6 +135,92 @@ def create_tenant(body: TenantIn, request: Request, user=Depends(auth.require_pl
                       target_type="tenant", target_id=t["id"],
                       details={"name": body.name}, ip=_ip(request))
     return t
+
+
+# ─── 账号申请审核(开户流) ─────────────────────────────────
+@router.get("/applications")
+def list_applications(status: Optional[str] = "pending", user=Depends(auth.require_org_admin)):
+    """列出开户申请。status 传 'all' 取全部,否则按状态过滤(默认仅待审)。"""
+    st = None if status in (None, "", "all") else status
+    return store.list_applications(st)
+
+
+class ApproveIn(BaseModel):
+    username: Optional[str] = None
+    role: str = "member"
+    tenant_id: Optional[str] = None   # 仅 platform_admin 可指定他租户;否则归审核管理员租户
+
+
+@router.post("/applications/{app_id}/approve")
+def approve_application(app_id: str, body: ApproveIn, request: Request,
+                        user=Depends(auth.require_org_admin)):
+    app = store.get_application(app_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="申请不存在")
+    if app["status"] != "pending":
+        raise HTTPException(status_code=409, detail="该申请已处理,不能重复审核")
+    _guard_role(user, body.role)
+
+    # 定租户:默认审核管理员所在租户;platform_admin 可改选他租户
+    tenant_id = user["tenant_id"]
+    if body.tenant_id and body.tenant_id != user["tenant_id"]:
+        if user["tenant_role"] != "platform_admin":
+            raise HTTPException(status_code=403, detail="无权将账号建到其它租户")
+        if not store.get_tenant(body.tenant_id):
+            raise HTTPException(status_code=400, detail="目标租户不存在")
+        tenant_id = body.tenant_id
+
+    username = ((body.username or app.get("desired_username") or "").strip())
+    if not username:
+        raise HTTPException(status_code=400, detail="请填写用户名")
+
+    pw = auth.gen_password()
+    try:
+        u = store.create_user(tenant_id, username, app.get("applicant") or username,
+                              body.role, auth.hash_password(pw))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+    # 写邮箱:users.email 有唯一约束,被占用则跳过(账号仍建成),不阻断审核
+    email_set = True
+    try:
+        store.set_user_email(u["id"], app.get("email") or "")
+    except Exception:
+        email_set = False
+
+    store.update_application(app_id, {
+        "status": "approved", "reviewed_at": store._now(),
+        "reviewed_by": user["id"], "created_user_id": u["id"],
+    })
+    store.write_audit("application.approve", actor_user_id=user["id"], tenant_id=tenant_id,
+                      target_type="user", target_id=u["id"],
+                      details={"application_id": app_id, "username": username,
+                               "role": body.role, "email": app.get("email")}, ip=_ip(request))
+    return {"user": _pub_user(u), "email": app.get("email") or "",
+            "initial_password": pw, "email_set": email_set}
+
+
+class RejectIn(BaseModel):
+    reason: str = ""
+
+
+@router.post("/applications/{app_id}/reject")
+def reject_application(app_id: str, body: RejectIn, request: Request,
+                       user=Depends(auth.require_org_admin)):
+    app = store.get_application(app_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="申请不存在")
+    if app["status"] != "pending":
+        raise HTTPException(status_code=409, detail="该申请已处理,不能重复审核")
+    updated = store.update_application(app_id, {
+        "status": "rejected", "reason": (body.reason or "").strip()[:300],
+        "reviewed_at": store._now(),
+        "reviewed_by": user["id"],
+    })
+    store.write_audit("application.reject", actor_user_id=user["id"], tenant_id=user["tenant_id"],
+                      target_type="application", target_id=app_id,
+                      details={"reason": body.reason}, ip=_ip(request))
+    return updated
 
 
 # ─── 审计查询 ──────────────────────────────────────────────

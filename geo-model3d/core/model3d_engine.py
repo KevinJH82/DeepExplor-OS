@@ -190,6 +190,14 @@ class Model3DEngine:
         if "slowvars" in surface_layers:
             weights["slowvars"] = float(params.get("slowvars_weight", 0.15))
             log(f"七慢变量接入: Δ判别式作为机制综合证据层，权重={weights['slowvars']:.2f}")
+        # 曲率接入：geo-stru 地形曲率(褶皱铰链/张性扩张带)作 2D 地表证据，并入融合
+        if "curvature" in surface_layers:
+            weights["curvature"] = float(params.get("curvature_weight", 0.08))
+            log(f"曲率接入: 褶皱铰链/扩张带控矿，权重={weights['curvature']:.2f}")
+        # 活动断裂接入：geo-stru insar_fusion 实测形变梯度(活动构造)作 2D 地表证据
+        if "active_fault" in surface_layers:
+            weights["active_fault"] = float(params.get("active_fault_weight", 0.10))
+            log(f"活动断裂接入: InSAR 实测形变梯度(活动构造)，权重={weights['active_fault']:.2f}")
 
         # 4b) 物探接入（方向二）：磁源深度→实测深度门控；磁AS→2D证据；速度→3D证据
         geo = geophys_mod.load_geophys(bbox, grid, roots.get("geophys", ""), mineral_type) if roots.get("geophys") else None

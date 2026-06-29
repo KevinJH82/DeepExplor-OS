@@ -101,7 +101,8 @@ def build_surface_layers(es) -> Tuple[Dict[str, np.ndarray], Dict[str, np.ndarra
     """从 EvidenceSet 取 2D 地表证据层 + 覆盖掩码。值 [0,1]，NaN=无覆盖。"""
     layers: Dict[str, np.ndarray] = {}
     coverage: Dict[str, np.ndarray] = {}
-    for name in ("alteration", "structure", "deformation", "geochem", "slowvars"):
+    for name in ("alteration", "structure", "curvature", "active_fault",
+                 "deformation", "geochem", "slowvars"):
         arr = getattr(es, name, None)
         if arr is not None and np.isfinite(arr).any():
             layers[name] = arr.astype(np.float32)

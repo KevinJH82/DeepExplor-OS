@@ -275,6 +275,65 @@ def touch_last_login(user_id: str) -> None:
             s.commit()
 
 
+def set_user_email(user_id: str, email: str) -> bool:
+    with db.Session() as s:
+        u = s.get(db.User, user_id)
+        if not u:
+            return False
+        u.email = email or None
+        s.commit()
+        return True
+
+
+# ─── 账号申请(开户审核流) ──────────────────────────────────
+def create_application(email: str, applicant: str = "", org_name: str = "",
+                       phone: str = "", purpose: str = "",
+                       desired_username: str = "") -> dict:
+    with db.Session() as s:
+        aid = _new_id("app")
+        a = db.AccountApplication(
+            id=aid, email=email, applicant=applicant, org_name=org_name,
+            phone=phone, purpose=purpose, desired_username=desired_username,
+            status="pending", created_at=_now())
+        s.add(a)
+        s.commit()
+        return a.as_dict()
+
+
+def list_applications(status: str = None) -> list:
+    with db.Session() as s:
+        q = select(db.AccountApplication)
+        if status:
+            q = q.where(db.AccountApplication.status == status)
+        rows = [a.as_dict() for a in s.scalars(q)]
+        return sorted(rows, key=lambda x: x["created_at"], reverse=True)
+
+
+def get_application(app_id: str):
+    with db.Session() as s:
+        a = s.get(db.AccountApplication, app_id)
+        return a.as_dict() if a else None
+
+
+def update_application(app_id: str, patch: dict):
+    with db.Session() as s:
+        a = s.get(db.AccountApplication, app_id)
+        if not a:
+            return None
+        for k, v in (patch or {}).items():
+            if hasattr(a, k):
+                setattr(a, k, v)
+        s.commit()
+        return a.as_dict()
+
+
+def count_pending_applications_by_email(email: str) -> int:
+    with db.Session() as s:
+        return len(s.scalars(select(db.AccountApplication).where(
+            db.AccountApplication.email == email,
+            db.AccountApplication.status == "pending")).all())
+
+
 def create_tenant(name: str, quota_gb: int = 0) -> dict:
     with db.Session() as s:
         tid = _new_id("t")

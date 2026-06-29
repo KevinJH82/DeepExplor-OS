@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import { Html, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { makeProjector } from '../lib/terrainProjection'
 import { loadSliceTexture } from '../lib/sliceTexture'
@@ -23,7 +23,7 @@ function buildTerrainGeometry(proj, terrain) {
 }
 
 // ROI 3D 卫星地形：DEM 顶点位移 + Esri 卫星纹理；证据图层/有利度切片/靶点/钻孔渲染其上。
-export default function Terrain3D({ bbox, projectId, model3d, drill, evidences, focusEvidence, onFocusEvidence, showDrill, report, onSelectTarget, selectedIndex }) {
+export default function Terrain3D({ bbox, projectId, model3d, drill, evidences, focusEvidence, onFocusEvidence, onSetEvidenceVis, showDrill, report, onSelectTarget, selectedIndex }) {
   const [terrain, setTerrain] = useState(null)   // {size,min_m,max_m,heights} | {flat:true}
   const [baseUrl, setBaseUrl] = useState(null)
   const [err, setErr] = useState(null)
@@ -64,7 +64,8 @@ export default function Terrain3D({ bbox, projectId, model3d, drill, evidences, 
         <OrbitControls enableDamping dampingFactor={0.1} target={[0, 25, 0]}
           minDistance={60} maxDistance={520} maxPolarAngle={Math.PI / 2.05} />
       </Canvas>
-      <EvidenceOverlay layers={evidenceLayers} evidences={evidences} focusEvidence={focusEvidence} onFocusEvidence={onFocusEvidence} />
+      <EvidenceOverlay layers={evidenceLayers} evidences={evidences} focusEvidence={focusEvidence}
+        onFocusEvidence={onFocusEvidence} onSetEvidenceVis={onSetEvidenceVis} />
       <Compass angle={compassAngle} />
       {!terrain && <div style={loadingStyle}>加载地形与卫星底图…</div>}
     </div>
@@ -154,26 +155,32 @@ function EvidenceDrapes({ geom, layers }) {
   ))
 }
 
-function EvidenceOverlay({ layers, evidences, focusEvidence, onFocusEvidence }) {
+function EvidenceOverlay({ layers, evidences, focusEvidence, onFocusEvidence, onSetEvidenceVis }) {
   const available = new Set(layers.map(({ e }) => e.key))
   const focusedMissing = focusEvidence && !available.has(focusEvidence)
-  const readyCount = EVIDENCES.filter((e) => {
+  const ready = EVIDENCES.filter((e) => {
     const ev = evidences?.[e.key]
-    return ev?.layerUrl && ev.visible !== false
-  }).length
-  const clearFocus = () => {
+    return !!ev?.layerUrl
+  })
+  const readyCount = ready.length
+  const visibleCount = ready.filter((e) => (evidences?.[e.key] || {}).visible !== false).length
+  const allVisible = readyCount > 0 && visibleCount === readyCount
+  const toggleAll = () => {
+    if (!readyCount || !onSetEvidenceVis) return
     if (focusEvidence && onFocusEvidence) onFocusEvidence(focusEvidence)
+    ready.forEach((e) => onSetEvidenceVis(e.key, { visible: !allVisible }))
   }
   return (
     <div style={overlayStyle} onPointerDown={(e) => e.stopPropagation()}>
       <div style={overlayHeadStyle}>
         <b>3D 证据投影</b>
-        <button type="button" style={allLayerButtonStyle(!focusEvidence)}
-          disabled={!readyCount || !focusEvidence} onClick={clearFocus}>
+        <button type="button" style={allLayerButtonStyle(allVisible)}
+          disabled={!readyCount || !onSetEvidenceVis} onClick={toggleAll}
+          title={allVisible ? '取消全部投影层' : '选中全部投影层'}>
           全部
         </button>
       </div>
-      <span>{readyCount ? `已叠加 ${layers.length}/${readyCount}` : '暂无可投影栅格'}</span>
+      <span>{readyCount ? `已叠加 ${visibleCount}/${readyCount}` : '暂无可投影栅格'}</span>
       <div style={chipsStyle}>
         {EVIDENCES.map((e) => {
           const ev = evidences?.[e.key] || {}
@@ -225,34 +232,80 @@ function Targets({ proj, targets, selectedIndex, onSelect }) {
     if (!targets?.length) return []
     return targets.slice(0, 20).map((t, i) => {
       const v = proj.toWorld(t.lon, t.lat, t.depth_m || 0)
+      const surface = proj.surfaceWorld(t.lon, t.lat)
       const s = t.score ?? 0.5
-      return { i, v, s, data: t }
+      return { i, v, surface, s, data: t }
     })
   }, [targets, proj])
 
-  return items.map(({ i, v, s, data }) => {
-    const col = s > 0.66 ? '#ff7a3c' : s > 0.4 ? '#ffcf5a' : '#ffe49a'
+  return items.map(({ i, v, surface, s, data }) => {
+    const col = targetColor(data, i)
     const r = 2.2 + s * 3.2
     const on = selectedIndex === i
+    const select = (e) => {
+      e.stopPropagation()
+      const screenX = e.clientX ?? e.nativeEvent?.clientX ?? e.sourceEvent?.clientX
+      const panelSide = Number.isFinite(screenX) && typeof window !== 'undefined'
+        ? (screenX < window.innerWidth / 2 ? 'left' : 'right')
+        : undefined
+      onSelect && onSelect({ ...data, _panelSide: panelSide }, i)
+    }
+    const label = data.rank != null ? `#${data.rank}` : `#${i + 1}`
     return (
-      <group key={i} position={[v.x, v.y, v.z]}>
-        {/* 落到地表的引线 */}
-        <Stem proj={proj} lon={data.lon} lat={data.lat} from={v} color={col} />
-        <mesh onClick={(e) => { e.stopPropagation(); onSelect && onSelect({ ...data }, i) }}>
-          <sphereGeometry args={[r, 24, 24]} />
-          <meshStandardMaterial color={col} emissive={col} emissiveIntensity={on ? 0.9 : 0.45}
-            roughness={0.35} metalness={0.1} />
-        </mesh>
-        {on && (
-          <mesh>
-            <sphereGeometry args={[r + 1.2, 20, 20]} />
-            <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.5} />
+      <group key={i}>
+        <group position={[v.x, v.y, v.z]}>
+          {/* 地下靶体球:表达深度位置 */}
+          <Stem proj={proj} lon={data.lon} lat={data.lat} from={v} color={col} />
+          <mesh onClick={select}>
+            <sphereGeometry args={[r, 24, 24]} />
+            <meshStandardMaterial color={col} emissive={col} emissiveIntensity={on ? 0.9 : 0.45}
+              roughness={0.35} metalness={0.1} />
           </mesh>
-        )}
+          {on && (
+            <mesh>
+              <sphereGeometry args={[r + 1.2, 20, 20]} />
+              <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.5} />
+            </mesh>
+          )}
+        </group>
+        <group position={[surface.x, surface.y + 5.4, surface.z]} renderOrder={80}>
+          {/* 地表投影点:始终位于证据/影像图层上方,用于平面定位靶点 */}
+          <mesh rotation={[-Math.PI / 2, 0, 0]} onClick={select}>
+            <ringGeometry args={[2.7, 4.1, 36]} />
+            <meshBasicMaterial color={col} transparent opacity={on ? 0.98 : 0.78}
+              depthTest={false} depthWrite={false} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh position={[0, 0.22, 0]} onClick={select}>
+            <sphereGeometry args={[2.35, 20, 20]} />
+            <meshBasicMaterial color={col} transparent opacity={0.96} depthTest={false} depthWrite={false} />
+          </mesh>
+          <Html center distanceFactor={7.5} zIndexRange={[30, 10]} style={{ pointerEvents: 'auto' }}>
+            <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={select}
+              style={targetLabelStyle(col, on)} title={`${label} 有利度 ${Number(s).toFixed(2)} / 深度 ${data.depth_m ?? '-'}m`}>
+              <b>{label}</b><span>{Number(s).toFixed(2)}</span>
+            </button>
+          </Html>
+        </group>
       </group>
     )
   })
 }
+
+function targetColor(t, index) {
+  const rank = Number(t?.rank ?? index + 1)
+  if (rank <= 1) return '#ff8a2a'
+  if (rank <= 3) return '#e0558b'
+  return '#8d98a8'
+}
+
+const targetLabelStyle = (color, active) => ({
+  display: 'flex', alignItems: 'center', gap: 4, height: 22, padding: '0 7px',
+  border: `1px solid ${active ? '#ffffff' : color}`,
+  borderRadius: 999, background: active ? color : 'rgba(255,255,255,.86)',
+  color: active ? '#ffffff' : '#17314a', boxShadow: '0 6px 16px rgba(14,39,70,.22)',
+  fontFamily: 'inherit', fontSize: 10.5, fontWeight: 800, lineHeight: '20px',
+  whiteSpace: 'nowrap', cursor: 'pointer',
+})
 
 // 靶点 → 地表的竖直引线
 function Stem({ proj, lon, lat, from, color }) {

@@ -11,15 +11,22 @@ from __future__ import annotations
 
 import os
 import subprocess
+import tempfile
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 from . import services
 
 # 仓库根:.../deepexplor-services(本文件在 geo-portal/backend/app/ 下,上溯 4 级)
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 _SYS_PY = "/usr/bin/python3"
+_DEFAULT_DELIVERY_ROOT = "/Volumes/大硬盘可劲用/DeepExplor/数据留存/交付数据"
+_FALLBACK_DELIVERY_ROOT = os.environ.get(
+    "DELIVERY_FALLBACK_ROOT",
+    os.path.join(_REPO_ROOT, "geo-portal", "backend", "_data", "delivery"),
+)
 
 # BFF 服务名 → (运行目录(相对仓库根), 入口 args, 自带 venv 的根目录|None)。端口取自 services。
 _SPECS = {
@@ -69,6 +76,38 @@ def _healthy(port: int, timeout: float = 3.0) -> bool:
         return False
 
 
+def _can_write_dir(path: str) -> bool:
+    if not path:
+        return False
+    try:
+        root = Path(path).expanduser()
+        root.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(prefix=".portal-write-", dir=str(root), delete=True) as f:
+            f.write(b"ok")
+        return True
+    except Exception:
+        return False
+
+
+def _delivery_root() -> str:
+    configured = os.environ.get("DELIVERY_ROOT", _DEFAULT_DELIVERY_ROOT)
+    candidates = []
+    for raw in (configured, _FALLBACK_DELIVERY_ROOT):
+        if raw and raw not in candidates:
+            candidates.append(raw)
+    for raw in candidates:
+        if _can_write_dir(raw):
+            return str(Path(raw).expanduser())
+    return str(Path(_FALLBACK_DELIVERY_ROOT).expanduser())
+
+
+def _service_env(svc: str) -> dict:
+    env = os.environ.copy()
+    if svc in {"stru", "analyser"}:
+        env["DELIVERY_ROOT"] = _delivery_root()
+    return env
+
+
 def is_up(svc: str) -> bool:
     port = _port(svc)
     return bool(port) and _healthy(port)
@@ -87,7 +126,7 @@ def _start_one(svc: str):
     try:
         logf = open(os.path.join("/tmp", f"{svc}.log"), "ab")
         # start_new_session:脱离 BFF 进程组,BFF 重启/退出不带走已拉起的服务
-        subprocess.Popen(cmd, cwd=cwd, stdout=logf, stderr=logf, start_new_session=True)
+        subprocess.Popen(cmd, cwd=cwd, stdout=logf, stderr=logf, start_new_session=True, env=_service_env(svc))
     except Exception as e:  # noqa: BLE001
         return False, f"拉起失败: {e}"
     for _ in range(50):           # 最多等 ~25s 健康

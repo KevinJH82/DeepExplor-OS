@@ -52,7 +52,7 @@ def load_structural_layers(
     Returns
     -------
     {'distance': arr|None, 'density': arr|None, 'hillshade': arr|None,
-     'slope': arr|None, 'aoi_name': str} 或 None(无产物)
+     'slope': arr|None, 'aspect': arr|None, 'aoi_name': str} 或 None(无产物)
     """
     try:
         from commons.structural_broker import find_structural_for_bbox, get_product_path
@@ -68,7 +68,8 @@ def load_structural_layers(
     for key, pkey in [('distance', 'distance_to_lineament'),
                       ('density', 'lineament_density'),
                       ('hillshade', 'hillshade'),
-                      ('slope', 'slope')]:
+                      ('slope', 'slope'),
+                      ('aspect', 'aspect')]:
         path = get_product_path(entry, pkey)
         out[key] = _reproject_to(path, ref_shape, ref_transform, ref_crs) if path else None
     return out
@@ -99,6 +100,78 @@ def terrain_normalize(index_map: np.ndarray, hillshade: np.ndarray) -> np.ndarra
     out = index_map.astype(np.float32) / rel
     out[~np.isfinite(out)] = np.nan
     return out
+
+
+def illumination_cos_i(
+    slope_deg: np.ndarray,
+    aspect_deg: np.ndarray,
+    sun_azimuth_deg: float = 315.0,
+    sun_altitude_deg: float = 45.0,
+) -> Optional[np.ndarray]:
+    """
+    由 geo-stru 的坡度/坡向(度)与太阳几何计算光照入射角余弦 cos(i)。
+
+    cos(i) = sin(alt)·cos(slope) + cos(alt)·sin(slope)·cos(az_sun − aspect)
+
+    太阳几何默认取 geo-stru 山体阴影产物 hillshade_315 的方位角 315°、
+    标准高度角 45°(metadata 未记录精确值时的可复现默认,可经参数覆盖)。
+    slope/aspect 缺失或无有效值返回 None。
+    """
+    if slope_deg is None or aspect_deg is None:
+        return None
+    s = np.asarray(slope_deg, dtype=np.float32)
+    a = np.asarray(aspect_deg, dtype=np.float32)
+    finite = np.isfinite(s) & np.isfinite(a)
+    if not finite.any():
+        return None
+    slope = np.deg2rad(s)
+    aspect = np.deg2rad(a)
+    alt = np.deg2rad(sun_altitude_deg)
+    az = np.deg2rad(sun_azimuth_deg)
+    cos_i = (np.sin(alt) * np.cos(slope)
+             + np.cos(alt) * np.sin(slope) * np.cos(az - aspect))
+    cos_i = np.where(finite, cos_i, np.nan).astype(np.float32)
+    return cos_i
+
+
+def minnaert_correction(
+    index_map: np.ndarray,
+    slope_deg: Optional[np.ndarray] = None,
+    aspect_deg: Optional[np.ndarray] = None,
+    hillshade: Optional[np.ndarray] = None,
+    sun_azimuth_deg: float = 315.0,
+    sun_altitude_deg: float = 45.0,
+    k: float = 0.6,
+) -> np.ndarray:
+    """
+    地形辐射(光照)校正,压制阴/阳坡引起的反射率/指数偏差导致的假蚀变。
+
+    优先用 slope+aspect 经 cos(i) 做 Minnaert 型校正(物理上比纯山体阴影更准:
+    显式利用坡向各向异性);slope/aspect 不可用时回退到基于 hillshade 的
+    terrain_normalize;两者都没有则原样返回。
+
+    k 控制校正强度(0=不校正,1=完全 Lambert 归一),默认 0.6 偏温和。
+    任何异常/无有效值都原样返回 index_map,绝不破坏既有分析。
+    """
+    try:
+        cos_i = illumination_cos_i(slope_deg, aspect_deg,
+                                   sun_azimuth_deg, sun_altitude_deg)
+        if cos_i is not None:
+            finite = np.isfinite(cos_i) & (cos_i > 1e-3)
+            if finite.any():
+                mean_ci = float(np.nanmean(cos_i[finite]))
+                if mean_ci > 1e-6:
+                    rel = np.where(finite, cos_i / mean_ci, 1.0)
+                    rel = np.clip(rel, 0.3, 3.0)
+                    out = index_map.astype(np.float32) / (rel ** k)
+                    out[~np.isfinite(out)] = np.nan
+                    return out
+        # 回退:基于山体阴影的相对光照归一化
+        if hillshade is not None:
+            return terrain_normalize(index_map, hillshade)
+    except Exception:
+        pass
+    return index_map
 
 
 def apply_structural_weighting(

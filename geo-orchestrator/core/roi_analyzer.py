@@ -199,6 +199,7 @@ def _scan_existing_products(bbox, roots: dict) -> Tuple[Dict[str, bool], Dict[st
 
     _try_find('commons.analyser_broker', 'find_alteration_for_bbox', 'analyser', 'geo_analyser')
     _try_find('commons.structural_broker', 'find_structural_for_bbox', 'stru', 'geo_stru')
+    _try_find('commons.insar_fusion_broker', 'find_insar_fusion_for_bbox', 'stru', 'geo_stru_insar_fusion')
     _try_find('commons.exploration_broker', 'find_exploration_for_bbox', 'exploration', 'geo_exploration')
     _try_find('commons.datacolle_broker', 'find_datacolle_for_bbox', 'datacolle', 'data_colle')
     _try_find('commons.model3d_broker', 'find_model3d_for_bbox', 'model3d', 'geo_model3d')

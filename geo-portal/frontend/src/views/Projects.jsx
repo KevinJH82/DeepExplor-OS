@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import { Modal, Input, Select, Button, message, Upload, Popconfirm } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import { useProject } from '../store'
@@ -79,6 +79,22 @@ const THUMBS = {
   au: 'linear-gradient(135deg,#f1d18a,#bfe3c9)',
   default: 'linear-gradient(135deg,#a9c8ef,#d7c2ec)',
 }
+// 阶段状态 → 颜色类(复用 .ok/.run/.er/.wt);degraded 视作"进行/警示"金色
+const STATUS_CLS = { completed: 'ok', running: 'run', failed: 'er', degraded: 'run', skipped: 'wt', pending: 'wt' }
+const DONE_STATUS = new Set(['completed', 'skipped', 'degraded'])
+const RUNNING_TEXT = { data: '数据下载中', evidence: '证据构建中', model3d: '3D 建模中', drill: 'AI 布孔中', report: '报告生成中' }
+
+// 由进度概要(后端 summarize_progress)推出卡片当前阶段文案 + 颜色类
+function progressText(pr) {
+  if (!pr) return { cls: 'wt', text: '○ 未开始' }
+  if (pr.all_done) return { cls: 'ok', text: '✓ 已完成' }
+  const { current_status: st, current_label: label } = pr
+  if (st === 'reordered') return { cls: 'wt', text: `↻ 已重新操作 · ${pr.done}/${pr.total} 阶段` }
+  if (st === 'running') return { cls: 'run', text: RUNNING_TEXT[pr.current] || `${label}进行中` }
+  if (st === 'failed') return { cls: 'er', text: `${label}阶段中断` }
+  if (st === 'degraded') return { cls: 'run', text: `${label}降级完成` }
+  return { cls: 'wt', text: `等待${label}` }
+}
 
 export default function Projects() {
   const nav = useNavigate()
@@ -89,7 +105,12 @@ export default function Projects() {
   const [file, setFile] = useState(null)
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => { refresh().catch(() => message.error('加载项目失败')) }, [refresh])
+  useEffect(() => {
+    refresh().catch(() => message.error('加载项目失败'))
+    // 轻量轮询:让在跑项目的进度保持更新(单次 listProjects 请求)
+    const id = setInterval(() => refresh().catch(() => {}), 30000)
+    return () => clearInterval(id)
+  }, [refresh])
 
   const closeModal = () => { setOpen(false); setName(''); setFile(null) }
 
@@ -145,19 +166,40 @@ export default function Projects() {
               <div className="pb">
                 <div className="pn">{p.name}</div>
                 <div style={{ color: 'var(--mut)', fontSize: 12 }}>{p.mineral_label}</div>
-                <div className="proj-meta">
-                  <span className={p.current_run ? 'ok' : 'wt'}>{p.current_run ? '● 有运行' : '○ 未开始'}</span>
-                  <span>{p.kml_name || p.aoi_bbox ? 'AOI 已就绪' : 'AOI 样例'}</span>
-                </div>
+
+                {p.progress ? (
+                  <div className="pprog">
+                    <div className="pstep">
+                      {p.progress.stages.map((s, i) => (
+                        <Fragment key={s.id}>
+                          {i > 0 && <span className={`sg${DONE_STATUS.has(p.progress.stages[i - 1].status) ? ' done' : ''}`} />}
+                          <span className={`nd ${STATUS_CLS[s.status] || 'wt'}${s.reordered ? ' ro' : ''}`}
+                            title={s.reordered ? `${s.label}:已重新操作(待重跑)` : `${s.label}:${s.status}`}>
+                            {s.reordered ? '↻' : null}
+                          </span>
+                        </Fragment>
+                      ))}
+                    </div>
+                    {(() => { const t = progressText(p.progress); return (
+                      <div className="pcur">
+                        <span className={`dt ${t.cls}`} />
+                        <span className={t.cls}>{t.text}</span>
+                        <span style={{ marginLeft: 'auto', color: 'var(--mut)' }}>{p.progress.percent}%</span>
+                      </div>
+                    ) })()}
+                    <div className="gauge"><i style={{ width: `${p.progress.percent}%` }} /></div>
+                  </div>
+                ) : (
+                  <div className="proj-meta">
+                    <span className="wt">○ 未开始</span>
+                    <span>{p.kml_name || p.aoi_bbox ? 'AOI 已就绪' : 'AOI 样例'}</span>
+                  </div>
+                )}
+
                 <div className="proj-meta">
                   <span>角色:{roleZh(p.my_role)}</span>
                   <span>{p.created_at ? p.created_at.slice(0, 10) : '-'}</span>
                 </div>
-                {p.current_run && (
-                  <div style={{ marginTop: 5, fontSize: 10.5, color: 'var(--mut)', fontFamily: 'ui-monospace,monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    trace: {p.current_run}
-                  </div>
-                )}
               </div>
             </div>
           ))}

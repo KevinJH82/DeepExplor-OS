@@ -18,6 +18,18 @@ export const adminDisableUser = (userId) =>
 export const adminEnableUser = (userId) =>
   client.post(`/api/admin/users/${userId}/enable`).then((r) => r.data)
 
+// ── 账号申请(开户审核流)──
+// 公开提交:登录页无 token,client 不会带 Authorization,即匿名请求
+export const submitAccountApplication = (body) =>
+  client.post('/api/public/account-applications', body).then((r) => r.data)
+export const adminListApplications = (status = 'pending') =>
+  client.get('/api/admin/applications', { params: { status } }).then((r) => r.data)
+export const adminApproveApplication = (appId, body) =>
+  client.post(`/api/admin/applications/${appId}/approve`, body).then((r) => r.data)
+export const adminRejectApplication = (appId, reason) =>
+  client.post(`/api/admin/applications/${appId}/reject`, { reason }).then((r) => r.data)
+export const adminListTenants = () => client.get('/api/admin/tenants').then((r) => r.data)
+
 // ── 项目 ──
 export const listProjects = () => client.get('/api/projects').then((r) => r.data)
 export const createProject = (body) => client.post('/api/projects', body).then((r) => r.data)
@@ -32,6 +44,8 @@ export const deleteRun = (traceId) => client.delete(`/api/runs/${traceId}`).then
 export const createRun = (projectId, plan, traceId) =>
   client.post(`/api/projects/${projectId}/runs`, { plan, trace_id: traceId }).then((r) => r.data)
 export const getRun = (traceId) => client.get(`/api/runs/${traceId}`).then((r) => r.data)
+export const getDatacolleEvidence = (traceId) =>
+  client.get(`/api/runs/${traceId}/datacolle-evidence`).then((r) => r.data)
 export const patchStage = (traceId, stage, patch) =>
   client.patch(`/api/runs/${traceId}/stage`, { stage, patch }).then((r) => r.data)
 export const listRuns = (projectId) =>

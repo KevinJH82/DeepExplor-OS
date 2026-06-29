@@ -317,6 +317,64 @@ function factLine(row) {
   return `${row.label}证据尚未运行, 不能作为当前项目事实。`
 }
 
+function cleanText(v) {
+  return String(v || '').replace(/\s+/g, ' ').trim()
+}
+
+function evidenceReady(row) {
+  const state = rowState(row)
+  return ['layer', 'modelDerived', 'archived', 'noLayer', 'completed'].includes(state)
+}
+
+function evidenceStrong(row) {
+  const state = rowState(row)
+  return ['layer', 'modelDerived'].includes(state)
+}
+
+function knowledgeHints(dc = {}) {
+  const points = (dc.literature_points || []).map(cleanText).filter(Boolean)
+  const hasAny = dc?.available && (dc.best_model || points.length || dc.pathfinder_elements?.length)
+  if (!hasAny) return null
+  return {
+    model: cleanText(dc.best_model),
+    pathfinders: dc.pathfinder_elements || [],
+    structure: points[0] || '',
+    alteration: points[1] || '',
+    geo: points[2] || '',
+    target: points.slice(3, 5).join(' '),
+  }
+}
+
+function modelFrameLine(f, hints) {
+  const modelName = hints?.model || f.model.name
+  return `本区判读先以${modelName}作为候选成矿框架, 但是否成立取决于项目内构造、蚀变、物化探和三维靶点是否能形成空间叠合。`
+}
+
+function refinedHint(text) {
+  if (!text) return null
+  return cleanText(text)
+    .replace(/^[-·*]\s*/, '')
+    .replace(/^区域|^研究表明|^已有研究显示/, '')
+}
+
+function supportLevel(f) {
+  const strong = [f.stru, f.analyser, f.geophys, f.geochem, f.insar].filter(evidenceStrong).length
+  const ready = [f.stru, f.analyser, f.geophys, f.geochem, f.insar].filter(evidenceReady).length
+  if (strong >= 3) return '较强'
+  if (strong >= 2 || ready >= 3) return '中等'
+  if (ready >= 2) return '初步'
+  return '不足'
+}
+
+function evidenceGapLines(f) {
+  const gaps = []
+  if (!evidenceReady(f.stru)) gaps.push('构造证据尚未闭合, 控矿通道和断裂交汇关系仍需确认。')
+  if (!evidenceReady(f.analyser)) gaps.push('蚀变证据尚未闭合, 热液活动中心和蚀变分带仍缺少直接约束。')
+  if (!evidenceReady(f.geophys) && !evidenceReady(f.geochem)) gaps.push('物化探证据尚未闭合, 异常组合与深部地质体的关系仍不清楚。')
+  if (!f.topTarget) gaps.push('三维靶点尚未形成或未加载, 当前判断仍停留在二维证据综合阶段。')
+  return gaps
+}
+
 function structureFactLine(row, f, kind = 'structure') {
   const state = rowState(row)
   const modelRule = STRUCTURE_RULES[mineralKey(f.current)] || STRUCTURE_RULES.gold
@@ -326,7 +384,17 @@ function structureFactLine(row, f, kind = 'structure') {
   const area = f.run.roi.area_km2
   if (kind === 'insar') {
     const reason = insarGroup.reason || 'InSAR 形变监测'
-    if (state === 'layer') return `${row.label}图层已接入; 本次编排说明为“${reason}”。当前解释为 AOI 内断裂带活动背景和破碎带响应的辅助证据, 与构造图层共同约束热液通道的活动性。`
+    // geo-stru insar_fusion 来源:补充“实测活动断裂 + 采空/沉降”指挥中心线索
+    let fusionNote = ''
+    if (insarGroup.insar_source === 'geo-stru-insar-fusion') {
+      const fs = insarGroup.insar_fusion || {}
+      const bits = []
+      if (fs.n_active_lineaments != null) bits.push(`实测活动断裂 ${fs.n_active_lineaments} 条`)
+      if (fs.n_subsidence_clusters != null) bits.push(`采空/沉降聚集区 ${fs.n_subsidence_clusters} 个`)
+      if (fs.signal_quality) bits.push(`信号质量 ${fs.signal_quality}`)
+      fusionNote = ` 本图层来自 geo-stru InSAR 融合(构造-形变耦合${bits.length ? ': ' + bits.join('、') : ''}), 直接指示活动构造与采空沉降。`
+    }
+    if (state === 'layer') return `${row.label}图层已接入; 本次编排说明为“${reason}”。${fusionNote}当前解释为 AOI 内断裂带活动背景和破碎带响应的辅助证据, 与构造图层共同约束热液通道的活动性。`
     if (state === 'modelDerived') return `${row.label}证据已作为三维融合输入参与靶点评分; 本次解释为 AOI 内断裂活动背景和破碎带响应的辅助约束, 用于校验构造通道是否具备近期活动或应力释放线索。`
     if (state === 'archived') return `${row.label}已有产物记录（${insarGroup.skip_reason || row.skipReason || '历史形变产物'}）; 当前解释为构造活动背景线索, 其成矿意义取决于与断裂、蚀变和物化探异常的叠合程度。`
     return factLine(row)
@@ -427,13 +495,16 @@ export function buildProjectEvidenceFacts({ current, evidenceRows = [], selected
 
 export function buildProjectNarrative(input) {
   const f = buildProjectEvidenceFacts(input)
+  const hints = knowledgeHints(input.datacolle)
   const targetText = model3dLine(f)
+  const level = supportLevel(f)
 
   const uncertainty = f.rows
     .filter((r) => r.status === 'failed' || r.degraded || r.status === 'skipped')
     .map((r) => `${r.label}: ${r.error || r.relation || '证据不足'}`)
   const mismatch = modelMismatchLine(f)
   if (mismatch) uncertainty.unshift(mismatch)
+  const gaps = evidenceGapLines(f)
   const productState = productFacts(f.run.existingProducts)
   const dataTaskLine = f.run.downloaderTasks.length
     ? `实跑编排要求下载/使用 ${f.run.sensors.join('、')}; 其中 ${sentenceList(f.run.downloaderTasks.map((t) => t.reason), 2)}`
@@ -444,92 +515,96 @@ export function buildProjectNarrative(input) {
     f.run.evidencePlan?.rationale ? `证据编排: ${f.run.evidencePlan.rationale}` : null,
     f.run.depthBand ? `目标深度带: ${f.run.depthBand}。` : null,
   ].filter(Boolean).join(' ')
+  const structureHint = refinedHint(hints?.structure)
+  const alterationHint = refinedHint(hints?.alteration)
+  const geoHint = refinedHint(hints?.geo)
+  const targetHint = refinedHint(hints?.target)
+  const pathfinderLine = hints?.pathfinders?.length
+    ? `化探判读重点关注 ${hints.pathfinders.join('、')} 等指示元素是否与构造-蚀变异常同位或近邻出现。`
+    : null
 
-  return [
+  const sections = [
     {
-      key: 'project',
-      title: '项目背景',
+      key: 'context',
+      title: '项目语境',
       weight: 'core',
       lines: [
-        `${f.areaName} 矿种标注为 ${f.mineralLabel}; 当前证据链按 ${f.model.name} 组织, KML 为 ${f.kmlName}。`,
+        `${f.areaName} 的目标矿种为 ${f.mineralLabel}, 本轮判读以 ${f.kmlName} 限定的 ROI 为对象。`,
         `AOI bbox 为 ${f.aoi}${f.run.roi.area_km2 ? `, 面积约 ${f.run.roi.area_km2} km²` : ''}${f.run.roi.tectonic_setting ? `, 构造背景为${f.run.roi.tectonic_setting}` : ''}。`,
-        modelDecisionLine || `模型关注: ${f.model.focus}。`,
+        dataTaskLine || (f.sourceNames.length ? `本次可用数据包括 ${f.sourceNames.join('、')}, 其价值在于交叉检验构造、蚀变和物化探异常是否指向同一空间。` : '当前尚未形成完整数据源组合, 证据链只能保持保守解释。'),
       ],
     },
     {
-      key: 'data',
-      title: '数据解译',
+      key: 'logic',
+      title: '成矿逻辑',
       weight: 'normal',
       lines: [
-        dataTaskLine || (f.sourceNames.length ? `本次选择数据源: ${f.sourceNames.join('、')}。` : '本次尚未形成完整数据源组合。'),
-        f.run.roiAdjustment ? `区域修正: ${f.run.roiAdjustment}。` : (f.sourcePurposes.length ? f.sourcePurposes.join(' ') : '数据源不足会限制遥感、构造和物化探之间的交叉验证。'),
-        productState.yes.length ? `已有产物包括 ${productState.yes.slice(0, 6).join('、')}; 当前仍缺失或未接入的产物包括 ${productState.no.slice(0, 4).join('、') || '无'}。` : '尚未读取到已有产物清单。',
-      ],
-    },
-    {
-      key: 'structure',
-      title: '构造证据',
-      weight: f.stru.status === 'completed' && !f.stru.degraded ? 'strong' : 'risk',
-      lines: [
-        structureFactLine(f.stru, f),
-        structureFactLine(f.insar, f, 'insar'),
-        structureMetallogenyLine(f),
-        f.stru.status === 'completed' && !f.stru.degraded
-          ? `因此, 构造证据在当前证据链中的角色是圈定 ${f.model.name} 的热液运移通道、构造扩容部位和异常叠合优先区。`
-          : '构造/形变证据不足时, 不能直接声称已识别控矿断裂或运动趋势。',
-      ],
-    },
-    {
-      key: 'alteration',
-      title: '蚀变证据',
-      weight: f.analyser.status === 'completed' && !f.analyser.degraded ? 'strong' : 'risk',
-      lines: [
-        factLine(f.analyser),
-        f.run.groups.analyser?.reason ? `本次蚀变任务说明为“${f.run.groups.analyser.reason}”; 当前解释把蚀变异常视为沿构造通道发育的热液活动响应, 并与 ${f.model.focus} 建立对应关系。` : null,
-        f.analyser.status === 'completed' && !f.analyser.degraded
-          ? `蚀变证据可用于验证 ${f.model.name} 所需的热液活动和蚀变分带。`
-          : '蚀变证据缺失会削弱对热液中心、近矿蚀变和矿床成因关系的判断。',
+        modelFrameLine(f, hints),
+        `有效证据组合应当表现为: ${f.model.focus}; 单项异常只有在与其他证据同向叠合时, 才能上升为靶区线索。`,
+        structureHint || null,
+        pathfinderLine,
       ].filter(Boolean),
     },
     {
-      key: 'geo',
-      title: '物化探约束',
-      weight: f.geophys.status === 'completed' || f.geochem.status === 'completed' ? 'strong' : 'normal',
+      key: 'chain',
+      title: '证据链判读',
+      weight: level === '较强' || level === '中等' ? 'strong' : level === '初步' ? 'normal' : 'risk',
       lines: [
-        factLine(f.geophys),
-        factLine(f.geochem),
-        f.run.groups.geophys?.reason ? `本次物探任务说明为“${f.run.groups.geophys.reason}”; 当前解释把磁/重异常作为岩体边界、破碎带或深部通道的间接约束, 并与 AOI 构造背景和目标深度带共同判读。` : null,
-        '物探和化探只有与构造、蚀变同向叠合时, 才能从异常线索上升为靶区证据。',
+        `构造: ${structureFactLine(f.stru, f)}`,
+        evidenceReady(f.insar) ? `形变: ${structureFactLine(f.insar, f, 'insar')}` : null,
+        `蚀变: ${factLine(f.analyser)}${alterationHint && evidenceReady(f.analyser) ? ` ${alterationHint}` : ''}`,
+        `物化探: ${[factLine(f.geophys), factLine(f.geochem)].join(' ')}${geoHint && (evidenceReady(f.geophys) || evidenceReady(f.geochem)) ? ` ${geoHint}` : ''}`,
+        structureMetallogenyLine(f),
       ].filter(Boolean),
     },
     {
       key: 'target',
-      title: '靶区推导',
-      weight: f.confidence === '较高' || f.confidence === '中等' ? 'strong' : 'risk',
+      title: '靶区收束',
+      weight: level === '较强' || level === '中等' ? 'strong' : 'risk',
       lines: [
+        `当前证据对靶区的支持程度为${level}; 判断依据不是单一图层, 而是构造位置、蚀变响应、物化探异常和三维结果之间是否形成同向叠合。`,
         f.model.targetRule,
         modelDecisionLine || null,
+        targetHint || null,
         targetText,
         targetConfidenceLine(f),
       ].filter(Boolean),
     },
     {
+      key: 'next',
+      title: '验证建议',
+      weight: gaps.length ? 'normal' : 'strong',
+      lines: [
+        gaps[0] || '当前主要证据已闭合, 下一步应围绕三维靶点和钻孔/布孔方案进行空间验证。',
+        f.topTarget ? '优先核查首位靶点周边的构造-蚀变-物化探叠合关系, 再决定布孔深度和孔斜方向。' : '优先进入或刷新三维建模, 将二维证据转化为可检验的深度、评分和靶点位置。',
+        productState.yes.length ? `已有产物可作为复核基础: ${productState.yes.slice(0, 5).join('、')}。` : null,
+      ].filter(Boolean),
+    },
+    {
       key: 'risk',
-      title: '不确定性',
-      weight: uncertainty.length ? 'risk' : 'normal',
-      lines: uncertainty.length
-        ? uncertainty
-        : ['当前没有记录失败、跳过或降级证据; 主要剩余不确定性来自原始产物空间叠合细节在当前视图中的展开程度。'],
+      title: '风险边界',
+      weight: uncertainty.length || gaps.length ? 'risk' : 'normal',
+      lines: [
+        ...(uncertainty.length ? uncertainty : []),
+        ...(gaps.length ? gaps.slice(0, 4) : []),
+        (!uncertainty.length && !gaps.length)
+          ? '当前没有记录失败、跳过或降级证据; 主要剩余不确定性来自原始产物空间叠合细节在当前视图中的展开程度。'
+          : null,
+      ].filter(Boolean),
     },
   ]
+  return sections
 }
 
 export function buildProjectSummary(input) {
   const sections = buildProjectNarrative(input)
   const target = sections.find((s) => s.key === 'target')
   const risk = sections.find((s) => s.key === 'risk')
+  const targetLine = target?.lines?.find((line) => (
+    line.includes('支持程度') || line.includes('靶点') || line.includes('三维')
+  )) || target?.lines?.[0]
   return [
-    target?.lines?.[2],
+    targetLine,
     risk?.weight === 'risk' ? `主要风险: ${risk.lines.slice(0, 2).join('；')}` : null,
   ].filter(Boolean).join(' ')
 }
@@ -539,7 +614,7 @@ export function buildGeologyNarrative(input) {
   return {
     modelName: buildProjectEvidenceFacts(input).model.name,
     sections,
-    thesis: sections.find((s) => s.key === 'project')?.lines?.[0] || '',
+    thesis: sections.find((s) => s.key === 'context')?.lines?.[0] || '',
     uncertainty: sections.find((s) => s.key === 'risk')?.lines || [],
   }
 }

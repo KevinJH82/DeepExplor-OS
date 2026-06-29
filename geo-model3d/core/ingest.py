@@ -35,6 +35,8 @@ class EvidenceSet:
     """对齐到网格水平面 (ny,nx) 的 2D 证据 + 元信息。值约定 [0,1]，越高越有利。"""
     alteration: Optional[np.ndarray] = None          # 蚀变综合评分
     structure: Optional[np.ndarray] = None           # 断裂邻近/构造有利度
+    curvature: Optional[np.ndarray] = None           # 地形曲率(褶皱铰链/扩张带控矿,geo-stru)
+    active_fault: Optional[np.ndarray] = None        # 实测活动断裂(geo-stru insar_fusion 形变梯度)
     deformation: Optional[np.ndarray] = None         # 地表形变(常缺)
     geochem: Optional[np.ndarray] = None             # 地球化学多元素组合异常(geo-geochem)
     slowvars: Optional[np.ndarray] = None            # 七慢变量 Δ 判别式反向有利度(geo-7slow)
@@ -50,7 +52,8 @@ class EvidenceSet:
 
     def available_layers(self) -> List[str]:
         out = []
-        for name in ("alteration", "structure", "deformation", "geochem", "slowvars"):
+        for name in ("alteration", "structure", "curvature", "active_fault",
+                     "deformation", "geochem", "slowvars"):
             if getattr(self, name) is not None and np.isfinite(getattr(self, name)).any():
                 out.append(name)
         return out
@@ -342,6 +345,76 @@ def _load_structure(bbox, grid, root, prov, mineral: Optional[str] = None) -> Tu
     return None, strikes
 
 
+def _load_curvature(bbox, grid, root, prov, mineral: Optional[str] = None) -> Optional[np.ndarray]:
+    """geo-stru 地形曲率 → 独立证据层。
+
+    |curvature| 高处对应脊/谷转折(褶皱铰链、张性扩张带)，是经典容矿构造部位。
+    与 _load_structure 的 curvature 兜底不同：这里始终作为「曲率」独立层加载，
+    不与断裂邻近/密度互斥。无产物/失败降级为 None。
+    """
+    _import_commons()
+    try:
+        from commons.structural_broker import find_structural_for_bbox, get_product_path
+    except Exception as e:
+        prov['curvature'] = {"status": "broker_import_failed", "error": str(e)}
+        return None
+
+    entries = find_structural_for_bbox(tuple(bbox), root)
+    if not entries:
+        prov['curvature'] = {"status": "missing", "root": root}
+        return None
+
+    entry, sel = select_best_entry(entries, bbox, mineral)
+    prov['curvature_selection'] = sel
+    # 曲率为主;无曲率时退「负开放度」(openness:谷/线性体形态增强,同属构造不连续指示)
+    curv_p = get_product_path(entry, "curvature")
+    kind = "curvature"
+    if not curv_p:
+        curv_p = get_product_path(entry, "openness")
+        kind = "openness"
+    if not curv_p:
+        prov['curvature'] = {"status": "no_raster", "run_id": entry.get("run_id")}
+        return None
+
+    curv = grid.reproject_to_grid(curv_p)
+    arr = _norm01(np.abs(curv))
+    prov['curvature'] = {"status": "ok", "source": "geo-stru", "kind": kind,
+                         "run_id": entry.get("run_id")}
+    return arr
+
+
+def _load_active_fault(bbox, grid, root, prov, mineral: Optional[str] = None) -> Optional[np.ndarray]:
+    """geo-stru insar_fusion 形变梯度 → 实测活动断裂证据层。
+
+    velocity_gradient(LOS 速率空间梯度)高处对应正在活动的形变线性体/断裂，
+    是「实测」活动构造(优于纯地形解译的静态断裂)。无 insar_fusion 产物/失败降级 None。
+    """
+    _import_commons()
+    try:
+        from commons.insar_fusion_broker import find_insar_fusion_for_bbox, get_product_path
+    except Exception as e:
+        prov['active_fault'] = {"status": "broker_import_failed", "error": str(e)}
+        return None
+
+    entries = find_insar_fusion_for_bbox(tuple(bbox), root)
+    if not entries:
+        prov['active_fault'] = {"status": "missing", "root": root}
+        return None
+
+    entry, sel = select_best_entry(entries, bbox, mineral)
+    prov['active_fault_selection'] = sel
+    vg_p = get_product_path(entry, "velocity_gradient")
+    if not vg_p:
+        prov['active_fault'] = {"status": "no_raster", "run_id": entry.get("run_id")}
+        return None
+
+    vg = grid.reproject_to_grid(vg_p)
+    arr = _norm01(np.abs(vg))
+    prov['active_fault'] = {"status": "ok", "source": "geo-stru-insar-fusion",
+                            "kind": "velocity_gradient", "run_id": entry.get("run_id")}
+    return arr
+
+
 # ─────────────────────────────────────────────
 # geo-exploration：经验深度 + 预测靶点（均可选）
 # ─────────────────────────────────────────────
@@ -427,6 +500,8 @@ def gather_evidence(bbox: List[float], mineral: str, grid, roots: Dict[str, str]
 
     alteration, deposit_type = _load_alteration(bbox, grid, roots["analyser"], prov, mineral)
     structure, strikes = _load_structure(bbox, grid, roots["stru"], prov, mineral)
+    curvature = _load_curvature(bbox, grid, roots["stru"], prov, mineral) if roots.get("stru") else None
+    active_fault = _load_active_fault(bbox, grid, roots["stru"], prov, mineral) if roots.get("stru") else None
     depth_map, targets = _load_exploration(bbox, grid, roots["exploration"], mineral, prov)
     geochem = _load_geochem(bbox, grid, roots.get("geochem", ""), prov, mineral) if roots.get("geochem") else None
     deformation = _load_deformation(bbox, grid, roots.get("insar", ""), prov, mineral) if roots.get("insar") else None
@@ -454,7 +529,9 @@ def gather_evidence(bbox: List[float], mineral: str, grid, roots: Dict[str, str]
             f"AOI 蚀变矿床类型({deposit_type}/{dt_commodity}) 与用户矿种({mineral})不一致，定族改用矿种默认")
 
     es = EvidenceSet(
-        alteration=alteration, structure=structure, deformation=deformation, geochem=geochem,
+        alteration=alteration, structure=structure, curvature=curvature,
+        active_fault=active_fault,
+        deformation=deformation, geochem=geochem,
         slowvars=slowvars,
         depth_map=depth_map, strikes=strikes, targets=targets,
         deposit_type=deposit_type, deposit_type_trusted=trusted,

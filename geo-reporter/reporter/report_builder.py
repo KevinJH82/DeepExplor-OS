@@ -372,6 +372,70 @@ class ReportBuilder:
             p.paragraph_format.space_before = Pt(3)
             p.paragraph_format.space_after = Pt(3)
 
+    def _add_metallogenic_evidence(self, doc: Document, metallogenic: dict,
+                                   literature_text: str, papers: List[dict]):
+        """渲染「区域成矿模型与文献佐证」子节（确定性，不经 LLM，保留 [n] 学术引用）。
+
+        这是把 data-colle 已做的成矿研判 + 学术支撑**落入证据链该环节**（第2章地质与矿产）
+        的关键：成矿模型先验 + 文献要点提炼（带 [n]）+ 文献清单（序号对应 [n]）。
+        三者皆空则整节不出（不占位）。
+        """
+        metallogenic = metallogenic or {}
+        literature_text = literature_text or ""
+        papers = papers or []
+        best_model = metallogenic.get("best_model")
+        if not (best_model or literature_text or papers):
+            return
+
+        self._add_heading(doc, "区域成矿模型与文献佐证", level=3)
+
+        # 1) 结构化成矿模型先验（不展示 fit_score，常为 0 易误导）
+        if best_model:
+            pf = metallogenic.get("pathfinder_elements") or []
+            mc = metallogenic.get("model_count")
+            lead = f"最契合成矿模型：{best_model}"
+            if mc:
+                lead += f"（候选成矿模型 {mc} 个）"
+            if pf:
+                lead += f"。指示元素组合（前缘晕→矿体→尾晕 pathfinder）：{'、'.join(map(str, pf))}。"
+            self._add_paragraph(doc, lead, font_size=11, bold=True)
+
+        # 2) 文献要点提炼（保留 [n] 内联引用；剥离 markdown 噪声；剔除内嵌「论文清单」，改用 3) 表格）
+        points = literature_text.split("### 论文清单")[0] if literature_text else ""
+        for raw in points.splitlines():
+            line = raw.strip()
+            if not line or line.startswith(">") or line.startswith("---"):
+                continue
+            if line.startswith("#"):
+                line = line.lstrip("#").strip().replace("**", "")
+                # 跳过章标题自身与装饰行
+                if not line or line.startswith("五、") or "📌" in line or "论文要点提炼" in line:
+                    continue
+                self._add_paragraph(doc, line, font_size=11, bold=True)
+                continue
+            bullet = line.startswith("- ") or line.startswith("· ") or line.startswith("* ")
+            line = line.lstrip("-·*").strip().replace("**", "")
+            if not line:
+                continue
+            self._add_paragraph(doc, ("· " + line) if bullet else line, font_size=11)
+
+        # 3) 文献清单（序号与上文 [n] 对应，故用来源顺序，勿排序）
+        if papers:
+            self._add_paragraph(doc, "区域文献清单（序号对应上文引用编号 [n]）：",
+                                font_size=11, bold=True)
+            rows = []
+            for i, p in enumerate(papers, 1):
+                authors = p.get("authors") or []
+                a = (authors[0] + (" 等" if len(authors) > 1 else "")) if authors else ""
+                yr = p.get("year") or ""
+                title = p.get("title") or ""
+                ref = " ".join(s for s in (a, f"({yr})" if yr else "", title) if s)
+                cite = f"被引 {p.get('cited_by')}" if p.get("cited_by") else ""
+                doi = p.get("doi") or p.get("url") or ""
+                rows.append([str(i), ref, cite, doi])
+            self._add_table(doc, ["#", "文献", "被引", "DOI/链接"], rows,
+                            col_widths=[0.8, 8.2, 1.8, 3.2])
+
     def build_report(self, location: LocationContext, search_results: Dict[str, SearchResult],
                      output_name: str = None, mineral_type: str = "",
                      target_figure=None, confidence: dict = None, tenant_id: str = None) -> str:
@@ -393,8 +457,15 @@ class ReportBuilder:
             生成的 .docx 文件路径
         """
         # P2 租户隔离:把本次报告的租户写入线程上下文,下游 broker 发现据此过滤他租户产物
-        from .data_sources import set_tenant
+        from .data_sources import (set_tenant, fetch_datacolle_metallogenic,
+                                    fetch_datacolle_literature, fetch_datacolle_papers)
         set_tenant(tenant_id)
+
+        # data-colle 成矿模型+文献证据（确定性渲染入第2章地质章，见 _add_metallogenic_evidence）
+        _dc_bbox = (location.min_lon, location.min_lat, location.max_lon, location.max_lat)
+        _dc_metallogenic = fetch_datacolle_metallogenic(*_dc_bbox)
+        _dc_literature = fetch_datacolle_literature(*_dc_bbox)
+        _dc_papers = fetch_datacolle_papers(*_dc_bbox)
 
         doc = Document()
 
@@ -461,7 +532,13 @@ class ReportBuilder:
 
             self._add_heading(doc, f"第{self._num_to_chinese(chapter_num)}章  {category.chapter_title}", level=1)
 
-            if result.error:
+            if result.error and cat_id == "slow_variables" and "embedded null byte" in str(result.error):
+                self._add_paragraph(
+                    doc,
+                    "本区暂无可与 ROI 匹配的慢变量综合证据产物；本章不参与本次综合评价。",
+                    font_size=11,
+                )
+            elif result.error:
                 # 如果搜索失败，显示错误消息
                 error_p = self._add_paragraph(doc, f"[数据获取失败] {result.error}", font_size=11)
                 for run in error_p.runs:
@@ -489,6 +566,11 @@ class ReportBuilder:
                     doc.add_paragraph()
                     self._add_heading(doc, f"对{mineral_type}勘探作业的影响", level=3)
                     self._add_paragraph(doc, result.exploration_impact, font_size=11)
+
+                # 地质与矿产章：织入 data-colle 成矿模型+文献证据（确定性，保留 [n] 学术引用）
+                if cat_id == "geology":
+                    doc.add_paragraph()
+                    self._add_metallogenic_evidence(doc, _dc_metallogenic, _dc_literature, _dc_papers)
 
                 # 嵌入子系统图件（蚀变/物探/深部预测等）
                 _figs = getattr(result, "figures", None) or []

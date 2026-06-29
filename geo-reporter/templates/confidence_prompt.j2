@@ -27,6 +27,15 @@
 - geo-model3d 三维成矿预测靶点：{{ "可用，识别靶点 " ~ subsystems.n_targets ~ " 个" if subsystems.model3d else "无匹配数据" }}
 - 已知矿点标签（deposits）：{{ "可用" if subsystems.deposits else "无匹配数据" }}
 - geo-drill 钻探布孔/反馈：{{ "可用" if subsystems.drill else "无匹配数据" }}
+{% if metallogenic and metallogenic.best_model %}
+
+【data-colle 成矿模型与结论先验（资料采集系统已结构化判定，作为成矿结论锚点，非凭空假设）】
+- 最契合成矿模型：{{ metallogenic.best_model }}（候选成矿模型 {{ metallogenic.model_count }} 个）
+- 指示元素组合（pathfinder）：{{ metallogenic.pathfinder_elements | join("、") }}
+{% if datacolle_conclusion %}- 资料系统综合结论与靶区建议（请据此校验，勿脱离另立成矿模型）：
+{{ datacolle_conclusion }}
+{% endif %}使用要求：上述成矿模型与指示元素由 data-colle 基于本区构造背景比对确定，详细文献佐证见第2章「区域成矿模型与文献佐证」。研判「成矿地质条件」与「地球化学证据」两维度时**必须**结合该模型与指示元素组合，并回引第2章；除非各章证据与之明确矛盾，应沿用该模型；若需推翻，须在 summary 中说明矛盾证据与所引章节。严禁忽略该先验另行编造成矿模型。
+{% endif %}
 {% if known_deposits %}
 【已知矿点（真实标签，用于靶区空间套合与成矿模型印证）】
 {% for d in known_deposits %}  - {{ d.name if d.name else "(未命名)" }}：矿种 {{ d.commodity }}，类型 {{ d.deposit_type }}，坐标({{ "%.4f"|format(d.lon) }}, {{ "%.4f"|format(d.lat) }})

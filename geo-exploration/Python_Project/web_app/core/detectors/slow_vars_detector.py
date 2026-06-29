@@ -117,6 +117,26 @@ class SlowVarsDetector(GeoDetectorBase):
             except Exception as e:
                 self._debug_log(f"[fault_activity] 构造增强失败: {e}")
 
+        # geo-stru insar_fusion 实测活动断裂增强 fault_activity(可选,需 context 提供 fault_lineament_insar)。
+        # velocity_gradient 是「实测」活动构造(优于纯地形解译),权重默认高于解译断裂。
+        # 与上方解译断裂叠加范式一致;缺失/异常则跳过(零回归)。
+        lin_insar = context.get('fault_lineament_insar') if isinstance(context, dict) else None
+        if lin_insar is not None:
+            try:
+                li = np.asarray(lin_insar, dtype=np.float64)
+                if li.shape == fault_activity.shape:
+                    lo, hi = np.nanmin(li), np.nanmax(li)
+                    if np.isfinite(lo) and np.isfinite(hi) and (hi - lo) > eps:
+                        li_norm = np.nan_to_num((li - lo) / (hi - lo), nan=0.0)
+                        w_li = float(context.get('lineament_weight_insar',
+                                     self.params.get('lineament_weight_insar', 0.6)))
+                        fault_activity = fault_activity + w_li * li_norm * stress_grad
+                        self._debug_log(f"[fault_activity] 已叠加 geo-stru 实测活动断裂(insar_fusion,权重 {w_li})")
+                else:
+                    self._debug_log(f"[fault_activity] 活动断裂层形状不匹配 {li.shape} vs {fault_activity.shape},跳过")
+            except Exception as e:
+                self._debug_log(f"[fault_activity] 活动断裂增强失败: {e}")
+
         # Phase 1.5: 用 InSAR 速率差分场增强 fault_activity(可选,需 context 提供 insar_velocity)
         insar_v = context.get('insar_velocity') if isinstance(context, dict) else None
         insar_coh = context.get('insar_coherence') if isinstance(context, dict) else None

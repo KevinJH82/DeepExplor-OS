@@ -34,3 +34,9 @@ dist/
 # ── 其它 ──
 .DS_Store
 *.log
+
+# ── 大体量地理数据(不入库) ──
+geo-model3d/data/hydrosheds/
+
+# ── 本地工具目录 ──
+.understand-anything/

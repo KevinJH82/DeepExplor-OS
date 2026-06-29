@@ -22,7 +22,8 @@ from .basemap import render_basemap
 from .data_sources import (_import_commons, current_tenant, GEO_STRU_OUTPUTS, DATACOLLE_OUTPUTS,
                            GEO_ANALYSER_OUTPUTS, GEO_EXPLORATION_OUTPUTS,
                            GEO_GEOPHYS_OUTPUTS, GEO_GEOCHEM_OUTPUTS, GEO_MODEL3D_OUTPUTS,
-                           GEO_DEPOSITS_OUTPUTS, GEO_DRILL_OUTPUTS)
+                           GEO_DEPOSITS_OUTPUTS, GEO_DRILL_OUTPUTS,
+                           fetch_datacolle_metallogenic, fetch_datacolle_section)
 
 
 def _bbox(location):
@@ -363,6 +364,10 @@ def evaluate_synthesis(location, mineral_type: str, search_results: Dict,
         for i, t in enumerate(raw_targets[:6], 1)
     ]
 
+    # data-colle 成矿先验 + 综合结论/靶区建议——作为成矿结论锚点注入研判 prompt
+    dc_metallogenic = fetch_datacolle_metallogenic(*_bbox(location))
+    dc_conclusion = "\n".join(fetch_datacolle_section("conclusion", *_bbox(location)) or [])
+
     env = Environment(loader=FileSystemLoader(str(templates_dir)))
     parsed = None
     try:
@@ -381,6 +386,8 @@ def evaluate_synthesis(location, mineral_type: str, search_results: Dict,
             drill_holes=(drill_evidence.get("holes") or [])[:8],
             drill_feedback=(drill_evidence.get("feedback") or [])[:8],
             target_source=target_source,
+            metallogenic=dc_metallogenic,
+            datacolle_conclusion=dc_conclusion,
         )
         parsed = _run_llm(prompt, timeout)
     except Exception as e:

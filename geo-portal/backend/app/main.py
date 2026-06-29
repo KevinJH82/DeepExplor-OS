@@ -30,6 +30,8 @@ from . import store, auth, services
 from .config import get_settings
 from .proxy import router as proxy_router
 from .admin import router as admin_router
+from .public import router as public_router
+from .runstages import summarize_progress
 
 _settings = get_settings()
 
@@ -694,7 +696,9 @@ _DC_DIR = os.environ.get("DATACOLLE_DIR", "/opt/deepexplor-services/data-colle/p
 _EMAG2_LOCAL = os.path.join(_DC_DIR, "cache", "emag2_upcont_global.tif")
 # data-colle 依赖(rasterio 等)在系统 python,而非 BFF venv;用系统解释器跑
 _DC_PYTHON = os.environ.get("DATACOLLE_PYTHON", "/usr/bin/python3")
-_DELIVERY_ROOT = os.environ.get("DELIVERY_ROOT", "/Volumes/大硬盘可劲用/DeepExplor/数据留存/交付数据")
+_DEFAULT_DELIVERY_ROOT = "/Volumes/大硬盘可劲用/DeepExplor/数据留存/交付数据"
+_DELIVERY_ROOT = os.environ.get("DELIVERY_ROOT", _DEFAULT_DELIVERY_ROOT)
+_DELIVERY_FALLBACK_ROOT = os.environ.get("DELIVERY_FALLBACK_ROOT", str(store.DATA_DIR / "delivery"))
 _FETCH_DEM = str(Path(__file__).resolve().parent.parent / "scripts" / "fetch_dem.py")
 _FETCH_BASEMAP = str(Path(__file__).resolve().parent.parent / "scripts" / "fetch_basemap.py")
 _FETCH_TERRAIN = str(Path(__file__).resolve().parent.parent / "scripts" / "fetch_terrain.py")
@@ -717,14 +721,42 @@ def _sys_env():
     return env
 
 
+def _can_write_dir(path: str) -> bool:
+    if not path:
+        return False
+    try:
+        root = Path(path).expanduser()
+        root.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(prefix=".portal-write-", dir=str(root), delete=True) as f:
+            f.write(b"ok")
+        return True
+    except Exception:
+        return False
+
+
+def _delivery_root() -> str:
+    """返回可写交付库根目录;默认移动硬盘不可写时落到门户本地交付缓存。"""
+    candidates = []
+    for raw in (_DELIVERY_ROOT, _DELIVERY_FALLBACK_ROOT):
+        if raw and raw not in candidates:
+            candidates.append(raw)
+    for raw in candidates:
+        if _can_write_dir(raw):
+            return str(Path(raw).expanduser())
+    raise RuntimeError(f"无可写交付库目录: {', '.join(candidates) or '未配置'}")
+
+
 def _acquire_dem(bbox, project_name):
     """缺 DEM 时:下 Copernicus GLO-30 → 镶嵌 → 写交付库冬季子目录 dem.tif(供 stru 读)。"""
     if not bbox or len(bbox) < 4:
         raise RuntimeError("缺 AOI bbox,无法下 DEM")
-    proj_dir = os.path.join(_DELIVERY_ROOT, project_name)
+    root = _delivery_root()
+    proj_dir = os.path.join(root, project_name)
     os.makedirs(proj_dir, exist_ok=True)
     cmd = [_DC_PYTHON, _FETCH_DEM, str(bbox[0]), str(bbox[1]), str(bbox[2]), str(bbox[3]), proj_dir]
-    r = subprocess.run(cmd, env=_sys_env(), timeout=600, capture_output=True)
+    env = _sys_env()
+    env["DELIVERY_ROOT"] = root
+    r = subprocess.run(cmd, env=env, timeout=600, capture_output=True)
     if r.returncode != 0:
         tail = (r.stderr or b"").decode("utf-8", "ignore")[-300:]
         raise RuntimeError(f"DEM 获取失败(码 {r.returncode}): {tail or 'NO_TILES(可能海域/无覆盖)'}")
@@ -1067,6 +1099,46 @@ def _find_insar_evidence(kml_name: str = "", project: dict = None):
     return _find_insar_evidence_by_bbox(project)
 
 
+def _find_insar_fusion_evidence(project: dict = None):
+    """发现 geo-stru insar_fusion 形变层(同区构造-形变融合,含活动断裂+采空沉降)。
+
+    经 commons.insar_fusion_broker 按项目 aoi_bbox 发现,返回 georeferenced 形变栅格
+    (los_velocity_mm_yr.tif,缺则 velocity_gradient.tif)+ 采空/活动断裂摘要。
+    作为 insar 证据层的优先来源(比 geo-insar 原始 LOS 更富:叠加构造耦合与采空识别)。
+    返回 (tif_path, aoi_name, summary) 或 (None, None, None);任何缺失/失败均降级。
+    """
+    project = project or {}
+    try:
+        import sys as _sys
+        for repo in ("/opt/Project/deepexplor-services", "/opt/deepexplor-services"):
+            if repo not in _sys.path:
+                _sys.path.insert(0, repo)
+        from commons.insar_fusion_broker import find_insar_fusion_for_bbox, get_product_path
+    except Exception:
+        return None, None, None
+    bbox = _as_bbox(project.get("aoi_bbox"))
+    if not bbox:
+        return None, None, None
+    try:
+        matches = find_insar_fusion_for_bbox(tuple(bbox))
+    except Exception:
+        return None, None, None
+    if not matches:
+        return None, None, None
+    entry = matches[0]
+    path = (get_product_path(entry, "los_velocity_mm_yr")
+            or get_product_path(entry, "velocity_gradient"))
+    if not path:
+        return None, None, None
+    fs = entry.get("fusion_stats") or {}
+    summary = {
+        "n_subsidence_clusters": fs.get("n_subsidence_clusters"),
+        "n_active_lineaments": fs.get("n_active_consistent_lineaments"),
+        "signal_quality": fs.get("signal_quality"),
+    }
+    return str(path), entry.get("aoi_name"), summary
+
+
 def _find_insar_evidence_by_aoi(aoi_name):
     """按 geo-insar 输出目录名(aoi)直接找 deformation_evidence.tif。"""
     if not aoi_name:
@@ -1080,12 +1152,18 @@ def _find_insar_evidence_by_aoi(aoi_name):
     return None
 
 
-def _clip_tif_to_project_bytes(src_bytes: bytes, project_id: str) -> bytes:
-    """按项目 bbox 裁剪 GeoTIFF。BFF venv 不带 rasterio,调用系统 python 的 rasterio 环境。"""
+def _clip_tif_to_project_bytes(src_bytes: bytes, project_id: str):
+    """按项目 bbox 裁剪 GeoTIFF,返回 (bytes, meta)。BFF venv 不带 rasterio,调系统 python。
+
+    meta = {scope, bounds}:
+    - scope='aoi'    :正常裁到 AOI(bounds=AOI bbox);
+    - scope='regional':裁到 AOI 后退化(全 nodata 或 ≤1px,如区域级粗网格/本区无信号)→ 回退
+      输出整幅原生栅格,bounds=该栅格的 WGS84 范围,供前端按真实范围摆放并标注"区域级"。
+    """
     proj = store.get_project(project_id) if project_id else None
     bbox = _as_bbox((proj or {}).get("aoi_bbox"))
     if not bbox:
-        return src_bytes
+        return src_bytes, {"scope": "native", "bounds": None}
     with tempfile.NamedTemporaryFile(suffix=".tif", delete=False) as src:
         src.write(src_bytes)
         src_path = src.name
@@ -1104,31 +1182,44 @@ with rasterio.open(src_path) as ds:
     left, bottom, right, top = transform_bounds("EPSG:4326", ds.crs, *bbox, densify_pts=21)
     win = from_bounds(left, bottom, right, top, ds.transform)
     full = Window(0, 0, ds.width, ds.height)
+    cwin = None
     try:
-        win = win.intersection(full).round_offsets().round_lengths()
+        cwin = win.intersection(full).round_offsets().round_lengths()
     except Exception:
-        raise SystemExit(3)
-    if win.width <= 0 or win.height <= 0:
-        raise SystemExit(3)
-    data = ds.read(window=win)
-    profile = ds.profile.copy()
-    profile.update({
-        "height": int(win.height),
-        "width": int(win.width),
-        "transform": ds.window_transform(win),
-    })
-    with rasterio.open(out_path, "w", **profile) as out:
-        out.write(data)
+        cwin = None
+    degenerate = cwin is None or cwin.width <= 1 or cwin.height <= 1
+    if not degenerate:
+        sub = ds.read(window=cwin, masked=True)
+        try:
+            degenerate = int(sub.count()) == 0   # 裁出来全是 nodata
+        except Exception:
+            degenerate = False
+    if not degenerate:
+        data = ds.read(window=cwin)
+        profile = ds.profile.copy()
+        profile.update({"height": int(cwin.height), "width": int(cwin.width),
+                        "transform": ds.window_transform(cwin)})
+        with rasterio.open(out_path, "w", **profile) as out:
+            out.write(data)
+        print(json.dumps({"scope": "aoi", "bounds": bbox}))
+    else:
+        # 回退:输出整幅原生栅格 + 其 WGS84 范围
+        with rasterio.open(out_path, "w", **ds.profile) as out:
+            out.write(ds.read())
+        l, b, r, t = transform_bounds(ds.crs, "EPSG:4326", *ds.bounds, densify_pts=21)
+        print(json.dumps({"scope": "regional", "bounds": [l, b, r, t]}))
 '''
     try:
         r = subprocess.run(["python3", "-c", script, src_path, out_path, json.dumps(bbox)],
                            timeout=60, capture_output=True)
-        if r.returncode == 3:
-            raise HTTPException(status_code=404, detail="栅格与当前 ROI 不相交")
         if r.returncode != 0 or not os.path.isfile(out_path):
-            return src_bytes
+            return src_bytes, {"scope": "native", "bounds": None}
+        try:
+            meta = json.loads((r.stdout or b"").decode("utf-8", "ignore").strip().splitlines()[-1])
+        except Exception:
+            meta = {"scope": "aoi", "bounds": bbox}
         with open(out_path, "rb") as f:
-            return f.read()
+            return f.read(), meta
     finally:
         for p in (src_path, out_path):
             try:
@@ -1268,16 +1359,57 @@ def _refresh_insar(task_id, t):
     return t
 
 
-def _run_insar(task_id, kml_name, project=None):
-    """形变:优先复用现成 deformation_evidence.tif;缺失则触发 geo-insar 真实处理(异步数小时)。"""
+def _reuse_data_stage_insar_result(t: dict, data_task: dict = None) -> bool:
+    data_task = data_task or {}
+    tid = data_task.get("task_id") or data_task.get("taskId")
+    data = None
+    if tid:
+        data = _ADAPTER_TASKS.get(tid)
+        if data is None:
+            try:
+                data = store.get_adapter_task(tid)
+            except Exception:
+                data = None
+    data = data or data_task
+    st = str((data or {}).get("status") or "").lower()
+    if st != "completed":
+        return False
+    for key in ("layer", "raw", "warning", "no_layer", "matched_aoi", "insar_stack_index",
+                "insar_task_id", "insar_aoi", "insar_source", "insar_fusion"):
+        if key in data:
+            t[key] = data[key]
+    t.update(status="completed", progress=100, note=None, error=None)
+    if tid:
+        t["reused_from"] = tid
+    return True
+
+
+def _run_insar(task_id, kml_name, project=None, allow_trigger=False, data_task=None):
+    """形变/InSAR:数据阶段可触发 HyP3;证据阶段仅复用已就绪产物,绝不再提交云处理。"""
     t = _ADAPTER_TASKS[task_id]
     try:
+        if _reuse_data_stage_insar_result(t, data_task):
+            return
+        # 优先 geo-stru insar_fusion 融合形变(同区含活动断裂+采空沉降),缺失才回退 geo-insar 原始形变
+        fpath, faoi, fsum = _find_insar_fusion_evidence(project)
+        if fpath:
+            t["layer"] = {"kind": "file", "path": fpath}
+            t.update(status="completed", progress=100, warning=None, matched_aoi=faoi,
+                     insar_source="geo-stru-insar-fusion", insar_fusion=fsum)
+            return
         path, matched = _find_insar_evidence(kml_name, project)
         if path:
             t["layer"] = {"kind": "file", "path": path}
             t.update(status="completed", progress=100, warning=None, matched_aoi=matched)
         elif _reuse_completed_insar_result(t, project):
             return
+        elif not allow_trigger:
+            st = str((data_task or {}).get("status") or "").lower()
+            if st in ("running", "pending"):
+                raise RuntimeError("InSAR 数据尚未准备完成,请先完成数据阶段")
+            if st == "failed":
+                raise RuntimeError((data_task or {}).get("error") or "InSAR 数据准备失败,请在数据阶段重试")
+            raise RuntimeError("InSAR 数据尚未准备,证据阶段不会触发 HyP3 下载")
         else:
             _trigger_insar_processing(t, project)   # 发起真实 InSAR 处理(不阻塞,状态由 svcstatus 代理)
     except Exception as e:
@@ -1453,6 +1585,10 @@ def _start_downloader(project_id: str, params: dict) -> dict:
     return {"service": "downloader", "task_id": task_id, "adapter": True, "sensors": task["sensor"]}
 
 
+_SENSOR_ZH = {"sentinel2": "Sentinel-2 光学", "sentinel1": "Sentinel-1 雷达",
+              "landsat": "Landsat", "dem": "DEM 高程", "aster": "ASTER"}
+
+
 def _downloader_status(task_id: str) -> dict:
     base = services.base_url("downloader")
     try:
@@ -1464,23 +1600,29 @@ def _downloader_status(task_id: str) -> dict:
     if not task:
         raise HTTPException(status_code=404, detail="downloader 任务不存在")
     raw = str(task.get("status") or "").lower()
+    prog_map = task.get("progress") or {}
+    # 分传感器明细:供前端 HUD 显示"正在下哪个传感器"(光学快、Sentinel-1 雷达单景上 GB 很慢)
+    sensors = []
+    for name, item in prog_map.items():
+        item = item or {}
+        ph = str(item.get("phase") or "")
+        sensors.append({"sensor": name, "label": _SENSOR_ZH.get(name, name),
+                        "phase": ph, "done": item.get("done"), "target": item.get("target"),
+                        "finished": ph == "done"})
+    active = next((s["label"] for s in sensors if not s["finished"]), "")
     if raw == "done":
         status, progress = "completed", 100
     elif raw in ("error", "failed", "stopped"):
         status, progress = "failed", 100
     else:
-        vals = []
-        for item in (task.get("progress") or {}).values():
-            try:
-                target = float(item.get("target") or 0)
-                done = float(item.get("done") or 0)
-                if target > 0:
-                    vals.append(min(100, max(0, done / target * 100)))
-            except Exception:
-                pass
-        progress = int(sum(vals) / len(vals)) if vals else 5
+        # 按"已完成传感器数 / 传感器总数"估算,running 封顶 95 —— 避免某些传感器
+        # target=0 或尚未登记目标(如 Sentinel-1 phase=start)时,被错算成 100% 的假象。
+        total = len(sensors)
+        done_cnt = sum(1 for s in sensors if s["finished"])
+        progress = min(95, int(done_cnt / total * 100)) if total else 5
         status = "running"
-    return {"status": status, "progress": progress, "raw": raw, "error": task.get("error")}
+    return {"status": status, "progress": progress, "raw": raw, "error": task.get("error"),
+            "sensors": sensors, "active_sensor": active}
 
 app = FastAPI(title="DeepExplor Portal BFF", version="0.1.0")
 
@@ -1489,10 +1631,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
+    expose_headers=["X-Raster-Scope", "X-Raster-Bounds", "X-Raster-Note"],
 )
 
 app.include_router(proxy_router)
 app.include_router(admin_router)
+app.include_router(public_router)
 
 
 def _new_trace_id() -> str:
@@ -1596,7 +1740,18 @@ class ProjectIn(BaseModel):
 
 @app.get("/api/projects")
 def get_projects(user=Depends(auth.current_user)):
-    return store.list_projects(user["tenant_id"], user["id"])
+    projects = store.list_projects(user["tenant_id"], user["id"])
+    for p in projects:
+        # 卡片进度取该项目【最远/最佳 run】(done 最多,并列再比 percent),反映"项目做到哪了";
+        # 新开的部分 run 不会让卡片看起来倒退。点卡片仍进当前在用的 run(current_run)。
+        runs = store.runs_for_project(p["id"]) if p.get("current_run") else []
+        best = None
+        for run in runs:
+            pr = summarize_progress(run.get("stages") or {})
+            if best is None or (pr["done"], pr["percent"]) > (best["done"], best["percent"]):
+                best = pr
+        p["progress"] = best
+    return projects
 
 
 @app.post("/api/projects")
@@ -1812,6 +1967,74 @@ def get_run(trace_id: str, user=Depends(auth.current_user)):
     return run
 
 
+def _datacolle_literature_points(literature_md: str, limit: int = 8) -> list:
+    """从 data-colle「论文要点提炼」markdown 抽取要点条目(保留 [n] 引用、剥离 markdown 噪声)。
+    取「### 论文清单」之前的 `- ` 项;纯字符串、空安全返回 []。"""
+    if not literature_md:
+        return []
+    head = literature_md.split("### 论文清单", 1)[0]
+    pts = []
+    for raw in head.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith(">") or line.startswith("---"):
+            continue
+        if not (line.startswith("- ") or line.startswith("· ") or line.startswith("* ")):
+            continue
+        line = line.lstrip("-·* ").replace("**", "").strip()
+        if line:
+            pts.append(line)
+        if len(pts) >= limit:
+            break
+    return pts
+
+
+@app.get("/api/runs/{trace_id}/datacolle-evidence")
+def get_datacolle_evidence(trace_id: str, user=Depends(auth.current_user)):
+    """证据链叙事面板用:本 ROI 的 data-colle 成矿模型+文献佐证
+    (best_model / pathfinder / 论文要点[n] / 文献清单)。经 datacolle_broker 按 bbox
+    (+trace/tenant)发现;无产物则 available=False(面板静默不出该卡)。"""
+    run = store.get_run(trace_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="运行不存在")
+    auth.require_project_read(user, run["project_id"])
+    proj = store.get_project(run["project_id"]) or {}
+    bbox = _as_bbox(proj.get("aoi_bbox"))
+    if not bbox:
+        return {"available": False}
+    try:
+        import sys as _sys
+        if "/opt/deepexplor-services" not in _sys.path:
+            _sys.path.insert(0, "/opt/deepexplor-services")
+        from commons.datacolle_broker import find_datacolle_for_bbox
+        entries = find_datacolle_for_bbox(tuple(bbox), _DC_DIR + "/output",
+                                          trace_id=trace_id, tenant_id=run.get("tenant_id"))
+    except Exception:
+        return {"available": False}
+    if not entries:
+        return {"available": False}
+    e = entries[0]
+    met = e.get("metallogenic") or {}
+    papers = []
+    for i, p in enumerate((e.get("papers") or [])[:12], 1):
+        if not isinstance(p, dict):
+            continue
+        authors = p.get("authors") or []
+        author = (authors[0] + (" 等" if len(authors) > 1 else "")) if authors else ""
+        papers.append({"n": i, "author": author, "year": p.get("year"),
+                       "title": p.get("title") or "", "cited_by": p.get("cited_by"),
+                       "doi": p.get("doi") or p.get("url") or ""})
+    lit = (e.get("sections") or {}).get("literature", "")
+    return {
+        "available": bool(met.get("best_model") or papers or lit),
+        "aoi_name": e.get("aoi_name"),
+        "best_model": met.get("best_model"),
+        "model_count": met.get("model_count"),
+        "pathfinder_elements": met.get("pathfinder_elements") or [],
+        "papers": papers,
+        "literature_points": _datacolle_literature_points(lit),
+    }
+
+
 class StagePatch(BaseModel):
     stage: str
     patch: dict
@@ -2005,7 +2228,12 @@ def start_service(trace_id: str, body: StartIn, user=Depends(auth.current_user))
         elif body.service == "geophys":
             th = threading.Thread(target=_adapter_thread, args=(_run_geophys, tid, kml_bytes, kml_name, proj["mineral"], tenant_id), daemon=True)
         elif body.service == "insar":
-            th = threading.Thread(target=_adapter_thread, args=(_run_insar, tid, kml_name, proj), daemon=True)
+            params = body.params or {}
+            phase = str(params.get("phase") or params.get("stage") or "").lower()
+            allow_trigger = phase == "data"
+            _ADAPTER_TASKS[tid]["phase"] = "data" if allow_trigger else "evidence"
+            data_task = (((run.get("stages") or {}).get("data") or {}).get("sub_tasks") or {}).get("insar") or {}
+            th = threading.Thread(target=_adapter_thread, args=(_run_insar, tid, kml_name, proj, allow_trigger, data_task), daemon=True)
         else:
             th = threading.Thread(target=_adapter_thread, args=(_run_reporter, tid, kml_bytes, kml_name, proj.get("mineral_label") or proj["mineral"], tenant_id), daemon=True)
         th.start()
@@ -2026,35 +2254,49 @@ def start_service(trace_id: str, body: StartIn, user=Depends(auth.current_user))
     return {"service": body.service, "task_id": task_id, "bbox": j.get("bbox")}
 
 
-# 数据阶段的"同步必需"服务(InSAR 异步,不计入完成判定)
-_DATA_SYNC_SERVICES = {"downloader", "datacolle", "preprocess"}
+# 数据阶段的必需服务。InSAR 一旦被编排选中,必须在数据阶段完成或明确无可叠加栅格。
+_DATA_SYNC_SERVICES = {"downloader", "datacolle", "preprocess", "insar"}
 
 
 def _reconcile_data_stage(trace_id: str, run: dict, service: str, result: dict) -> None:
-    """后端兜底:数据同步服务真正完成时,把 stages.data 子任务/状态持久化,不依赖前端 finishData。
+    """后端兜底:把真实数据服务状态写回 stages.data。
 
-    安全:仅当服务回报 status=='completed'(下载/资料确实就绪)才标记;InSAR 等异步服务不计入。
-    所有必需同步服务完成 → 主动把 stages.data 标 completed(证据门据此解锁,刷新/换设备也保持)。
+    InSAR 在这里被当作数据准备任务处理:未完成不放行,完成但 no_layer 也算数据已给出终态。
     """
     try:
-        if service not in _DATA_SYNC_SERVICES or str(result.get("status")) != "completed":
+        status = str((result or {}).get("status") or "").lower()
+        if service not in _DATA_SYNC_SERVICES or status not in ("running", "completed", "failed", "skipped"):
             return
         data = (run.get("stages") or {}).get("data") or {}
-        if data.get("status") == "completed":
-            return
         subs = dict(data.get("sub_tasks") or {})
         cur = dict(subs.get(service) or {})
-        if cur.get("status") == "completed":
-            return  # 已记录,避免每次轮询重复写库
-        cur["status"] = "completed"
+        cur["status"] = status
+        cur["progress"] = int((result or {}).get("progress") or (100 if status in ("completed", "skipped") else cur.get("progress") or 0))
+        cur["required"] = True
+        if (result or {}).get("task_id") or cur.get("task_id"):
+            cur["task_id"] = (result or {}).get("task_id") or cur.get("task_id")
+        for key in ("error", "warning", "note", "no_layer", "layer", "raw", "sensors", "active_sensor", "insar_task_id", "insar_aoi", "insar_stack_index"):
+            if key in (result or {}):
+                cur[key] = result.get(key)
         subs[service] = cur
         planned = set(data.get("services") or [])
         required = (planned & _DATA_SYNC_SERVICES) or {service}
-        all_done = all((subs.get(s) or {}).get("status") in ("completed", "skipped") for s in required)
         patch = {"sub_tasks": subs}
-        if all_done:
+        if status == "failed":
+            patch["status"] = "failed"
+            patch["progress"] = cur.get("progress") or 0
+            patch["error"] = cur.get("error") or result.get("error") or f"{service} 数据准备失败"
+        elif any((subs.get(s) or {}).get("status") == "failed" for s in required):
+            patch["status"] = "failed"
+            patch["progress"] = min(99, int(data.get("progress") or cur.get("progress") or 0))
+        elif all((subs.get(s) or {}).get("status") in ("completed", "skipped") for s in required):
             patch["status"] = "completed"
             patch["progress"] = 100
+            patch["error"] = ""
+        else:
+            patch["status"] = "running"
+            vals = [int((subs.get(s) or {}).get("progress") or 0) for s in required if (subs.get(s) or {}).get("status") != "skipped"]
+            patch["progress"] = min(99, int(sum(vals) / len(vals))) if vals else int(data.get("progress") or 0)
         store.update_stage(trace_id, "data", patch)
     except Exception:
         pass  # 兜底逻辑不得影响 svcstatus 正常返回
@@ -2079,6 +2321,10 @@ def service_status(trace_id: str, service: str, task_id: str, user=Depends(auth.
     if t and t.get("insar_task_id") and t.get("status") not in ("completed", "failed"):
         t = _refresh_insar(task_id, t)
     if t:
+        if service == "insar" and t.get("phase") == "data":
+            rec = dict(t)
+            rec["task_id"] = task_id
+            _reconcile_data_stage(trace_id, run, service, rec)
         return {
             "status": t.get("status"),
             "progress": t.get("progress"),
@@ -2087,6 +2333,7 @@ def service_status(trace_id: str, service: str, task_id: str, user=Depends(auth.
             "download": t.get("download"),
             "warning": t.get("warning"),
             "note": t.get("note"),
+            "no_layer": t.get("no_layer"),
         }
     # 仍找不到且是适配器 id → BFF 重启时正在跑、未落库的孤儿任务 → 报 failed,前端给重试入口。
     if "_bff_" in task_id:
@@ -2096,12 +2343,14 @@ def service_status(trace_id: str, service: str, task_id: str, user=Depends(auth.
         raise HTTPException(status_code=404, detail=f"未知服务: {service}")
     if service == "downloader":
         res = _downloader_status(task_id)
+        res["task_id"] = task_id   # 确保 task_id 落库,供重开后续接轮询
         _reconcile_data_stage(trace_id, run, service, res)   # 后端兜底:真完成则持久化 stages.data
         return res
     url = f"{services.base_url(service)}/api/status/{task_id}"
     try:
         with httpx.Client(timeout=30.0, headers=_internal_headers()) as c:
             res = _norm_status(c.get(url).json())
+        res["task_id"] = task_id   # 确保 task_id 落库,供重开后续接轮询
         _reconcile_data_stage(trace_id, run, service, res)   # 后端兜底:datacolle/preprocess 完成同理
         return res
     except (httpx.ConnectError, httpx.ReadTimeout, ValueError):
@@ -2127,32 +2376,116 @@ def adapter_raster(task_id: str, project_id: str = "", user=Depends(auth.current
             raise HTTPException(status_code=404, detail="栅格文件不存在")
         if project_id:
             with open(layer["path"], "rb") as f:
-                content = _clip_tif_to_project_bytes(f.read(), project_id)
-            return Response(content=content, media_type="image/tiff")
+                content, meta = _clip_tif_to_project_bytes(f.read(), project_id)
+            return Response(content=content, media_type="image/tiff", headers=_raster_scope_headers(meta))
         return FileResponse(layer["path"], media_type="image/tiff")
     if layer["kind"] == "proxy":
         url = f"{services.base_url(layer['service'])}/api/result/{layer['task']}/{layer['rel']}"
         try:
             with httpx.Client(timeout=60.0, headers=_internal_headers()) as c:
                 r = c.get(url)
-            content = _clip_tif_to_project_bytes(r.content, project_id) if project_id else r.content
-            return Response(content=content, media_type="image/tiff")
+            if project_id:
+                content, meta = _clip_tif_to_project_bytes(r.content, project_id)
+            else:
+                content, meta = r.content, {"scope": "native", "bounds": None}
+            return Response(content=content, media_type="image/tiff", headers=_raster_scope_headers(meta))
         except httpx.ConnectError:
             raise HTTPException(status_code=503, detail="服务不可达")
     raise HTTPException(status_code=404, detail="未知栅格类型")
+
+
+def _raster_scope_headers(meta: dict) -> dict:
+    """把裁剪结果的 scope/bounds 放进响应头,供前端按真实范围摆放 + 标注"区域级"。"""
+    meta = meta or {}
+    # 注意:HTTP 头必须 latin-1,不能放中文。文案由前端按 scope 自行渲染。
+    h = {"X-Raster-Scope": str(meta.get("scope") or "aoi")}
+    b = meta.get("bounds")
+    if b and len(b) == 4:
+        h["X-Raster-Bounds"] = ",".join(f"{float(x):.6f}" for x in b)
+    return h
+
+
+def _reporter_norm_kml_name(name: str) -> str:
+    base = os.path.basename(str(name or "").strip())
+    return re.sub(r"^[0-9a-fA-F]{6,16}_", "", base)
+
+
+def _reporter_find_completed_download(c: httpx.Client, base: str, rid: str, fmt: str) -> Optional[str]:
+    """历史任务可能把 upload-kml 的 task_id 当作完成报告;按同 KML/区域寻找真实完成任务。"""
+    try:
+        status_resp = c.get(f"{base}/api/status/{rid}")
+        stale = status_resp.json() if status_resp.status_code < 500 else {}
+    except Exception:
+        stale = {}
+    try:
+        tasks_resp = c.get(f"{base}/api/tasks")
+        payload = tasks_resp.json()
+    except Exception:
+        return None
+    tasks = payload.get("tasks") if isinstance(payload, dict) else payload
+    if not isinstance(tasks, list):
+        return None
+    need_key = "has_pptx" if fmt == "pptx" else "has_report"
+    stale_kml = _reporter_norm_kml_name((stale or {}).get("kml_name"))
+    stale_area = str((stale or {}).get("area_name") or "").strip()
+    ranked = []
+    for item in tasks:
+        if not isinstance(item, dict):
+            continue
+        tid = str(item.get("task_id") or "").strip()
+        if not tid or tid == rid:
+            continue
+        if item.get("status") != "completed" and not item.get(need_key):
+            continue
+        if not item.get(need_key):
+            continue
+        score = 0
+        cand_kml = _reporter_norm_kml_name(item.get("kml_name"))
+        cand_area = str(item.get("area_name") or "").strip()
+        if stale_kml and cand_kml == stale_kml:
+            score += 80
+        if stale_area and cand_area == stale_area:
+            score += 40
+        elif stale_area and cand_area and (stale_area in cand_area or cand_area in stale_area):
+            score += 12
+        if score <= 0:
+            continue
+        ranked.append((score, str(item.get("completed_at") or item.get("created_at") or ""), tid))
+    if not ranked:
+        return None
+    ranked.sort(reverse=True)
+    return ranked[0][2]
+
+
+def _remember_reporter_download(task_id: str, task: dict, rid: str) -> None:
+    download = {
+        "service": "reporter",
+        "task": rid,
+        "docx": f"api/download/{rid}",
+        "pptx": f"api/download/{rid}?format=pptx",
+    }
+    task["download"] = download
+    task["reporter_task_id"] = rid
+    _ADAPTER_TASKS[task_id] = task
+    try:
+        store.save_adapter_task(task_id, task)
+    except Exception:
+        pass
 
 
 @app.get("/api/adapter-report/{task_id}")
 def adapter_report(task_id: str, fmt: str = "docx", user=Depends(auth.current_user)):
     """适配器(reporter)产出的报告下载代理。"""
     t = _ADAPTER_TASKS.get(task_id)
-    if t is None:
-        try:
-            t = store.get_adapter_task(task_id)
-            if t is not None:
-                _ADAPTER_TASKS[task_id] = t
-        except Exception:
-            t = None
+    try:
+        persisted = store.get_adapter_task(task_id)
+        if persisted is not None:
+            # 下载链接可能被运维修正到磁盘可恢复的 reporter 历史任务。
+            # 优先使用持久化记录，避免进程内旧 _ADAPTER_TASKS 指向已失效的 upload-only task。
+            t = persisted
+            _ADAPTER_TASKS[task_id] = persisted
+    except Exception:
+        pass
     dl = (t or {}).get("download") or {}
     rid = dl.get("task")
     if not rid:
@@ -2160,11 +2493,23 @@ def adapter_report(task_id: str, fmt: str = "docx", user=Depends(auth.current_us
     rel = dl.get("pptx" if fmt == "pptx" else "docx")
     if not rel:
         raise HTTPException(status_code=404, detail="未知报告格式")
-    url = f"{services.base_url('reporter')}/{rel}"
+    base = services.base_url("reporter")
+    url = f"{base}/{rel}"
     try:
         with httpx.Client(timeout=300.0, headers=_internal_headers()) as c:
             r = c.get(url)
+            if r.status_code >= 400:
+                fallback_rid = _reporter_find_completed_download(c, base, str(rid), fmt)
+                if fallback_rid:
+                    _remember_reporter_download(task_id, t or {}, fallback_rid)
+                    rel = f"api/download/{fallback_rid}" + ("?format=pptx" if fmt == "pptx" else "")
+                    r = c.get(f"{base}/{rel}")
         if r.status_code >= 400:
+            # 走到这里:原任务产物 404 且未在 reporter 找到可恢复的同区完成任务。
+            # 多半是 reporter 重启丢了已生成报告(任务退回 kml_uploaded),给出可操作提示。
+            if r.status_code == 404:
+                raise HTTPException(status_code=404,
+                                    detail="报告产物已丢失(reporter 服务可能已重启),请在报告环节点击「重新生成报告」后再下载")
             raise HTTPException(status_code=r.status_code, detail=r.text[:300] or "报告下载失败")
         media = (
             "application/vnd.openxmlformats-officedocument.presentationml.presentation"
