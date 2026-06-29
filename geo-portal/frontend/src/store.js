@@ -4,6 +4,9 @@ import { setAccessToken } from './api/client'
 import { STAGES, EVIDENCES, DEFAULT_SOURCE_KEYS, ALL_EVIDENCE_KEYS, SOURCE_SERVICES } from './lib/stages'
 import { loadSliceTexture, loadEvidenceRaster } from './lib/sliceTexture'
 
+// 正在轮询的任务键集合(traceId:stage:taskId),防止"重开续接"重复起轮询
+const _activePolls = new Set()
+
 // ── 认证 ──
 // access token 存内存(client.js),refresh 是 HttpOnly cookie。
 // 刷新页面后内存丢失 → boot() 用 refresh cookie 静默换回 access。
@@ -49,10 +52,18 @@ export const useProject = create((set, get) => ({
   projects: [],
   current: null,        // 当前项目
   traceId: null,        // 当前运行主键
+  manualEvidence: [],   // 手工提交证据(项目级,预留入口)
   async refresh() { set({ projects: await api.listProjects() }) },
+  async loadManualEvidence(projectId) {
+    const id = projectId || get().current?.id
+    if (!id) return
+    try { set({ manualEvidence: await api.listManualEvidence(id) }) }
+    catch { set({ manualEvidence: [] }) }
+  },
   async open(id) {
     const p = await api.getProject(id)
-    set({ current: p, traceId: p.current_run || null })
+    set({ current: p, traceId: p.current_run || null, manualEvidence: [] })
+    get().loadManualEvidence(id).catch(() => {})
     if (p.current_run) {
       try {
         const run = await api.getRun(p.current_run)
@@ -905,12 +916,19 @@ export const useWorkflow = create((set, get) => ({
   // 轮询一个【已启动】的任务直到终态(不再 startSvc),供 runStageReal 与"重开续接"复用。
   pollStage(traceId, id, service, taskId, { onDone } = {}) {
     const { setStage } = get()
+    const key = `${traceId}:${id}:${taskId}`
+    if (_activePolls.has(key)) return   // 已在轮询同一任务 → 幂等,避免重开续接时重复
+    _activePolls.add(key)
+    const stop = () => _activePolls.delete(key)
     setStage(id, { status: 'running', taskId })
+    // 持久化"运行中+taskId":离开项目空间再回来时 hydrate 不会把它重置成 pending,可续接轮询。
+    // 仅对 report 开启(它有重开续接;data 走自己的 sub_tasks;model3d/drill 无续接,持久化会卡住反成回归)。
+    if (traceId && id === 'report') api.patchStage(traceId, id, { status: 'running', progress: get().stages[id]?.progress || 3, taskId }).catch(() => {})
     const useSynth = service !== 'insar' && service !== 'downloader'  // 下载用真实分传感器进度,不再假性爬条
     const interval = service === 'insar' ? 8000 : 1600
     let synth = Math.max(3, get().stages[id]?.progress || 3)
     const poll = async () => {
-      if (get().stages[id]?.status !== 'running') return
+      if (get().stages[id]?.status !== 'running' || get().stages[id]?.taskId !== taskId) { stop(); return }
       if (useSynth) synth = Math.min(92, synth + 7)
       let done = false, failed = false, realp = 0, errMsg = '', download = null, warning = '', note = '', noLayer = false, sensors = null, active = ''
       try {
@@ -938,7 +956,7 @@ export const useWorkflow = create((set, get) => ({
         }
         if (service === 'model3d') { try { await get().loadModel3dResults(taskId) } catch {} }
         if (service === 'drill') { try { await get().loadDrillResults(taskId) } catch {} }
-        onDone && onDone(); return
+        stop(); onDone && onDone(); return
       }
       if (failed) {
         if (id === 'data') {
@@ -948,7 +966,7 @@ export const useWorkflow = create((set, get) => ({
           api.patchStage(traceId, 'data', { sub_tasks: subs }).catch(() => {})
         }
         setStage(id, { status: 'failed', error: errMsg })
-        return
+        stop(); return
       }
       const progress = useSynth ? Math.max(synth, realp) : Math.max(10, realp)
       if (id === 'data') {

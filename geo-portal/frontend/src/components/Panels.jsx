@@ -4,6 +4,7 @@ import { useWorkflow, useProject, dataSourcesFromPlan } from '../store'
 import { EVIDENCES, DATA_SOURCES, SOURCE_FEEDS, SOURCE_SERVICES, evidenceDoneCount, EVIDENCE_GATE, isUnlocked, evidencePlanGateDetails } from '../lib/stages'
 import { buildEvidenceRows, stageTrace, statusText, statusTone } from '../lib/evidenceChain'
 import { buildProjectSummary } from '../lib/geologyNarrative'
+import ManualEvidence from './ManualEvidence'
 import * as api from '../api/portal'
 
 // 可勾选 chip
@@ -323,6 +324,7 @@ function PlanPanel() {
           </div>
         </div>
       ))}
+      <ManualEvidenceSection />
       <div style={{ marginTop: 6, color: 'var(--mut)', fontSize: 12 }}>参与证据分析</div>
       <div className="chips">
         {EVIDENCES.map((e) => (
@@ -332,6 +334,22 @@ function PlanPanel() {
       <button className="pbtn" disabled={!activeEvidence.length} onClick={generate}>
         {activeEvidence.length ? '▶ 生成编排单并进入数据准备' : '至少选 1 项证据'}
       </button>
+    </div>
+  )
+}
+
+// 数据准备里的「手工提交证据」折叠区(默认收起,标题带已交计数)
+function ManualEvidenceSection() {
+  const items = useProject((s) => s.manualEvidence)
+  const [open, setOpen] = useState(false)
+  const n = (items || []).length
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div onClick={() => setOpen(!open)}
+        style={{ cursor: 'pointer', fontSize: 12, color: 'var(--cy)', userSelect: 'none' }}>
+        {open ? '▾' : '▸'} 手工提交证据 / 靶向超弱核磁{n ? `(已交 ${n})` : '(预留)'}
+      </div>
+      {open && <ManualEvidence />}
     </div>
   )
 }
@@ -452,6 +470,7 @@ function DataPanel() {
       <div className="kv" style={{ marginTop: 6 }}><span>遥感源</span><b>{rs.length} 项</b></div>
       <div className="kv"><span>InSAR 数据</span><b>{insar.length ? `${insar.length} 项` : '未选'}</b></div>
       <div className="kv"><span>data-colle 资料</span><b>{dc.length ? `${dc.length} 项(物探/化探)` : '未选'}</b></div>
+      <ManualEvidenceSection />
       <StageTrace active="data" />
       {st.status === 'completed' && !dataIncomplete ? (
         <button className="pbtn" onClick={enterEvidence}>{evidencePlan ? '进入 2D 证据 →' : '生成证据编排 →'}</button>
@@ -774,6 +793,12 @@ function ReportHud() {
   const st = stages.report || {}
   const reportTaskId = st.taskId || st.sub_tasks?.reporter?.task_id
   const [reportDownloading, setReportDownloading] = useState('')
+  // 重开续接:报告生成中离开再回来,接回轮询(BFF 仍在后台生成),不必重新生成。pollStage 幂等。
+  useEffect(() => {
+    if (st.status === 'running' && reportTaskId && traceId) {
+      useWorkflow.getState().pollStage(traceId, 'report', 'reporter', reportTaskId, { onDone: () => syncStage(traceId, 'report') })
+    }
+  }, [st.status, reportTaskId, traceId])
   const rows = buildEvidenceRows(evidences, selectedEvidence)
   const summary = useProjectSummary(rows)
   const downloadReport = async (fmt = 'docx') => {

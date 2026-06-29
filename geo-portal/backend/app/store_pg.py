@@ -334,6 +334,43 @@ def count_pending_applications_by_email(email: str) -> int:
             db.AccountApplication.status == "pending")).all())
 
 
+# ─── 手工提交证据(项目级资产) ─────────────────────────────
+def add_manual_evidence(project_id: str, category: str, label: str, filename: str,
+                        path: str, size: int = 0, note: str = "", uploaded_by: str = "") -> dict:
+    with db.Session() as s:
+        mid = _new_id("me")
+        m = db.ManualEvidence(id=mid, project_id=project_id, category=category, label=label,
+                              filename=filename, path=path, size=int(size or 0), note=note,
+                              uploaded_by=uploaded_by, created_at=_now())
+        s.add(m)
+        s.commit()
+        return m.as_dict()
+
+
+def list_manual_evidence(project_id: str) -> list:
+    with db.Session() as s:
+        rows = [m.as_dict() for m in s.scalars(
+            select(db.ManualEvidence).where(db.ManualEvidence.project_id == project_id))]
+        return sorted(rows, key=lambda x: x["created_at"], reverse=True)
+
+
+def get_manual_evidence(me_id: str):
+    with db.Session() as s:
+        m = s.get(db.ManualEvidence, me_id)
+        return m.as_dict() if m else None
+
+
+def delete_manual_evidence(me_id: str):
+    with db.Session() as s:
+        m = s.get(db.ManualEvidence, me_id)
+        if not m:
+            return None
+        rec = m.as_dict()
+        s.delete(m)
+        s.commit()
+        return rec
+
+
 def create_tenant(name: str, quota_gb: int = 0) -> dict:
     with db.Session() as s:
         tid = _new_id("t")

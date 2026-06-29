@@ -72,6 +72,21 @@ export const uploadKml = (projectId, file) => {
   fd.append('file', file)
   return client.post(`/api/projects/${projectId}/kml`, fd).then((r) => r.data)
 }
+// ── 手工提交证据(预留入口:物探/化探/历史钻孔/靶向超弱核磁)──
+export const listManualEvidence = (projectId) =>
+  client.get(`/api/projects/${projectId}/manual-evidence`).then((r) => r.data)
+export const uploadManualEvidence = (projectId, category, file, note = '') => {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('category', category)
+  if (note) fd.append('note', note)
+  return client.post(`/api/projects/${projectId}/manual-evidence`, fd).then((r) => r.data)
+}
+export const deleteManualEvidence = (projectId, meId) =>
+  client.delete(`/api/projects/${projectId}/manual-evidence/${meId}`).then((r) => r.data)
+export const downloadManualEvidence = (projectId, meId) =>
+  client.get(`/api/projects/${projectId}/manual-evidence/${meId}/file`, { responseType: 'blob' }).then((r) => r.data)
+
 export const listDeliveries = () => client.get('/api/deliveries').then((r) => r.data)
 export const bindDelivery = (projectId, deliveryId) =>
   client.post(`/api/projects/${projectId}/delivery`, { delivery_id: deliveryId }).then((r) => r.data)

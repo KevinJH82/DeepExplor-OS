@@ -39,6 +39,7 @@ def _seed() -> dict:
         "runs": {},           # trace_id -> run
         "refresh_tokens": {}, # jti -> {user_id, expires_at, revoked}
         "account_applications": {},  # app_id -> 开户申请
+        "manual_evidence": {},       # me_id -> 手工提交证据
     }
 
 
@@ -57,6 +58,7 @@ def _load() -> dict:
     db.setdefault("refresh_tokens", {})
     db.setdefault("audit_log", [])
     db.setdefault("account_applications", {})
+    db.setdefault("manual_evidence", {})
     return db
 
 
@@ -443,6 +445,41 @@ def count_pending_applications_by_email(email: str) -> int:
     with _lock:
         rows = (_load().get("account_applications", {}) or {}).values()
     return sum(1 for a in rows if a.get("email") == email and a.get("status") == "pending")
+
+
+# ─── 手工提交证据(项目级资产) ─────────────────────────────
+def add_manual_evidence(project_id: str, category: str, label: str, filename: str,
+                        path: str, size: int = 0, note: str = "", uploaded_by: str = "") -> dict:
+    with _lock:
+        db = _load()
+        mid = _new_id("me")
+        m = {"id": mid, "project_id": project_id, "category": category, "label": label,
+             "filename": filename, "path": path, "size": int(size or 0), "note": note,
+             "uploaded_by": uploaded_by, "created_at": _now()}
+        db.setdefault("manual_evidence", {})[mid] = m
+        _save(db)
+        return m
+
+
+def list_manual_evidence(project_id: str) -> list:
+    with _lock:
+        rows = [m for m in (_load().get("manual_evidence", {}) or {}).values()
+                if m.get("project_id") == project_id]
+    return sorted(rows, key=lambda x: x.get("created_at", ""), reverse=True)
+
+
+def get_manual_evidence(me_id: str):
+    with _lock:
+        return (_load().get("manual_evidence", {}) or {}).get(me_id)
+
+
+def delete_manual_evidence(me_id: str):
+    with _lock:
+        db = _load()
+        rec = db.get("manual_evidence", {}).pop(me_id, None)
+        if rec is not None:
+            _save(db)
+        return rec
 
 
 # ─── refresh token 吊销表(jti) ─────────────────────────────

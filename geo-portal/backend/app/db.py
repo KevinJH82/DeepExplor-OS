@@ -189,6 +189,28 @@ class AccountApplication(Base):
                 "created_user_id": self.created_user_id}
 
 
+class ManualEvidence(Base):
+    """手工提交的外部证据(地质图/电法/磁法/航磁/重力/历史钻孔/靶向超弱核磁)。
+    项目级资产(跨多次 run 复用);本期仅留存+在证据链标注"待融合",不参与融合算法。"""
+    __tablename__ = "manual_evidence"
+    id: Mapped[str] = mapped_column(String, primary_key=True)        # me_xxxxxxxxxx
+    project_id: Mapped[str] = mapped_column(String, ForeignKey("projects.id"), index=True)
+    category: Mapped[str] = mapped_column(String, index=True)        # geological_map/electrical/magnetic/aeromagnetic/gravity/historical_drill/nmr_weak
+    label: Mapped[str] = mapped_column(String, default="")           # 中文名(冗余,展示用)
+    filename: Mapped[str] = mapped_column(String)                    # 原始文件名
+    path: Mapped[str] = mapped_column(String)                        # 落盘路径(内部用)
+    size: Mapped[int] = mapped_column(BigInteger, default=0)
+    note: Mapped[str] = mapped_column(String, default="")
+    uploaded_by: Mapped[str] = mapped_column(String, default="")
+    created_at: Mapped[str] = mapped_column(String, index=True)
+
+    def as_dict(self):
+        return {"id": self.id, "project_id": self.project_id, "category": self.category,
+                "label": self.label, "filename": self.filename, "path": self.path,
+                "size": self.size or 0, "note": self.note or "",
+                "uploaded_by": self.uploaded_by or "", "created_at": self.created_at}
+
+
 _engine = None
 _Session = None
 

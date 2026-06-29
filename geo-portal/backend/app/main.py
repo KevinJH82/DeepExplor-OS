@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List
 import httpx
-from fastapi import FastAPI, Depends, HTTPException, Body, UploadFile, File, Cookie, Response, Request
+from fastapi import FastAPI, Depends, HTTPException, Body, UploadFile, File, Form, Cookie, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -1899,6 +1899,95 @@ async def upload_kml(project_id: str, file: UploadFile = File(...), user=Depends
     return {"ok": True, "filename": file.filename, "bbox": bbox, "points": len(pts),
             "delivery": {"id": deliv.get("delivery_id"), "name": deliv.get("delivery_name"),
                          "method": deliv.get("method"), "candidates": deliv.get("candidates") or []}}
+
+
+# ─── 手工提交证据(地质图/电法/磁法/航磁/重力/历史钻孔/靶向超弱核磁) ─────
+# 预留入口:本期仅留存 + 证据链标注"待融合",不进 evidence_plan / 不参与融合算法。
+_MANUAL_EV_CATS = {
+    "geological_map": "地质图", "electrical": "电法", "magnetic": "磁法",
+    "aeromagnetic": "航磁", "gravity": "重力", "historical_drill": "历史钻孔数据",
+    "nmr_weak": "靶向超弱核磁",  # 预留·未来强支撑
+}
+_MANUAL_DIR = store.DATA_DIR / "manual"
+_MANUAL_MAX_BYTES = 200 * 1024 * 1024   # 单文件 200MB 上限
+
+
+def _safe_name(name: str) -> str:
+    """去掉路径分隔与控制字符,防目录穿越;空则给默认名。"""
+    base = os.path.basename(str(name or "").replace("\\", "/")).strip()
+    base = re.sub(r"[^\w.\-()一-鿿 ]", "_", base)
+    return base[:160] or "file"
+
+
+def _pub_me(m: dict) -> dict:
+    """对外去掉绝对 path(仅内部用)。"""
+    return {k: v for k, v in (m or {}).items() if k != "path"}
+
+
+@app.post("/api/projects/{project_id}/manual-evidence")
+async def manual_evidence_upload(project_id: str, file: UploadFile = File(...),
+                                 category: str = Form(...), note: str = Form(""),
+                                 request: Request = None, user=Depends(auth.current_user)):
+    auth.require_project_write(user, project_id)
+    if category not in _MANUAL_EV_CATS:
+        raise HTTPException(status_code=400, detail=f"未知证据类别: {category}")
+    raw = await file.read()
+    if len(raw) > _MANUAL_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="文件过大(上限 200MB)")
+    if not raw:
+        raise HTTPException(status_code=400, detail="空文件")
+    ts = time.strftime("%Y%m%dT%H%M%S", time.gmtime())
+    fname = _safe_name(file.filename)
+    out_dir = _MANUAL_DIR / project_id / category
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"{ts}_{fname}"
+    out_path.write_bytes(raw)
+    rec = store.add_manual_evidence(project_id, category, _MANUAL_EV_CATS[category],
+                                    fname, str(out_path), len(raw),
+                                    (note or "").strip()[:500], user["id"])
+    store.write_audit("manual_evidence.add", actor_user_id=user["id"], tenant_id=user["tenant_id"],
+                      target_type="manual_evidence", target_id=rec["id"],
+                      details={"project_id": project_id, "category": category, "filename": fname},
+                      ip=(request.client.host if request and request.client else ""))
+    return _pub_me(rec)
+
+
+@app.get("/api/projects/{project_id}/manual-evidence")
+def manual_evidence_list(project_id: str, user=Depends(auth.current_user)):
+    auth.require_project_read(user, project_id)
+    return [_pub_me(m) for m in store.list_manual_evidence(project_id)]
+
+
+@app.delete("/api/projects/{project_id}/manual-evidence/{me_id}")
+def manual_evidence_delete(project_id: str, me_id: str, request: Request = None,
+                           user=Depends(auth.current_user)):
+    auth.require_project_write(user, project_id)
+    rec = store.get_manual_evidence(me_id)
+    if not rec or rec.get("project_id") != project_id:
+        raise HTTPException(status_code=404, detail="证据不存在")
+    store.delete_manual_evidence(me_id)
+    try:
+        os.unlink(rec.get("path"))
+    except OSError:
+        pass
+    store.write_audit("manual_evidence.delete", actor_user_id=user["id"], tenant_id=user["tenant_id"],
+                      target_type="manual_evidence", target_id=me_id,
+                      details={"project_id": project_id}, ip=(request.client.host if request and request.client else ""))
+    return {"ok": True}
+
+
+@app.get("/api/projects/{project_id}/manual-evidence/{me_id}/file")
+def manual_evidence_file(project_id: str, me_id: str, user=Depends(auth.current_user)):
+    auth.require_project_read(user, project_id)
+    rec = store.get_manual_evidence(me_id)
+    if not rec or rec.get("project_id") != project_id:
+        raise HTTPException(status_code=404, detail="证据不存在")
+    path = rec.get("path")
+    if not path or not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="文件已不存在")
+    fn = urllib.parse.quote(rec.get("filename") or "evidence")
+    return FileResponse(path, filename=rec.get("filename") or "evidence",
+                        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fn}"})
 
 
 class DeliveryBindIn(BaseModel):

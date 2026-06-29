@@ -40,6 +40,18 @@ export const DATA_SOURCES = [
   ] },
 ]
 
+// 手工提交证据类别(预留入口;与后端 _MANUAL_EV_CATS 一致)。本期仅留存+标注"待融合"。
+export const MANUAL_EVIDENCE_TYPES = [
+  { key: 'geological_map', label: '地质图' },
+  { key: 'electrical', label: '电法' },
+  { key: 'magnetic', label: '磁法' },
+  { key: 'aeromagnetic', label: '航磁' },
+  { key: 'gravity', label: '重力' },
+  { key: 'historical_drill', label: '历史钻孔数据' },
+]
+// 预留:靶向超弱核磁(未来作为强支撑证据融入证据链)
+export const NMR_RESERVED = { key: 'nmr_weak', label: '靶向超弱核磁' }
+
 const _SRC_ITEMS = DATA_SOURCES.flatMap((g) => g.items)
 export const SOURCE_ITEMS = _SRC_ITEMS
 export const SOURCE_SERVICES = Object.fromEntries(_SRC_ITEMS.map((i) => [i.key, i.service || 'datacolle']))
