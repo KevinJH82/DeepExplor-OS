@@ -438,7 +438,8 @@ class ReportBuilder:
 
     def build_report(self, location: LocationContext, search_results: Dict[str, SearchResult],
                      output_name: str = None, mineral_type: str = "",
-                     target_figure=None, confidence: dict = None, tenant_id: str = None) -> str:
+                     target_figure=None, confidence: dict = None, tenant_id: str = None,
+                     econ_params: dict = None) -> str:
         """
         生成完整的地质勘探报告。
 
@@ -510,8 +511,11 @@ class ReportBuilder:
         self._add_paragraph(doc, f"研究区位于 {location.location_str}，坐标范围为：{location.coords_str}。")
 
         self._add_heading(doc, "1.2 行政区划", level=2)
-        admin_text = f"国家：{location.country}；省份：{location.province or '未确定'}；城市：{location.city or '未确定'}；区县：{location.district or '未确定'}。"
-        self._add_paragraph(doc, admin_text)
+        # 未确定的行政字段不显示(不以"未确定"占位)
+        _admin = [(k, v) for k, v in (("国家", location.country), ("省份", location.province),
+                                      ("城市", location.city), ("区县", location.district)) if v and str(v).strip()]
+        admin_text = "；".join(f"{k}：{str(v).strip()}" for k, v in _admin) + ("。" if _admin else "")
+        self._add_paragraph(doc, admin_text or "行政区划信息暂略。")
 
         self._add_heading(doc, "1.3 地质背景", level=2)
         if location.kml_description:
@@ -684,13 +688,32 @@ class ReportBuilder:
         output_path = self.output_dir / f"{output_name}.docx"
         doc.save(str(output_path))
 
-        # 同时生成 PPT 演示文稿
+        # 同时生成 PPT 演示文稿(旧版)
         from .pptx_builder import PptxBuilder
         pptx_builder = PptxBuilder(str(self.output_dir))
         pptx_path = pptx_builder.build_pptx(location, search_results, output_name, mineral_type,
                                             target_figure=target_figure, confidence=confidence)
 
-        return str(output_path), pptx_path
+        # 新旧并存:再生成新版(融合论证式)docx + pptx;任一失败不影响旧版与彼此
+        v2_docx = v2_pptx = None
+        try:
+            from .report_builder_v2 import ReportBuilderV2
+            v2_docx = ReportBuilderV2(str(self.output_dir)).build_report_v2(
+                location, search_results, output_name, mineral_type,
+                target_figure=target_figure, confidence=confidence, tenant_id=tenant_id,
+                econ_params=econ_params)
+        except Exception as e:
+            print(f"[report_v2] 新版 docx 生成失败(不影响旧版): {e}")
+        try:
+            from .pptx_builder_v2 import PptxBuilderV2
+            v2_pptx = PptxBuilderV2(str(self.output_dir)).build_pptx_v2(
+                location, search_results, output_name, mineral_type,
+                target_figure=target_figure, confidence=confidence, econ_params=econ_params)
+        except Exception as e:
+            print(f"[report_v2] 新版 pptx 生成失败(不影响旧版): {e}")
+
+        # 返回 4 文件:旧版 docx/pptx + 新版 docx/pptx(新版可能为 None)
+        return str(output_path), pptx_path, v2_docx, v2_pptx
 
     @staticmethod
     def _num_to_chinese(num: int) -> str:

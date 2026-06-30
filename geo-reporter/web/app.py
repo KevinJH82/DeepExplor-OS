@@ -258,6 +258,15 @@ def upload_kml():
     try:
         file.save(str(upload_path))
         geometry, bbox, name, area_name, description = _parse_uploaded_file(str(upload_path))
+        # 可选:随 KML 一并上传经济参数(JSON 字符串),供新版报告价值评估章(Phase C)
+        econ_params = None
+        try:
+            _ep = request.form.get("econ_params")
+            if _ep:
+                import json as _json
+                econ_params = _json.loads(_ep)
+        except Exception:
+            econ_params = None
         tasks[task_id] = {
             "task_code": task_code,
             "status": "kml_uploaded",
@@ -268,6 +277,7 @@ def upload_kml():
             "name": name,
             "area_name": area_name,
             "description": description,
+            "econ_params": econ_params,
             "created_at": datetime.now().isoformat()
         }
         return jsonify({
@@ -407,7 +417,7 @@ def run_report_generation(task_id: str):
                 return report_builder.build_report(
                     location, search_results, output_name=task["area_name"],
                     mineral_type=mineral_type, target_figure=target_figure, confidence=confidence,
-                    tenant_id=tenant_id)
+                    tenant_id=tenant_id, econ_params=task.get("econ_params"))
 
             yield from pump_keepalive(_do_build, build_box)
             if "error" in build_box:
@@ -415,12 +425,19 @@ def run_report_generation(task_id: str):
                 task["error"] = str(build_box["error"])
                 yield ev({'error': f'Report generation failed: {build_box["error"]}'})
                 return
-            report_path, pptx_path = build_box["result"]
+            _res = build_box["result"]
+            # 兼容旧 2 元组与新 4 元组(旧版docx, 旧版pptx, 新版docx, 新版pptx)
+            report_path, pptx_path = _res[0], _res[1]
+            report_path_v2 = _res[2] if len(_res) > 2 else None
+            pptx_path_v2 = _res[3] if len(_res) > 3 else None
             task["report_path"] = report_path
             task["pptx_path"] = pptx_path
+            task["report_path_v2"] = report_path_v2
+            task["pptx_path_v2"] = pptx_path_v2
             task["status"] = "completed"
             task["completed_at"] = datetime.now().isoformat()
-            yield ev({'step': 5, 'message': '报告生成完成！', 'report_path': report_path, 'pptx_path': pptx_path})
+            yield ev({'step': 5, 'message': '报告生成完成！', 'report_path': report_path, 'pptx_path': pptx_path,
+                      'report_path_v2': report_path_v2, 'pptx_path_v2': pptx_path_v2})
 
         except Exception as e:
             traceback.print_exc()
@@ -451,29 +468,23 @@ def download_report(task_id: str):
     if task_id not in tasks:
         return jsonify({"error": "Report not found or not yet generated"}), 404
 
-    fmt = request.args.get("format", "docx")
-
+    fmt = request.args.get("format", "docx")          # docx | pptx
+    version = request.args.get("version", "legacy")   # legacy | v2
+    # 4 文件并存:按 (version, format) 取对应路径
+    key = {
+        ("legacy", "docx"): "report_path", ("legacy", "pptx"): "pptx_path",
+        ("v2", "docx"): "report_path_v2", ("v2", "pptx"): "pptx_path_v2",
+    }.get((version, fmt))
+    if not key:
+        return jsonify({"error": "Unknown version/format"}), 400
+    path = tasks[task_id].get(key)
+    if not path or not Path(path).exists():
+        return jsonify({"error": f"{version} {fmt} file not found"}), 404
     if fmt == "pptx":
-        pptx_path = tasks[task_id].get("pptx_path")
-        if not pptx_path or not Path(pptx_path).exists():
-            return jsonify({"error": "PPTX file not found"}), 404
-        return send_file(
-            pptx_path,
-            mimetype="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            as_attachment=True,
-            download_name=Path(pptx_path).name
-        )
-
-    report_path = tasks[task_id].get("report_path")
-    if not report_path or not Path(report_path).exists():
-        return jsonify({"error": "Report file not found on disk"}), 404
-
-    return send_file(
-        report_path,
-        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        as_attachment=True,
-        download_name=Path(report_path).name
-    )
+        media = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    else:
+        media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    return send_file(path, mimetype=media, as_attachment=True, download_name=Path(path).name)
 
 
 @app.route("/api/tasks", methods=["GET"])

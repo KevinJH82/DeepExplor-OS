@@ -14,7 +14,7 @@ from typing import Dict, List, Optional, Tuple
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR, MSO_AUTO_SIZE
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.chart.data import ChartData
 from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
@@ -87,6 +87,9 @@ class PptxBuilder:
 
         # 每个数据类别一页
         for category in get_all_categories():
+            # 「慢变量综合证据」页不在 PPT 中呈现(按产品要求去掉该页)
+            if category.id == "slow_variables":
+                continue
             result = search_results.get(category.id)
             if result and not result.error:
                 self._add_category_slide(prs, category.chapter_title, result, mineral_type, category.id)
@@ -177,6 +180,8 @@ class PptxBuilder:
         txBox = slide.shapes.add_textbox(left, top, width, height)
         tf = txBox.text_frame
         tf.word_wrap = True
+        # 内容多少自适应:文本自动缩放以适配文本框高度,避免溢出遮盖下方模块
+        tf.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
 
         for i, item in enumerate(items):
             if i == 0:
@@ -220,10 +225,11 @@ class PptxBuilder:
             bool - 是否显示图表
         """
         # 强数值化类别（必选图表）
-        strong_numeric_cats = {"climate", "hydrology", "geophysics", "remote_sensing"}
+        strong_numeric_cats = {"climate", "hydrology", "remote_sensing"}
 
-        # 不适合图表的类别
-        no_chart_cats = {"mining_rights"}
+        # 不适合图表的类别（内容多为描述/分类条目,用表格更清晰,不牵强塞图表）
+        no_chart_cats = {"mining_rights", "geology", "geophysics", "geochemistry",
+                         "insar_deformation", "infrastructure"}
 
         if category_id in no_chart_cats:
             return False
@@ -669,10 +675,13 @@ class PptxBuilder:
             color=self.COLOR_WHITE, bold=True, alignment=PP_ALIGN.CENTER
         )
 
-        # 副标题（研究区名称）
+        # 副标题（研究区名称）：area_name 为空或仅是占位名 "AOI" 时,回退地理编码的真实区域名
+        area = (location.area_name or "").strip()
+        if not area or re.fullmatch(r"aoi", area, flags=re.IGNORECASE):
+            area = (location.location_str or "").strip() or "研究区"
         self._add_textbox(
             slide, Inches(2), Inches(3.7), Inches(9.333), Inches(0.8),
-            location.area_name, font_size=28, font_name=self.FONT_TITLE,
+            area, font_size=28, font_name=self.FONT_TITLE,
             color=self.COLOR_ACCENT, alignment=PP_ALIGN.CENTER
         )
 
@@ -847,17 +856,18 @@ class PptxBuilder:
         )
         self._add_accent_line(slide, Inches(0.8), Inches(1.1), Inches(3))
 
-        # 左侧信息卡片
-        info_items = [
-            f"位置：{location.location_str}",
-            f"国家：{location.country}",
-            f"省份：{location.province or '未确定'}",
-            f"城市：{location.city or '未确定'}",
-            f"区县：{location.district or '未确定'}",
-            f"坐标范围：{location.coords_str}",
+        # 左侧信息卡片：未确定的字段直接不显示(不再以"未确定"占位)
+        _fields = [
+            ("位置", location.location_str),
+            ("国家", location.country),
+            ("省份", location.province),
+            ("城市", location.city),
+            ("区县", location.district),
+            ("坐标范围", location.coords_str),
         ]
         if mineral_type:
-            info_items.append(f"目标矿种：{mineral_type}")
+            _fields.append(("目标矿种", mineral_type))
+        info_items = [f"{k}：{str(v).strip()}" for k, v in _fields if v and str(v).strip()]
 
         self._add_bullet_list(
             slide, Inches(0.8), Inches(1.5), Inches(5.5), Inches(5),
@@ -998,10 +1008,10 @@ class PptxBuilder:
                     # 计算图表尺寸（饼图需要更大空间）
                     chart_type = chart_info["type"]
                     if chart_type == "pie":
-                        # 饼图需要更多宽度
-                        chart_width = Inches(6.0)
-                        chart_height = Inches(5.0)
-                        left_pos = Inches(0.3)
+                        # 饼图:适度缩小并左留白,避免溢入右侧要点栏(右栏起于 7.0)被遮挡
+                        chart_width = Inches(5.0)
+                        chart_height = min(Inches(4.0), mid_height)
+                        left_pos = Inches(0.5)
                     else:
                         # 其他类型用标准尺寸
                         chart_width = Inches(6.8)
@@ -1036,7 +1046,7 @@ class PptxBuilder:
                         desc_text = f"饼图展示了{dimension_name}的各类别占比分布" if dimension_name else f"饼图展示了{title}的各类别占比分布"
                         self._add_textbox(
                             slide, left_pos, y_cursor + chart_height + Inches(0.2),
-                            Inches(6.0), Inches(0.5),
+                            Inches(5.0), Inches(0.5),
                             desc_text, font_size=10, color=self.COLOR_LIGHT,
                             alignment=PP_ALIGN.CENTER
                         )
@@ -1237,10 +1247,16 @@ class PptxBuilder:
         if len(result_sents) < 2:
             result_sents += other_sents[:2 - len(result_sents)]
 
-        condensed = "；".join(result_sents[:2])
-        if len(condensed) > 120:
-            condensed = condensed[:119] + "…"
-        return condensed or summary[:120]
+        # 按整句拼接,以「。」收尾;不做"…"硬截断造成首行半句跳出
+        picked = [s for s in result_sents[:2] if s]
+        condensed = "。".join(picked)
+        if not condensed:
+            # 无可用整句 → 在 ~120 字内就近找句末标点断句,以「。」结尾
+            head = (summary or "").strip()[:120]
+            m = list(re.finditer(r'[。！？；;]', head))
+            condensed = head[:m[-1].start()] if m else head
+        condensed = condensed.rstrip("。！？；;，,、 ")
+        return (condensed + "。") if condensed else (summary or "")
 
     def _fig_attr(self, fig, key):
         return getattr(fig, key, None) if not isinstance(fig, dict) else fig.get(key)
@@ -1260,6 +1276,23 @@ class PptxBuilder:
         self._add_accent_line(slide, Inches(0.8), Inches(1.1), Inches(3))
 
         shown = figs[:2]
+        if len(shown) == 1:
+            # 单图:放大并在显示框内等比适配、整体居中(避免偏左下/周边留白)
+            f = shown[0]
+            box_l, box_t, box_w, box_h = Inches(1.0), Inches(1.45), Inches(11.3), Inches(4.85)
+            try:
+                pic = slide.shapes.add_picture(self._fig_attr(f, "path"), box_l, box_t, width=box_w)
+                if pic.height > box_h:   # 太高 → 改按高度适配
+                    pic.width = int(pic.width * box_h / pic.height)
+                    pic.height = box_h
+                pic.left = int((self.SLIDE_WIDTH - pic.width) / 2)        # 水平居中
+                pic.top = int(box_t + (box_h - pic.height) / 2)          # 垂直居中
+                cap = self._fig_attr(f, 'caption') or ''
+                self._add_textbox(slide, Inches(1.0), Inches(6.45), Inches(11.3), Inches(0.8), cap,
+                                  font_size=11, color=self.COLOR_LIGHT, alignment=PP_ALIGN.CENTER)
+            except Exception:
+                pass
+            return
         img_w = Inches(5.6)
         gap = Inches(0.4)
         total_w = img_w * len(shown) + gap * (len(shown) - 1)
@@ -1291,12 +1324,15 @@ class PptxBuilder:
         areas = getattr(target_figure, "favorable_areas", None) if target_figure is not None else None
         if path and os.path.exists(path):
             try:
-                # 左侧热力靶区图
-                slide.shapes.add_picture(path, Inches(0.6), Inches(1.4), height=Inches(5.2))
+                # 左侧热力靶区图：放大以便靶区位置更清晰(右侧评级栏起于 8.0,留足边距)
+                pic = slide.shapes.add_picture(path, Inches(0.5), Inches(1.3), height=Inches(5.8))
+                if pic.width > Inches(7.0):   # 过宽则改按宽度适配,避免压到右侧评级栏
+                    pic.height = int(pic.height * Inches(7.0) / pic.width)
+                    pic.width = Inches(7.0)
             except Exception:
                 path = None
             cap = self._fig_attr(target_figure, "caption") or ""
-            self._add_textbox(slide, Inches(0.6), Inches(6.7), Inches(7), Inches(0.6),
+            self._add_textbox(slide, Inches(0.5), Inches(7.05), Inches(7.2), Inches(0.4),
                               cap, font_size=11, color=self.COLOR_LIGHT, alignment=PP_ALIGN.CENTER)
             # 右侧：各靶区置信评级 + 理由
             if mode == "areas":
@@ -1382,28 +1418,19 @@ class PptxBuilder:
         )
         self._add_accent_line(slide, Inches(0.8), Inches(1.1), Inches(3))
 
-        # 左侧：各类别首条发现
+        # 各类别首条发现(去掉右侧柱状图,发现清单铺满整幅)
         all_findings = []
-        chart_labels, chart_values = [], []
         for category in get_all_categories():
+            if category.id == "slow_variables":   # 慢变量页已去掉,汇总也不纳入
+                continue
             result = search_results.get(category.id)
-            if result and not result.error:
-                if result.key_findings:
-                    all_findings.append(f"【{category.name}】{result.key_findings[0]}")
-                chart_labels.append(category.name[:5])  # 短标签
-                chart_values.append(len(result.data_points) if result.data_points else 0)
+            if result and not result.error and result.key_findings:
+                all_findings.append(f"【{category.name}】{result.key_findings[0]}")
 
         if all_findings:
             self._add_bullet_list(
-                slide, Inches(0.8), Inches(1.5), Inches(6.8), Inches(5.5),
-                all_findings[:8], font_size=14, icon="◆"
-            )
-
-        # 右侧：数据点数量柱状图
-        if len(chart_values) >= 3 and any(v > 0 for v in chart_values):
-            self._add_bar_chart(
-                slide, Inches(7.8), Inches(1.5), Inches(5.2), Inches(5.5),
-                chart_labels, chart_values
+                slide, Inches(0.8), Inches(1.5), Inches(11.7), Inches(5.5),
+                all_findings[:10], font_size=14, icon="◆"
             )
 
     def _add_sources_slide(self, prs, search_results: Dict[str, SearchResult]):
