@@ -401,6 +401,36 @@ def calc_band_depth(
     return index_map
 
 
+def calc_rx(image: np.ndarray, roi_mask: Optional[np.ndarray] = None, reg: float = 1e-3) -> np.ndarray:
+    """全局 RX 异常检测 (RXD, 书 §9.2.1)。
+
+    像元相对背景(ROI 内均值 μ / 协方差 Σ)的马氏距离平方:
+        RXD(x) = (x-μ)ᵀ Σ⁻¹ (x-μ)
+    捕捉单波段阈值漏掉的**波段间联合(协方差)异常** —— 矿物组合在多波段上的协同偏离。
+    与具体矿物无关,产出一层"光谱异常"证据。reg: 协方差对角正则(防奇异)。
+    返回 (H,W) float32 RXD 分数(越大越异常),ROI 外 NaN。
+    """
+    B, H, W = image.shape
+    X = image.reshape(B, -1).astype(np.float64)             # (B,N)
+    finite_pix = np.isfinite(X).all(axis=0)                 # 全波段有限的像元
+    bgsel = finite_pix & roi_mask.reshape(-1) if roi_mask is not None else finite_pix
+    if int(bgsel.sum()) < B + 1:
+        return np.full((H, W), np.nan, dtype=np.float32)
+
+    bg = X[:, bgsel]
+    mu = bg.mean(axis=1, keepdims=True)                     # (B,1)
+    cov = np.cov(bg)                                        # (B,B)
+    cov = np.atleast_2d(cov)
+    cov += reg * (np.trace(cov) / B) * np.eye(B)            # 对角正则
+    inv = np.linalg.pinv(cov)
+    d = X - mu                                              # (B,N)
+    rxd = np.einsum("bn,bn->n", d, inv @ d)                 # 马氏距离平方 (N,)
+    rxd = np.where(finite_pix, rxd, np.nan).reshape(H, W).astype(np.float32)
+    if roi_mask is not None:
+        rxd = np.where(roi_mask, rxd, np.nan).astype(np.float32)
+    return rxd
+
+
 # ─────────────────────────────────────────────
 # 地植物学胁迫(丛林模式)
 # ─────────────────────────────────────────────
@@ -800,6 +830,20 @@ def analyze_single(
             grade_map=fin["grade_map"], grade_thresholds=fin["grade_thresholds"],
             grade_k_levels=fin["grade_k_levels"], grade_family=fin["grade_family"],
             ratio_expr=f"SAM({splib_key})", sign=1,
+        )
+
+    if method == "rx":
+        # RX 多变量异常(P2-a, 书§9.2.1): 与具体矿物无关,对整幅多波段图算马氏距离异常。
+        index_map = calc_rx(image, roi_mask=roi_mask)
+        # RX 是协方差异常,非"羟基/铁染"族;固定用羟基 k 组(2/2.5/3)做分级
+        fin = _finalize_anomaly(index_map, roi_mask, threshold_method, k, None)
+        return AlterationResult(
+            mineral=mineral, method="rx", sensor=sensor_key,
+            index_map=index_map, anomaly_mask=fin["anomaly"],
+            anomaly_ratio=fin["anomaly_ratio"], threshold=fin["thr"],
+            grade_map=fin["grade_map"], grade_thresholds=fin["grade_thresholds"],
+            grade_k_levels=fin["grade_k_levels"], grade_family=fin["grade_family"],
+            ratio_expr="RX(马氏距离)", sign=1,
         )
 
     if method == "veg_stress":

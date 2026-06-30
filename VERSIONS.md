@@ -21,7 +21,7 @@
 | `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.2.0 |
 | `geo-preprocess` | 预处理（辐射/几何/大气校正、镶嵌、裁剪） | 0.1.0 |
 | `geo-insar` | InSAR 时序形变（相干/速度聚类/线性体） | 0.1.0 |
-| `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.3.0 |
+| `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.4.0 |
 | `geo-geochem` | 化探背景与异常 | 0.1.0 |
 | `geo-geophys` | 物探位场（磁/重力） | 0.1.0 |
 | `geo-stru` | 构造解译（坡向/曲率/活动断裂/InSAR 融合） | 0.1.0 |
@@ -46,6 +46,11 @@
 | `geo-exploration/Python_Project` | geo-exploration | 勘查应用主代码 | 0.1.0 |
 
 ## 变更日志（monorepo 级）
+
+### 2026-06-30 — geo-analyser 0.4.0（升级 v2 · P2-a RX 多变量异常）
+- **P2-a RX/马氏异常**（书 §9.2.1，`calc_rx` + analyze_single method="rx"）：对整幅多波段图算
+  像元相对背景(μ/Σ)的马氏距离平方 RXD,捕捉单波段阈值漏掉的波段间联合(协方差)异常,产出
+  与矿物无关的"光谱异常"证据层;协方差对角正则防奇异;复用分级/中值滤波/API。
 
 ### 2026-06-30 — geo-analyser 0.3.0（升级 v2 · P1 高光谱波形/吸收特征）
 - **P1-a SASP 光谱吸收特征**（书 §7.2.2，新增 `spectral_absorption.py`）：高光谱诊断窗口内提取
