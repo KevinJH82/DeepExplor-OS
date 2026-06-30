@@ -21,7 +21,7 @@
 | `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.2.0 |
 | `geo-preprocess` | 预处理（辐射/几何/大气校正、镶嵌、裁剪、多源配准、全色融合） | 0.3.0 |
 | `geo-insar` | InSAR 时序形变（相干/速度聚类/线性体） | 0.1.0 |
-| `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.5.0 |
+| `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.6.0 |
 | `geo-geochem` | 化探背景与异常 | 0.1.0 |
 | `geo-geophys` | 物探位场（磁/重力） | 0.1.0 |
 | `geo-stru` | 构造解译（坡向/曲率/活动断裂/InSAR 融合） | 0.1.0 |
@@ -46,6 +46,12 @@
 | `geo-exploration/Python_Project` | geo-exploration | 勘查应用主代码 | 0.1.0 |
 
 ## 变更日志（monorepo 级）
+
+### 2026-06-30 — geo-analyser 0.6.0（升级 v2 · P3-a N-FINDR/VCA 端元提取）
+- **P3-a 端元自动提取**（书 §9.3.2，`endmember_extraction.py`）：VCA(Nascimento&Dias2005) +
+  N-FINDR(Winter1999) 几何法从数据自动提纯真·端元(单形体顶点),替代 spectral_unmix 的
+  NDVI/BSI 启发式 3 端元,使 NNLS 解混丰度具地质含义。linear_unmix 加 endmember_method="vca"/"nfindr"。
+- 合成验证: VCA/N-FINDR 恢复 3 已知端元光谱角 <2°; VCA 解混丰度 vs 真值相关 0.992。
 
 ### 2026-06-30 — geo-preprocess 0.3.0（升级 v2 · P2-c 多源配准 + P2-d 全色融合）
 - **P2-c 多源像元级配准**（书 §10.5.2，`core/coregistration.py`）：把不同分辨率/来源栅格重采样到

@@ -91,20 +91,28 @@ def linear_unmix(
     roi_mask: Optional[np.ndarray] = None,
     candidate_mask: Optional[np.ndarray] = None,
     sum_to_one: bool = True,
+    endmember_method: str = "heuristic",
+    n_endmembers: int = 3,
 ) -> UnmixResult:
     """
     线性光谱解混: image(b) ≈ Σ_k a_k · E(b,k), a_k ≥ 0。用 scipy NNLS 逐像元求解。
 
     为控制耗时,只在 candidate_mask(默认=ROI 内)像元上解混,其余置 NaN。
-    endmembers 为 None 时用 estimate_endmembers 自动估计(需可计算 NDVI/BSI 的多光谱影像,
-    其波段顺序假定为 Landsat8/9(见 _LANDSAT_IDX),由调用方保证)。
+    endmembers 为 None 时按 endmember_method 自动估计:
+      - "heuristic"(默认): NDVI/BSI 极值取 绿植/土岩/阴影 三端元(需 Landsat 波段顺序);
+      - "vca" / "nfindr"(P3-a): 几何法从数据自动提纯 n_endmembers 个真·端元(无需波段语义,
+        适合高光谱矿物解混),使丰度具地质含义。
 
     sum_to_one: True 时对 NNLS 解做和归一(丰度比例),便于解释。
     """
     from scipy.optimize import nnls
 
     B, H, W = image.shape
-    if endmembers is None:
+    if endmembers is None and endmember_method in ("vca", "nfindr"):
+        import endmember_extraction as _ee
+        endmembers, endmember_names, _ = _ee.extract_endmembers(
+            image, n_endmembers, method=endmember_method, roi_mask=roi_mask)
+    elif endmembers is None:
         # 需要 NDVI/BSI;调用方应传 6 波段(含 nir/swir1)的多光谱。这里按 Landsat 顺序兜底。
         _LB = _LANDSAT_IDX
         nir = image[_LB["nir"]]; red = image[_LB["red"]]
