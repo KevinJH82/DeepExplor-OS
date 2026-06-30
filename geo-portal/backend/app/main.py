@@ -404,6 +404,9 @@ _PROFILES = {
 }
 
 
+_LEVEL_ZH = {"required": "必需", "recommended": "推荐", "optional": "可选"}
+
+
 def _evidence_profile(mineral: str) -> dict:
     return _PROFILES[_mineral_family(mineral)]
 
@@ -510,7 +513,7 @@ def _build_evidence_plan(run: dict, proj: dict, existing: dict = None) -> dict:
             "skip_reason": old.get("skip_reason") or "",
             "fallback_action": old.get("fallback_action") or "",
             "reason": (
-                f"{ev['label']}证据被设为{level}; " +
+                f"{ev['label']}证据被设为{_LEVEL_ZH.get(level, level)}; " +
                 ("当前数据源可支持该分析。" if support_ok else "当前数据源不足, 建议补充对应资料后再运行。")
             ),
         }
@@ -875,9 +878,32 @@ def _model3d_run_in_bbox(run_dir, bbox):
     return hits >= max(1, len(tg) // 2)
 
 
+def _mineral_main_zh(mineral: str) -> str:
+    """项目矿种 → 匹配产物矿床类型的主字;多金属/未识别返回 '' 表示不设矿种门控。"""
+    if not mineral or mineral == "multi_mineral":
+        return ""
+    zh = _MINERAL_ZH.get(mineral, "")
+    return zh[0] if zh else ""
+
+
+def _product_mineral_ok(run_dir, mineral_main: str) -> bool:
+    """产物 model_stats.deposit_type 是否含本项目矿种主字。
+    用于 bbox 复用的矿种门控:同一 ROI 不同矿种时,避免借用别矿种的三维/布孔产物。
+    mineral_main 为空(多金属/未知)→ 放行;deposit_type 缺失 → 无法确认矿种,保守不复用。"""
+    if not mineral_main:
+        return True
+    try:
+        meta = json.loads((Path(run_dir) / "metadata.json").read_text(encoding="utf-8"))
+        dep = str((meta.get("model_stats") or {}).get("deposit_type") or "")
+    except Exception:
+        dep = ""
+    return mineral_main in dep
+
+
 def _find_existing_model3d(project: dict):
     """按项目 KML/aoi 名称发现最新 model3d 靶点产物。"""
     names = [_safe_stem(project.get("kml_name")), _safe_stem(project.get("name"))]
+    mineral_main = _mineral_main_zh(project.get("mineral"))
     roots = [Path(p) for p in _MODEL3D_RESULT_ROOTS if p]
     for root in roots:
       if not root.is_dir():
@@ -888,10 +914,11 @@ def _find_existing_model3d(project: dict):
           if mdir.is_dir():
               candidates.extend([d for d in mdir.iterdir() if d.is_dir()])
       if not candidates and project.get("aoi_bbox"):
-          # 名称不匹配 → 按 bbox 复用:仅取靶点真正落在本 ROI 内的产物(此前未过滤导致取到别区靶点)
+          # 名称不匹配 → 按 bbox 复用:仅取靶点落在本 ROI 内、且矿种(成因族)一致的产物
+          # (此前不校验矿种 → 同一 ROI 不同矿种会借到别矿种的靶点/成因族/权重)
           bbox = project.get("aoi_bbox")
           candidates.extend(d for d in root.glob("*/model3d/*")
-                            if d.is_dir() and _model3d_run_in_bbox(d, bbox))
+                            if d.is_dir() and _model3d_run_in_bbox(d, bbox) and _product_mineral_ok(d, mineral_main))
       candidates = sorted([d for d in candidates if (d / "targets_3d.json").exists()],
                           key=lambda d: d.name, reverse=True)
       for run_dir in candidates:
@@ -926,6 +953,7 @@ def _drill_run_in_bbox(run_dir, bbox):
 def _latest_drill_run_dir(project: dict):
     """按项目 KML/aoi 名称定位最新 AI 布孔产物目录(含 planned_holes.geojson)。无则 None。"""
     names = [_safe_stem(project.get("kml_name")), _safe_stem(project.get("name"))]
+    mineral_main = _mineral_main_zh(project.get("mineral"))
     for root in [Path(p) for p in _DRILL_RESULT_ROOTS if p]:
         if not root.is_dir():
             continue
@@ -935,10 +963,10 @@ def _latest_drill_run_dir(project: dict):
             if ddir.is_dir():
                 candidates.extend([d for d in ddir.iterdir() if d.is_dir()])
         if not candidates and project.get("aoi_bbox"):
-            # 名称不匹配 → 按 bbox 复用:仅取钻孔落在本 ROI 内的产物(否则会取到别区钻孔)
+            # 名称不匹配 → 按 bbox 复用:仅取钻孔落在本 ROI 内、且矿种一致的产物(否则借到别区/别矿种钻孔)
             bbox = project.get("aoi_bbox")
             candidates.extend(d for d in root.glob("*/drill/*")
-                              if d.is_dir() and _drill_run_in_bbox(d, bbox))
+                              if d.is_dir() and _drill_run_in_bbox(d, bbox) and _product_mineral_ok(d, mineral_main))
         candidates = sorted([d for d in candidates if (d / "planned_holes.geojson").exists()],
                             key=lambda d: d.name, reverse=True)
         if candidates:
@@ -1547,15 +1575,18 @@ def _run_insar(task_id, kml_name, project=None, allow_trigger=False, data_task=N
         t.update(status="failed", error=str(e))
 
 
-def _run_reporter(task_id, kml_bytes, kml_name, mineral, tenant_id=None):
-    """geo-reporter 原生接口是 upload-kml + SSE run;BFF 消费 SSE 并归一为门户任务状态。"""
+def _run_reporter(task_id, kml_bytes, kml_name, mineral, tenant_id=None, econ_params=None):
+    """geo-reporter 原生接口是 upload-kml + SSE run;BFF 消费 SSE 并归一为门户任务状态。
+    econ_params(经济参数表,来自项目上传)随 upload-kml 透传,供新版报告价值评估章。"""
     t = _ADAPTER_TASKS[task_id]
+    _econ_form = {"econ_params": json.dumps(econ_params)} if econ_params else None
     try:
         base = services.base_url("reporter")
         with httpx.Client(timeout=1800.0, headers=_internal_headers(tenant_id)) as c:
             up = c.post(
                 f"{base}/api/upload-kml",
                 files={"file": (kml_name or "aoi.kml", kml_bytes, _KML_MIME)},
+                data=_econ_form,
             )
             if up.status_code >= 400:
                 raise RuntimeError(up.text[:300] or "reporter upload-kml 失败")
@@ -1604,23 +1635,13 @@ def _run_reporter(task_id, kml_bytes, kml_name, mineral, tenant_id=None):
                         prog = min(90, int(t.get("progress") or 12) + 3)
                     t.update(progress=max(int(t.get("progress") or 0), prog), raw=msg)
                     if step == 5:
-                        t["download"] = {
-                            "service": "reporter",
-                            "task": rid,
-                            "docx": f"api/download/{rid}",
-                            "pptx": f"api/download/{rid}?format=pptx",
-                        }
+                        t["download"] = _reporter_download_links(rid)
                         break
 
             sj = c.get(f"{base}/api/status/{rid}").json()
             if sj.get("status") == "completed" or sj.get("has_report"):
                 t.update(status="completed", progress=100, raw="completed")
-                t.setdefault("download", {
-                    "service": "reporter",
-                    "task": rid,
-                    "docx": f"api/download/{rid}",
-                    "pptx": f"api/download/{rid}?format=pptx",
-                })
+                t.setdefault("download", _reporter_download_links(rid))
             else:
                 raise RuntimeError(f"reporter 未完成: {sj}")
     except Exception as e:
@@ -2096,6 +2117,45 @@ def manual_evidence_list(project_id: str, user=Depends(auth.current_user)):
     return [_pub_me(m) for m in store.list_manual_evidence(project_id)]
 
 
+def _parse_econ_table(raw: bytes, ext: str) -> dict:
+    """解析上传的经济参数表(CSV 两列「参数,值」或 JSON)→ dict;供新版报告价值评估章。"""
+    text = raw.decode("utf-8-sig", "ignore")
+    if ext == "json":
+        try:
+            d = json.loads(text)
+            return d if isinstance(d, dict) else {}
+        except Exception:
+            return {}
+    import csv as _csv
+    out = {}
+    for row in _csv.reader(text.splitlines()):
+        if len(row) >= 2 and str(row[0]).strip() and str(row[0]).strip().lower() not in ("参数", "param", "key"):
+            out[str(row[0]).strip()] = str(row[1]).strip()
+    return out
+
+
+@app.post("/api/projects/{project_id}/econ-params")
+async def upload_econ_params(project_id: str, file: UploadFile = File(...), user=Depends(auth.current_user)):
+    """上传经济参数表(CSV/JSON)→ 解析存到项目;报告生成时透传给 reporter 的价值评估章(Phase C)。"""
+    auth.require_project_write(user, project_id)
+    raw = await file.read()
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if ext not in ("csv", "json", "txt"):
+        raise HTTPException(status_code=400, detail="仅支持 CSV / JSON 参数表")
+    econ = _parse_econ_table(raw, ext)
+    if not econ:
+        raise HTTPException(status_code=400, detail="参数表为空或无法解析(CSV 需两列「参数,值」)")
+    store.update_project(project_id, {"econ_params": econ})
+    return {"ok": True, "econ_params": econ, "keys": list(econ.keys())}
+
+
+@app.get("/api/projects/{project_id}/econ-params")
+def get_econ_params(project_id: str, user=Depends(auth.current_user)):
+    auth.require_project_read(user, project_id)
+    proj = store.get_project(project_id) or {}
+    return {"econ_params": proj.get("econ_params")}
+
+
 @app.delete("/api/projects/{project_id}/manual-evidence/{me_id}")
 def manual_evidence_delete(project_id: str, me_id: str, request: Request = None,
                            user=Depends(auth.current_user)):
@@ -2194,6 +2254,17 @@ def get_run(trace_id: str, user=Depends(auth.current_user)):
     return run
 
 
+def _smooth_citation(text: str) -> str:
+    """把文献要点里生硬的"摘要"口吻平滑成正常文献引述,避免读者跳出感。
+    data-colle 的论文要点常用"摘要"作元指代(摘要未提供X/摘要缺失/摘要[7]中指出),
+    统一改为"文献",并去掉"摘要引用"标签;保留 [n] 引用编号以便对照文献清单。"""
+    t = str(text or "")
+    t = re.sub(r"摘要引用[:：]?\s*", "", t)                # 去"摘要引用"标签
+    t = t.replace("论文摘要", "文献").replace("文献标题与摘要", "文献")
+    t = t.replace("摘要", "文献")                          # 余下"摘要"统一为"文献"
+    return re.sub(r"\s+", " ", t).strip()
+
+
 def _datacolle_literature_points(literature_md: str, limit: int = 8) -> list:
     """从 data-colle「论文要点提炼」markdown 抽取要点条目(保留 [n] 引用、剥离 markdown 噪声)。
     取「### 论文清单」之前的 `- ` 项;纯字符串、空安全返回 []。"""
@@ -2207,7 +2278,7 @@ def _datacolle_literature_points(literature_md: str, limit: int = 8) -> list:
             continue
         if not (line.startswith("- ") or line.startswith("· ") or line.startswith("* ")):
             continue
-        line = line.lstrip("-·* ").replace("**", "").strip()
+        line = _smooth_citation(line.lstrip("-·* ").replace("**", "").strip())
         if line:
             pts.append(line)
         if len(pts) >= limit:
@@ -2237,6 +2308,17 @@ def get_datacolle_evidence(trace_id: str, user=Depends(auth.current_user)):
                                           trace_id=trace_id, tenant_id=run.get("tenant_id"))
     except Exception:
         return {"available": False}
+    # 矿种门控:同一 ROI 不同矿种时,bbox 回退可能命中别矿种的 data-colle,过滤掉(避免文献佐证串矿种)
+    pm = str(proj.get("mineral") or "").strip().lower()
+    if pm and pm != "multi_mineral":
+        pm_zh = _MINERAL_ZH.get(pm, "")[:1]
+
+        def _dc_mineral_ok(em):
+            ea = str(em or "").strip().lower()
+            if not ea:
+                return False
+            return ea == pm or (pm_zh and _MINERAL_ZH.get(ea, ea)[:1] == pm_zh)
+        entries = [x for x in entries if _dc_mineral_ok(x.get("mineral"))]
     if not entries:
         return {"available": False}
     e = entries[0]
@@ -2462,7 +2544,7 @@ def start_service(trace_id: str, body: StartIn, user=Depends(auth.current_user))
             data_task = (((run.get("stages") or {}).get("data") or {}).get("sub_tasks") or {}).get("insar") or {}
             th = threading.Thread(target=_adapter_thread, args=(_run_insar, tid, kml_name, proj, allow_trigger, data_task), daemon=True)
         else:
-            th = threading.Thread(target=_adapter_thread, args=(_run_reporter, tid, kml_bytes, kml_name, proj.get("mineral_label") or proj["mineral"], tenant_id), daemon=True)
+            th = threading.Thread(target=_adapter_thread, args=(_run_reporter, tid, kml_bytes, kml_name, proj.get("mineral_label") or proj["mineral"], tenant_id, proj.get("econ_params")), daemon=True)
         th.start()
         return {"service": body.service, "task_id": tid, "adapter": True}
 
@@ -2545,6 +2627,12 @@ def _synthesis_prompt(facts: dict) -> str:
         "请只基于这些真实数字做证据链综合研判,严禁编造数据中没有的数值/坐标/占比(如 metrics 缺失就不要写具体数)。"
         "某证据 status=completed 但无 metrics 时,如实写'已完成,但本次未采到量化指标',不得臆造比例或元素;"
         "不要把'证据已完成'与'是否进入三维融合层(fusion_layers)'混为一谈,二者分别陈述。"
+        "若提供 model3d_family(三维建模据实判定的成因族),以它为【权威成因族】;字段 model/rationale 仅为建模前按矿种定的先验证据模型,"
+        "不得用其矿床类型名(如与 model3d_family 不一致的'IOCG'等)冒充权威成因族,避免口径自相矛盾。"
+        "【语言规范】这是正式中文文案:输出全程使用规范中文,严禁出现任何英文字段名/状态/枚举/数据键"
+        "(如 analyser/stru/geophys/geochem/insar、completed、knowledge/data_driven、alteration/structure/magnetic/curvature、"
+        "rank、datacolle、skarn/porphyry/iocg 等);证据一律称 蚀变/构造/物探/化探/形变,靶点称'1号靶点'(不要写 rank1),"
+        "状态称'已完成'。所给数据已是中文键,照用中文即可。\n"
         "输出【纯 JSON】(不要任何解释/markdown 代码块),schema:\n"
         '{"grade":"A|B|C|D(综合成矿置信)","summary":"3-5句中文综合研判,需引用真实数(构造条数/蚀变占比/靶点评分深度/形变速率等)并说明证据如何相互印证",'
         '"dimensions":[{"name":"构造|蚀变|物探|化探|形变","level":"高|中|低|缺","evidence":"一句中文,引用该证据真实指标"}],'
@@ -2727,7 +2815,7 @@ def _reporter_find_completed_download(c: httpx.Client, base: str, rid: str, fmt:
     tasks = payload.get("tasks") if isinstance(payload, dict) else payload
     if not isinstance(tasks, list):
         return None
-    need_key = "has_pptx" if fmt == "pptx" else "has_report"
+    need_key = "has_pptx" if "pptx" in fmt else "has_report"
     stale_kml = _reporter_norm_kml_name((stale or {}).get("kml_name"))
     stale_area = str((stale or {}).get("area_name") or "").strip()
     ranked = []
@@ -2759,13 +2847,20 @@ def _reporter_find_completed_download(c: httpx.Client, base: str, rid: str, fmt:
     return ranked[0][2]
 
 
-def _remember_reporter_download(task_id: str, task: dict, rid: str) -> None:
-    download = {
+def _reporter_download_links(rid: str) -> dict:
+    """报告下载链接(新旧并存,4 文件:旧版 docx/pptx + 新版 docx/pptx)。"""
+    return {
         "service": "reporter",
         "task": rid,
         "docx": f"api/download/{rid}",
         "pptx": f"api/download/{rid}?format=pptx",
+        "docx_v2": f"api/download/{rid}?version=v2",
+        "pptx_v2": f"api/download/{rid}?format=pptx&version=v2",
     }
+
+
+def _remember_reporter_download(task_id: str, task: dict, rid: str) -> None:
+    download = _reporter_download_links(rid)
     task["download"] = download
     task["reporter_task_id"] = rid
     _ADAPTER_TASKS[task_id] = task
@@ -2792,9 +2887,15 @@ def adapter_report(task_id: str, fmt: str = "docx", user=Depends(auth.current_us
     rid = dl.get("task")
     if not rid:
         raise HTTPException(status_code=404, detail="报告尚未生成")
-    rel = dl.get("pptx" if fmt == "pptx" else "docx")
+    is_pptx = "pptx" in fmt          # fmt ∈ docx|pptx|docx_v2|pptx_v2
+    is_v2 = fmt.endswith("_v2")
+    # 兼容旧记录(可能只有 docx/pptx 键):新版键缺失时按版本拼 reporter 查询串
+    rel = dl.get(fmt)
     if not rel:
-        raise HTTPException(status_code=404, detail="未知报告格式")
+        q = []
+        if is_pptx: q.append("format=pptx")
+        if is_v2: q.append("version=v2")
+        rel = f"api/download/{rid}" + ("?" + "&".join(q) if q else "")
     base = services.base_url("reporter")
     url = f"{base}/{rel}"
     try:
@@ -2804,7 +2905,10 @@ def adapter_report(task_id: str, fmt: str = "docx", user=Depends(auth.current_us
                 fallback_rid = _reporter_find_completed_download(c, base, str(rid), fmt)
                 if fallback_rid:
                     _remember_reporter_download(task_id, t or {}, fallback_rid)
-                    rel = f"api/download/{fallback_rid}" + ("?format=pptx" if fmt == "pptx" else "")
+                    q = []
+                    if is_pptx: q.append("format=pptx")
+                    if is_v2: q.append("version=v2")
+                    rel = f"api/download/{fallback_rid}" + ("?" + "&".join(q) if q else "")
                     r = c.get(f"{base}/{rel}")
         if r.status_code >= 400:
             # 走到这里:原任务产物 404 且未在 reporter 找到可恢复的同区完成任务。
@@ -2815,13 +2919,14 @@ def adapter_report(task_id: str, fmt: str = "docx", user=Depends(auth.current_us
             raise HTTPException(status_code=r.status_code, detail=r.text[:300] or "报告下载失败")
         media = (
             "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-            if fmt == "pptx"
+            if is_pptx
             else "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
+        ext = "pptx" if is_pptx else "docx"
         return Response(
             content=r.content,
             media_type=media,
-            headers={"Content-Disposition": f'attachment; filename="report.{fmt}"'},
+            headers={"Content-Disposition": f'attachment; filename="report.{ext}"'},
         )
     except httpx.ConnectError:
         raise HTTPException(status_code=503, detail="reporter 服务不可达")

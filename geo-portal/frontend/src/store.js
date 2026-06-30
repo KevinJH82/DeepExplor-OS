@@ -3,6 +3,12 @@ import * as api from './api/portal'
 import { setAccessToken } from './api/client'
 import { STAGES, EVIDENCES, DEFAULT_SOURCE_KEYS, ALL_EVIDENCE_KEYS, SOURCE_SERVICES } from './lib/stages'
 import { loadSliceTexture, loadEvidenceRaster } from './lib/sliceTexture'
+import { _EV_ZH, _WLAYER_ZH, FAMILY_RATIONALE } from './lib/geologyNarrative'
+
+// 综合研判事实层中文化:LLM 会照抄 facts 里的字段名/枚举,故先全部转中文,避免输出英文
+const _METHOD_ZH = { knowledge: '知识驱动(成因族专家权重)', data_driven: '数据驱动(已知矿点学习)', domain_adapt: '同成因族源模型跨区迁移' }
+const _zhLayers = (arr) => (arr || []).map((l) => _WLAYER_ZH[l] || l)
+const _zhWeights = (obj) => (obj ? Object.fromEntries(Object.entries(obj).map(([k, v]) => [_WLAYER_ZH[k] || k, v])) : null)
 
 // 正在轮询的任务键集合(traceId:stage:taskId),防止"重开续接"重复起轮询
 const _activePolls = new Set()
@@ -610,10 +616,13 @@ export const useWorkflow = create((set, get) => ({
       }).sort((a, b) => a.depth - b.depth)
     }
     set((s) => {
-      const nextEvidences = stats ? mergeEvidenceFromModelStats(s.evidences, stats) : s.evidences
-      const modelKeys = stats ? evidenceKeysFromModelStats(stats) : []
+      // 历史产物:live task 已不在 model3d 服务内存中 → statusFull 无 model_stats(stats=null);
+      // 此时保留既有 stats(来自 loadExistingModel3d 的 /model3d-existing),否则会把好的 stats 抹成 null
+      const effStats = stats || s.model3d.stats
+      const nextEvidences = effStats ? mergeEvidenceFromModelStats(s.evidences, effStats) : s.evidences
+      const modelKeys = effStats ? evidenceKeysFromModelStats(effStats) : []
       return {
-        model3d: { taskId, targets, slices, stats, slicePngs },
+        model3d: { taskId, targets, slices, stats: effStats, slicePngs },
         evidences: nextEvidences,
         selectedEvidence: Array.from(new Set([...(s.selectedEvidence || []), ...modelKeys])),
         stages: {
@@ -923,19 +932,25 @@ export const useWorkflow = create((set, get) => ({
     const proj = useProject.getState().current || {}
     const evs = ['analyser', 'stru', 'geophys', 'geochem', 'insar'].map((k) => {
       const e = s.evidences[k] || {}
-      return { key: k, status: e.status, weight: e.weight, metrics: e.summary?.metrics }
-    }).filter((e) => e.status === 'completed')
+      return { 证据: _EV_ZH[k] || k, 状态: e.status === 'completed' ? '已完成' : e.status, 权重: e.weight, 量化指标: e.summary?.metrics }
+    }).filter((e) => e.状态 === '已完成')
     const dc = s.datacolleEvidence
+    const famKey = s.model3d?.stats?.family
     const facts = {
       project: proj.name, mineral: proj.mineral_label || proj.mineral,
       model: s.evidencePlan?.model, rationale: s.evidencePlan?.rationale,
       gate: s.evidencePlan?.gate,
       evidences: evs,
       targets: (s.model3d?.targets || []).slice(0, 6).map((t, i) => ({
-        rank: i + 1, score: t.score != null ? t.score : t.value, depth_m: t.depth_m,
-        lon: t.longitude, lat: t.latitude,
+        靶点序号: i + 1, 评分: t.score != null ? t.score : t.value, 深度米: t.depth_m,
+        经度: t.longitude, 纬度: t.latitude,
       })),
-      fusion_layers: s.model3d?.stats?.available_layers || [],
+      // 三维融合实采证据层 + 实际权重(键已中文化)
+      fusion_layers: _zhLayers(s.model3d?.stats?.available_layers),
+      // 权威成因族 = 三维建模据实判定(编排跟随 3D);model/rationale 仅为建模前矿种先验
+      model3d_family: famKey ? (FAMILY_RATIONALE[famKey]?.zh || famKey) : null,
+      model3d_used_weights: _zhWeights(s.model3d?.stats?.used_weights),
+      prediction_method: _METHOD_ZH[s.model3d?.stats?.prediction_method] || s.model3d?.stats?.prediction_method || null,
       drill: { holes: (s.drill?.holes || []).length, feedback: (s.drill?.feedback || []).map((f) => f.result).filter(Boolean) },
       datacolle: dc ? { best_model: dc.best_model, pathfinders: dc.pathfinder_elements } : null,
     }

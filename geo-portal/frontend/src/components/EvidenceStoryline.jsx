@@ -60,7 +60,8 @@ export default function EvidenceStoryline() {
   const model3dReady = stages?.model3d?.status === 'completed' || (model3d?.targets?.length > 0)
   const lineLimit = (key) => {
     if (key === 'context' || key === 'logic') return 4
-    if (key === 'chain' || key === 'target') return 6
+    if (key === 'target') return 7   // 含新增"权重分配逻辑"句,放宽一行避免挤掉靶点置信
+    if (key === 'chain') return 6
     if (key === 'next' || key === 'risk') return 4
     return 3
   }

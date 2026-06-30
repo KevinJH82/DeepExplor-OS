@@ -305,7 +305,7 @@ function factLine(row) {
     return `${row.label}证据已进入三维融合模型（${planText}${reason}）; ${coverage}。`
   }
   if (state === 'archived') {
-    const reason = row.skipReason || row.reason || 'orchestrator 标记已有历史产物'
+    const reason = row.skipReason || row.reason || '编排器标记已有历史产物'
     return `${row.label}证据已有产物记录（${reason}）, 当前视图尚未接入代表性可视栅格; 证据链可引用其处理结论, 但空间叠合关系需加载原始产物后复核。`
   }
   if (state === 'noLayer') return `${row.label}证据已完成, 但当前产物未提供可直接叠加的栅格; 这降低的是当前视图的空间可核查性, 不等同于该证据地质意义较低。`
@@ -464,8 +464,39 @@ function targetConfidenceLine(f) {
 }
 
 // ── 事实层:把各证据服务的真实量化指标(row.summary.metrics)转成接地气的中文短句 ──
-const _EV_ZH = { analyser: '蚀变', stru: '构造', geophys: '物探', geochem: '化探', insar: '形变' }
+export const _EV_ZH = { analyser: '蚀变', stru: '构造', geophys: '物探', geochem: '化探', insar: '形变' }
 const _LAYER_ZH = { structure: '构造', alteration: '蚀变', geophys: '物探', geochem: '化探', insar: '形变' }
+// geo-model3d used_weights 的层键→中文(镜像 geo-model3d/core/knowledge.py 的证据层 + 动态并入层)
+export const _WLAYER_ZH = {
+  alteration: '蚀变', structure: '构造', deformation: '形变', depth_consistency: '深度自洽',
+  geochem: '化探', magnetic: '磁异常', curvature: '曲率', active_fault: '活动断裂', slowvars: '慢变量',
+}
+// 三维融合方式枚举→中文(避免叙事里出现 knowledge/fuzzy/bayesian 英文)
+const _FUSION_ZH = { knowledge: '知识加权求和', fuzzy: '模糊伽马融合', bayesian: '贝叶斯后验融合' }
+const _fusionZh = (k) => _FUSION_ZH[k] || '知识加权求和'
+// 成因族→{中文名, 主导证据理由}(镜像 geo-model3d/core/knowledge.py FAMILY_WEIGHTS 的 note),
+// 用于在叙事中解释"为什么按这个权重分配"。model_stats.family 只给族键,理由文字不在其中,故前端镜像。
+export const FAMILY_RATIONALE = {
+  porphyry: { zh: '斑岩', why: '同心蚀变分带最诊断,蚀变主导' },
+  skarn: { zh: '矽卡岩', why: '接触交代带控矿,蚀变主导' },
+  epithermal: { zh: '浅成低温热液', why: '脉/断裂控制、浅成,构造与蚀变并重' },
+  carlin: { zh: '卡林型', why: '断裂+有利岩性,构造与蚀变并重' },
+  vms: { zh: '火山块状硫化物型', why: '蚀变筒+同火山断裂,蚀变主导' },
+  iocg: { zh: '铁氧化物铜金型', why: '钠钙-钾-赤铁矿蚀变+强磁性,蚀变与构造并重' },
+  greisen_pegmatite: { zh: '云英岩/伟晶岩', why: '岩体顶部裂隙控矿' },
+  carbonatite_ree: { zh: '碳酸岩稀土', why: '钠长石化/萤石化+磁/能谱' },
+  orogenic_gold: { zh: '造山型金', why: '剪切带主导、深成、蚀变弱,构造主导' },
+  sedex: { zh: '喷流沉积型', why: '层控+同生断裂' },
+  mvt: { zh: '密西西比河谷型', why: '岩溶/断裂控制,白云石化弱' },
+  struct_vein: { zh: '热液脉', why: '断裂-脉主导,构造主导' },
+  sandstone_u: { zh: '砂岩/不整合铀', why: '氧化还原前锋、浅成' },
+  magmatic_sulfide: { zh: '岩浆硫化物', why: '蚀变弱、靠构造+强磁' },
+  kimberlite: { zh: '金伯利岩', why: '克拉通深断裂+强磁,构造主导' },
+  laterite: { zh: '红土', why: '风化壳控、近地表,三维增益有限' },
+  sedimentary: { zh: '沉积/变质', why: '地层控矿,现有证据弱代理' },
+  brine_evaporite: { zh: '盐湖卤水/蒸发岩', why: '非热液非构造,三维不适用' },
+  hydrocarbon: { zh: '油气微渗漏', why: '地表渗漏晕推断、储层在深部' },
+}
 function _num(v, d = 1) { return v == null || isNaN(v) ? null : Number(v).toFixed(d) }
 
 function summaryMetricsLine(key, summary) {
@@ -514,13 +545,54 @@ function targetsDetailLine(f, model3d = {}) {
     const sc = _num(t.score != null ? t.score : t.value, 2)
     return `#${i + 1} 评分 ${sc ?? '-'}${t.depth_m != null ? ` @ ${t.depth_m}m` : ''}`
   }).join('; ')
-  const layers = (model3d?.stats?.available_layers || []).map((l) => _LAYER_ZH[l] || l)
+  const layers = (model3d?.stats?.available_layers || []).map((l) => _WLAYER_ZH[l] || _LAYER_ZH[l] || l)
   const weights = ['analyser', 'stru', 'geophys', 'geochem', 'insar']
     .map((k) => (f[k]?.weight != null ? `${_EV_ZH[k]}${Math.round(f[k].weight * 100)}%` : null))
     .filter(Boolean)
   return `三维融合共生成 ${ts.length} 个靶点; 前三:${top}。` +
     (layers.length ? `融合实际采纳证据层:${layers.join('、')};` : '') +
-    (weights.length ? ` 权重组合 ${weights.join('+')}。` : '')
+    (weights.length ? ` 编排先验权重 ${weights.join('+')}。` : '')
+}
+
+// 权重分配逻辑:解释"为什么按这个权重"——成因族 + 制度(知识/数据驱动/迁移) + 三维融合实际 used_weights
+function weightRationaleLine(model3d = {}) {
+  const s = model3d?.stats
+  if (!s || !s.family) return null
+  const fam = FAMILY_RATIONALE[s.family]
+  const pm = s.prediction_method || 'knowledge'
+  // 制度文案
+  let regime
+  if (pm === 'data_driven') {
+    const n = s.label_status?.n_in_grid
+    regime = `本次为数据驱动分配${n != null ? `(从 ${n} 个已知矿点学习)` : ''},权重为模型特征重要度而非固定专家值`
+  } else if (pm === 'domain_adapt') {
+    regime = '本次由同成因族源模型跨区迁移得到权重'
+  } else {
+    const n = s.label_status?.n_in_grid, lm = s.label_status?.label_min ?? 8
+    regime = `本次按知识驱动(成因族专家权重)分配${n != null ? `——已知矿点标签 ${n}<${lm} 未触发数据驱动,故用专家先验` : ''}`
+  }
+  // 成因族理由
+  const famClause = fam ? `成因族判定为${fam.zh}:${fam.why},故对应证据权重最高` : '成因族暂未归类'
+  // 三维融合实际权重(used_weights 中 >0 的项;data_driven 时多为 null → 跳过)
+  const uw = s.used_weights || {}
+  const wtxt = Object.entries(uw)
+    .filter(([, v]) => typeof v === 'number' && v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `${_WLAYER_ZH[k] || k}${Math.round(v * 100)}%`)
+    .join('·')
+  const wClause = wtxt ? `三维融合实际权重为 ${wtxt}` : ''
+  const note = pm === 'data_driven' ? '(权重由真实矿点数据学习得到,非固定专家值)'
+    : pm === 'domain_adapt' ? '(权重迁移自同成因族源区模型)'
+    : `(权重为初版专家值、待地质专家校准;融合方式为${_fusionZh(s.fusion_method)})`
+  return `权重分配逻辑:${regime}。${famClause}。${wClause ? wClause + '。' : ''}${note}`
+}
+
+// 权威成因族(三维建模据实判定);用于统一口径——编排跟随 3D。无 stats.family 时返回 null。
+function authFamilyLine(model3d = {}) {
+  const fam = model3d?.stats?.family
+  if (!fam) return null
+  const r = FAMILY_RATIONALE[fam]
+  return `成因族判定(三维建模据实):${r ? `${r.zh}——${r.why}` : '暂未归类'}。`
 }
 
 // 布孔:用真实 drill.holes / feedback
@@ -579,12 +651,22 @@ export function buildProjectNarrative(input) {
   const dataTaskLine = f.run.downloaderTasks.length
     ? `实跑编排要求下载/使用 ${f.run.sensors.join('、')}; 其中 ${sentenceList(f.run.downloaderTasks.map((t) => t.reason), 2)}`
     : null
-  const modelDecisionLine = [
-    f.run.familyReason ? `成因族判定: ${f.run.familyReason}。` : null,
-    f.run.weightSummary ? `权重设置: ${f.run.weightSummary}。` : null,
-    f.run.evidencePlan?.rationale ? `证据编排: ${f.run.evidencePlan.rationale}` : null,
-    f.run.depthBand ? `目标深度带: ${f.run.depthBand}。` : null,
-  ].filter(Boolean).join(' ')
+  // 统一口径:有三维建模成因族时以它为权威(编排跟随 3D),把按矿种定的编排口径明确标为"建模前先验"
+  const authFam = authFamilyLine(input.model3d)
+  const modelDecisionLine = (authFam
+    ? [
+        authFam,
+        f.run.evidencePlan?.rationale ? `证据编排(建模前按矿种先验):${f.run.evidencePlan.rationale}(门控与先验权重据此设定)。` : null,
+        f.run.weightSummary ? `先验权重设置: ${f.run.weightSummary}。` : null,
+        f.run.depthBand ? `目标深度带: ${f.run.depthBand}。` : null,
+      ]
+    : [
+        f.run.familyReason ? `成因族判定: ${f.run.familyReason}。` : null,
+        f.run.weightSummary ? `权重设置: ${f.run.weightSummary}。` : null,
+        f.run.evidencePlan?.rationale ? `证据编排: ${f.run.evidencePlan.rationale}` : null,
+        f.run.depthBand ? `目标深度带: ${f.run.depthBand}。` : null,
+      ]
+  ).filter(Boolean).join(' ')
   const structureHint = refinedHint(hints?.structure)
   const alterationHint = refinedHint(hints?.alteration)
   const geoHint = refinedHint(hints?.geo)
@@ -634,6 +716,7 @@ export function buildProjectNarrative(input) {
       lines: [
         `当前证据对靶区的支持程度为${level}; 判断依据不是单一图层, 而是构造位置、蚀变响应、物化探异常和三维结果之间是否形成同向叠合。`,
         targetsDetailLine(f, input.model3d) || null,
+        weightRationaleLine(input.model3d) || null,
         f.model.targetRule,
         modelDecisionLine || null,
         targetHint || null,

@@ -75,6 +75,12 @@ export const uploadKml = (projectId, file) => {
   fd.append('file', file)
   return client.post(`/api/projects/${projectId}/kml`, fd).then((r) => r.data)
 }
+// 经济参数表上传(新版报告价值评估章用,CSV/JSON)
+export const uploadEconParams = (projectId, file) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  return client.post(`/api/projects/${projectId}/econ-params`, fd).then((r) => r.data)
+}
 // ── 手工提交证据(预留入口:物探/化探/历史钻孔/靶向超弱核磁)──
 export const listManualEvidence = (projectId) =>
   client.get(`/api/projects/${projectId}/manual-evidence`).then((r) => r.data)

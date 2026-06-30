@@ -78,6 +78,7 @@ class Project(Base):
     thumb: Mapped[str] = mapped_column(String, default="cu")
     creator_id: Mapped[str] = mapped_column(String, index=True)
     current_run: Mapped[str] = mapped_column(String, nullable=True)
+    econ_params = mapped_column(_JSON, nullable=True)   # 经济参数表(价值评估章用,用户上传)
     created_at: Mapped[str] = mapped_column(String)
 
     def as_dict(self):
@@ -87,6 +88,7 @@ class Project(Base):
                 "delivery_id": self.delivery_id, "delivery_name": self.delivery_name,
                 "thumb": self.thumb,
                 "creator_id": self.creator_id, "current_run": self.current_run,
+                "econ_params": self.econ_params,
                 "created_at": self.created_at}
 
 

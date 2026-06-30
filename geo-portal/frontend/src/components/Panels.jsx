@@ -578,7 +578,7 @@ function EvidenceHud() {
                   onChange={(e) => updatePlanTask(t.key, { enabled: e.target.checked })} />
                 <span>{t.label}</span>
               </label>
-              <span className={`req ${t.required_level}`}>{t.required_level}</span>
+              <span className={`req ${t.required_level}`}>{({ required: '必需', recommended: '推荐', optional: '可选' })[t.required_level] || t.required_level}</span>
               <input type="number" min="0" max="1" step="0.01" value={t.weight}
                 onChange={(e) => updatePlanTask(t.key, { weight: Number(e.target.value) || 0 })} />
             </div>
@@ -647,7 +647,9 @@ function Model3DHud() {
   const targets = model3d?.targets
   const top = targets?.[0]
   const stats = model3d?.stats
-  const layers = stats?.available_layers
+  const _LAYER_ZH = { alteration: '蚀变', structure: '构造', deformation: '形变', depth_consistency: '深度自洽', geochem: '化探', magnetic: '磁异常', curvature: '曲率', active_fault: '活动断裂', slowvars: '慢变量', geophys: '物探', insar: '形变' }
+  const _FUSION_ZH = { knowledge: '知识加权求和', fuzzy: '模糊伽马融合', bayesian: '贝叶斯后验融合' }
+  const layers = (stats?.available_layers || []).map((l) => _LAYER_ZH[l] || l)
   const real = !!top
   const rows = buildEvidenceRows(evidences, selectedEvidence)
   const summary = useProjectSummary(rows)
@@ -675,7 +677,7 @@ function Model3DHud() {
       <h5 style={{ marginTop: 14 }}>模型概况</h5>
       <div className="kv"><span>证据层</span><b>{layers?.length ? layers.join('+') : '蚀变+构造'}</b></div>
       <div className="kv"><span>矿床类型</span><b style={{ fontSize: 11 }}>{stats?.deposit_type || '—'}</b></div>
-      <div className="kv"><span>融合法</span><b>{stats?.fusion_method || 'knowledge'}</b></div>
+      <div className="kv"><span>融合法</span><b style={{ fontSize: 11 }}>{_FUSION_ZH[stats?.fusion_method] || '知识加权求和'}</b></div>
       <SummaryNote text={summary} />
       <StageTrace active="model3d" />
 
@@ -789,10 +791,25 @@ function DrillHud() {
 // ⑥ 报告 HUD
 function ReportHud() {
   const { stages, evidences, selectedEvidence, runStageReal } = useWorkflow()
-  const { traceId } = useProject()
+  const { traceId, current } = useProject()
   const st = stages.report || {}
   const reportTaskId = st.taskId || st.sub_tasks?.reporter?.task_id
   const [reportDownloading, setReportDownloading] = useState('')
+  const [econUploading, setEconUploading] = useState(false)
+  const uploadEcon = async (e) => {
+    const f = e.target.files?.[0]
+    if (!f || !current?.id) return
+    setEconUploading(true)
+    try {
+      const r = await api.uploadEconParams(current.id, f)
+      message.success(`经济参数已上传(${(r.keys || []).length} 项),重新生成报告后新版「价值评估」章即出定量`)
+    } catch (err) {
+      message.error(err?.response?.data?.detail || '参数表上传失败')
+    } finally {
+      setEconUploading(false)
+      e.target.value = ''
+    }
+  }
   // 重开续接:报告生成中离开再回来,接回轮询(BFF 仍在后台生成),不必重新生成。pollStage 幂等。
   useEffect(() => {
     if (st.status === 'running' && reportTaskId && traceId) {
@@ -811,8 +828,10 @@ function ReportHud() {
       const blob = await api.downloadAdapterReport(reportTaskId, fmt)
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
+      const ext = fmt.startsWith('pptx') ? 'pptx' : 'docx'
+      const ver = fmt.endsWith('_v2') ? '新版' : '旧版'
       a.href = url
-      a.download = `报告.${fmt}`
+      a.download = `报告_${ver}.${ext}`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -833,15 +852,28 @@ function ReportHud() {
       <div className="gauge"><i style={{ width: `${st.progress || 0}%` }} /></div>
       <SummaryNote text={summary} />
       <StageTrace active="report" />
+      <label className="pbtn ghost" style={{ display: 'block', textAlign: 'center', cursor: 'pointer', marginBottom: 6 }}
+        title="上传 CSV/JSON 经济参数表(资源量/品位/金属价格/钻探单价…),用于新版报告「资源潜力与价值评估」章">
+        {econUploading ? '上传中…' : (current?.econ_params ? '⬆ 更新经济参数表(新版价值评估)' : '⬆ 上传经济参数表(新版价值评估)')}
+        <input type="file" accept=".csv,.json,.txt" style={{ display: 'none' }} onChange={uploadEcon} />
+      </label>
       {st.status !== 'completed'
         ? <button className="pbtn" onClick={() => runStageReal(traceId, 'report', 'reporter', { onDone: () => syncStage(traceId, 'report') })} disabled={st.status === 'running'}>
             {st.status === 'running' ? '生成中…' : '▶ 生成报告'}</button>
         : <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ fontSize: 11, color: 'var(--mut)' }}>旧版(现行)</div>
             <button className="pbtn" onClick={() => downloadReport('docx')} disabled={!!reportDownloading}>
-              {reportDownloading === 'docx' ? '下载中…' : '⬇ 下载 报告.docx'}
+              {reportDownloading === 'docx' ? '下载中…' : '⬇ 旧版 报告.docx'}
             </button>
             <button className="pbtn" onClick={() => downloadReport('pptx')} disabled={!!reportDownloading}>
-              {reportDownloading === 'pptx' ? '下载中…' : '⬇ 下载 报告.pptx'}
+              {reportDownloading === 'pptx' ? '下载中…' : '⬇ 旧版 报告.pptx'}
+            </button>
+            <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 4 }}>新版(融合·预览)</div>
+            <button className="pbtn" onClick={() => downloadReport('docx_v2')} disabled={!!reportDownloading}>
+              {reportDownloading === 'docx_v2' ? '下载中…' : '⬇ 新版 报告.docx'}
+            </button>
+            <button className="pbtn" onClick={() => downloadReport('pptx_v2')} disabled={!!reportDownloading}>
+              {reportDownloading === 'pptx_v2' ? '下载中…' : '⬇ 新版 报告.pptx'}
             </button>
             <button className="pbtn ghost" disabled={!!reportDownloading}
               onClick={() => runStageReal(traceId, 'report', 'reporter', { onDone: () => syncStage(traceId, 'report') })}

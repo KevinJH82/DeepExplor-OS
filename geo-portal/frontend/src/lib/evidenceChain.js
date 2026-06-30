@@ -1,5 +1,15 @@
 import { EVIDENCES, DATA_SOURCES, SOURCE_SERVICES } from './stages'
 
+// 证据级别枚举→中文(叙事为正式文案,避免 required/recommended/optional 英文)
+export const LEVEL_ZH = { required: '必需', recommended: '推荐', optional: '可选' }
+// 把后端生成文案里残留的英文枚举/标识词归一为中文(存量 run 的 reason 也即时生效)
+function zhEnum(s) {
+  if (!s) return s
+  return String(s)
+    .replace(/\brequired\b/g, '必需').replace(/\brecommended\b/g, '推荐').replace(/\boptional\b/g, '可选')
+    .replace(/orchestrator/gi, '编排器')
+}
+
 export const STATUS_TEXT = {
   pending: '待运行',
   running: '运行中',
@@ -75,8 +85,8 @@ export function evidenceRelation(key, ev = {}) {
   if (ev.status === 'failed') return ev.error ? '运行失败' : '证据缺失'
   if (ev.status === 'skipped') return '本次不参与'
   if (ev.status === 'running') return '正在生成异常证据'
-  if (ev.modelDerived) return ev.reason || '已作为 3D 融合输入参与靶点评分'
-  if (ev.archived) return ev.skipReason || '已有历史产物, 当前视图待接入'
+  if (ev.modelDerived) return zhEnum(ev.reason) || '已作为 3D 融合输入参与靶点评分'
+  if (ev.archived) return zhEnum(ev.skipReason) || '已有历史产物, 当前视图待接入'
   if (ev.degraded) return '服务失败,按低置信缺失证据纳入'
   if (ev.noLayer) return key === 'geochem' ? '点/矢量证据待接入' : '无可叠加栅格'
   if (ev.layerUrl) return '异常层已叠加'
@@ -98,7 +108,7 @@ export function buildEvidenceRows(evidences, selected) {
       relation: evidenceRelation(e.key, ev),
       contribution: evidenceContribution(e.key, ev),
       weight: ev.weight,
-      requiredLevel: ev.planTask?.required_level,
+      requiredLevel: LEVEL_ZH[ev.planTask?.required_level] || ev.planTask?.required_level,
       recommended: ev.planTask?.recommended,
       taskId: ev.taskId,
       layerUrl: ev.layerUrl,
@@ -108,8 +118,8 @@ export function buildEvidenceRows(evidences, selected) {
       modelDerived: ev.modelDerived,
       modelLayer: ev.modelLayer,
       modelSourceStatus: ev.modelSourceStatus,
-      reason: ev.reason,
-      skipReason: ev.skipReason,
+      reason: zhEnum(ev.reason),
+      skipReason: zhEnum(ev.skipReason),
       error: ev.error,
       summary: ev.summary,   // 证据量化指标(叙事事实层用)
     }
@@ -162,7 +172,7 @@ export function stageTrace(active, ctx) {
     },
     model3d: {
       input: evLabels,
-      process: [ctx.model3d?.stats?.fusion_method || 'knowledge fusion'],
+      process: [({ knowledge: '知识加权求和', fuzzy: '模糊伽马融合', bayesian: '贝叶斯后验融合' })[ctx.model3d?.stats?.fusion_method] || '知识加权求和'],
       output: [`靶点 ${ctx.model3d?.targets?.length || 0} 个`, '深度切片', '模型统计'],
     },
     drill: {
