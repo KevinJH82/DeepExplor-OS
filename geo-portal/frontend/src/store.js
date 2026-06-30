@@ -446,6 +446,7 @@ function mergeEvidencePlanStatuses(evidences, evidencePlan = {}) {
       planTask: task,
       weight: task.weight,
       reason: task.reason || next[key].reason,
+      summary: task.summary ?? next[key].summary,   // 证据量化指标(叙事事实层),刷新后回灌
       taskId,
       status,
       progress: task.progress ?? next[key].progress,
@@ -913,6 +914,37 @@ export const useWorkflow = create((set, get) => ({
     get().pollStage(traceId, id, service, taskId, { onDone })
   },
 
+  // 证据链综合研判(LLM):组装本 run 真实数据 → BFF claude;按需触发(默认不自动调,控成本)
+  synthesis: null,
+  synthesisLoading: false,
+  async loadSynthesis(traceId, refresh = false) {
+    if (!traceId) return
+    const s = get()
+    const proj = useProject.getState().current || {}
+    const evs = ['analyser', 'stru', 'geophys', 'geochem', 'insar'].map((k) => {
+      const e = s.evidences[k] || {}
+      return { key: k, status: e.status, weight: e.weight, metrics: e.summary?.metrics }
+    }).filter((e) => e.status === 'completed')
+    const dc = s.datacolleEvidence
+    const facts = {
+      project: proj.name, mineral: proj.mineral_label || proj.mineral,
+      model: s.evidencePlan?.model, rationale: s.evidencePlan?.rationale,
+      gate: s.evidencePlan?.gate,
+      evidences: evs,
+      targets: (s.model3d?.targets || []).slice(0, 6).map((t, i) => ({
+        rank: i + 1, score: t.score != null ? t.score : t.value, depth_m: t.depth_m,
+        lon: t.longitude, lat: t.latitude,
+      })),
+      fusion_layers: s.model3d?.stats?.available_layers || [],
+      drill: { holes: (s.drill?.holes || []).length, feedback: (s.drill?.feedback || []).map((f) => f.result).filter(Boolean) },
+      datacolle: dc ? { best_model: dc.best_model, pathfinders: dc.pathfinder_elements } : null,
+    }
+    set({ synthesisLoading: true })
+    try { set({ synthesis: await api.runSynthesis(traceId, facts, refresh) }) }
+    catch { set({ synthesis: { available: false, reason: '请求失败,可重试' } }) }
+    finally { set({ synthesisLoading: false }) }
+  },
+
   // 轮询一个【已启动】的任务直到终态(不再 startSvc),供 runStageReal 与"重开续接"复用。
   pollStage(traceId, id, service, taskId, { onDone } = {}) {
     const { setStage } = get()
@@ -1037,16 +1069,16 @@ export const useWorkflow = create((set, get) => ({
     const poll = async () => {
       if (get().evidences[key]?.status !== 'running') { stop(); return }  // 被跳过/降级/外部改 → 停
       if (useSynth) synth = Math.min(92, synth + 9)
-      let done = false, failed = false, realp = 0, errMsg = '', note = ''
+      let done = false, failed = false, realp = 0, errMsg = '', note = '', summary = null
       try {
         const s = await api.svcStatus(traceId, svc, taskId)
-        realp = s.progress || 0; note = s.note || ''
+        realp = s.progress || 0; note = s.note || ''; summary = s.summary || null
         if (s.status === 'completed') done = true
         else if (s.status === 'failed') { failed = true; errMsg = s.error || s.raw || '' }
       } catch { /* 瞬时错误,继续 */ }
       if (done) {
-        setEvidence(key, { status: 'completed', progress: 100, note: '' })
-        get().persistEvidenceTask(traceId, key, { status: 'completed', progress: 100, task_id: taskId, error: '', degraded: false })
+        setEvidence(key, { status: 'completed', progress: 100, note: '', summary })
+        get().persistEvidenceTask(traceId, key, { status: 'completed', progress: 100, task_id: taskId, error: '', degraded: false, summary })
         get().loadEvidenceLayer(key, svc, taskId)
         checkEvidenceSettle(get); stop(); return
       }

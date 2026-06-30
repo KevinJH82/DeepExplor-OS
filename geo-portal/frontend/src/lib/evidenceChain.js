@@ -111,6 +111,7 @@ export function buildEvidenceRows(evidences, selected) {
       reason: ev.reason,
       skipReason: ev.skipReason,
       error: ev.error,
+      summary: ev.summary,   // 证据量化指标(叙事事实层用)
     }
   })
 }

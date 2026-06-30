@@ -331,7 +331,8 @@ function evidenceStrong(row) {
   return ['layer', 'modelDerived'].includes(state)
 }
 
-function knowledgeHints(dc = {}) {
+function knowledgeHints(dc) {
+  dc = dc || {}
   const points = (dc.literature_points || []).map(cleanText).filter(Boolean)
   const hasAny = dc?.available && (dc.best_model || points.length || dc.pathfinder_elements?.length)
   if (!hasAny) return null
@@ -462,6 +463,75 @@ function targetConfidenceLine(f) {
   return `二维证据一致性评估为 ${f.confidence}; 三维模型尚未形成靶点产物, 靶区空间置信度仍未闭合。`
 }
 
+// ── 事实层:把各证据服务的真实量化指标(row.summary.metrics)转成接地气的中文短句 ──
+const _EV_ZH = { analyser: '蚀变', stru: '构造', geophys: '物探', geochem: '化探', insar: '形变' }
+const _LAYER_ZH = { structure: '构造', alteration: '蚀变', geophys: '物探', geochem: '化探', insar: '形变' }
+function _num(v, d = 1) { return v == null || isNaN(v) ? null : Number(v).toFixed(d) }
+
+function summaryMetricsLine(key, summary) {
+  const m = summary?.metrics
+  if (!m) return null
+  const p = []
+  if (key === 'analyser') {
+    if (m.anomaly_ratio != null) p.push(`蚀变异常占比 ${_num(m.anomaly_ratio * 100, 1)}%`)
+    if (m.high_confidence_pixels != null) p.push(`高置信像元 ${Number(m.high_confidence_pixels).toLocaleString()}`)
+    if (m.n_minerals) p.push(`${m.n_minerals} 类矿物指示`)
+    if (m.deposit_type) p.push(`矿床类型 ${m.deposit_type}`)
+  } else if (key === 'stru') {
+    if (m.n_lineaments != null) p.push(`识别线性构造 ${m.n_lineaments} 条`)
+    if (m.total_lineament_length_km != null) p.push(`总长 ${_num(m.total_lineament_length_km, 1)} km`)
+    if (m.dominant_strikes_deg?.length) p.push(`主走向 ${m.dominant_strikes_deg.slice(0, 3).map((d) => Math.round(d) + '°').join('/')}`)
+    if (m.lineament_density_mean != null) p.push(`平均密度 ${_num(m.lineament_density_mean, 2)}`)
+  } else if (key === 'geophys') {
+    if (m.n_sources != null) p.push(`Euler 反演源 ${m.n_sources} 个`)
+    if (m.source_depth_km_min != null && m.source_depth_km_max != null) p.push(`源深 ${_num(m.source_depth_km_min, 1)}–${_num(m.source_depth_km_max, 1)} km`)
+    if (m.inclination_deg != null) p.push(`磁倾角 ${_num(m.inclination_deg, 0)}°`)
+  } else if (key === 'geochem') {
+    if (m.n_anomalies != null) p.push(`异常样本 ${m.n_anomalies} 个`)
+    if (m.key_elements?.length) p.push(`关键元素 ${m.key_elements.join('-')}`)
+    if (m.median_ca_log_ratio != null) p.push(`C-A 阈值(log) ${_num(m.median_ca_log_ratio, 2)}`)
+  } else if (key === 'insar') {
+    if (m.deformation_rate_abs_mean_mm_yr != null) p.push(`平均形变速率 ${_num(m.deformation_rate_abs_mean_mm_yr, 1)} mm/yr`)
+    if (m.deformation_rate_abs_max_mm_yr != null) p.push(`峰值 ${_num(m.deformation_rate_abs_max_mm_yr, 1)} mm/yr`)
+    if (m.coverage_ratio != null) p.push(`有效覆盖 ${_num(m.coverage_ratio * 100, 0)}%`)
+    if (m.n_bursts != null) p.push(`${m.n_bursts} 景`)
+  }
+  return p.length ? p.join('、') : null
+}
+
+// 实测数前缀:把真实指标放到每条证据判读最前面(没有则空)
+function metricsClause(row) {
+  if (!evidenceReady(row)) return ''
+  const nums = summaryMetricsLine(row.key, row.summary)
+  return nums ? `实测 ${nums};` : ''
+}
+
+// 靶区:用真实 model3d.targets + 融合采纳的证据层 + 权重(交叉印证)
+function targetsDetailLine(f, model3d = {}) {
+  const ts = model3d?.targets || []
+  if (!ts.length) return null
+  const top = ts.slice(0, 3).map((t, i) => {
+    const sc = _num(t.score != null ? t.score : t.value, 2)
+    return `#${i + 1} 评分 ${sc ?? '-'}${t.depth_m != null ? ` @ ${t.depth_m}m` : ''}`
+  }).join('; ')
+  const layers = (model3d?.stats?.available_layers || []).map((l) => _LAYER_ZH[l] || l)
+  const weights = ['analyser', 'stru', 'geophys', 'geochem', 'insar']
+    .map((k) => (f[k]?.weight != null ? `${_EV_ZH[k]}${Math.round(f[k].weight * 100)}%` : null))
+    .filter(Boolean)
+  return `三维融合共生成 ${ts.length} 个靶点; 前三:${top}。` +
+    (layers.length ? `融合实际采纳证据层:${layers.join('、')};` : '') +
+    (weights.length ? ` 权重组合 ${weights.join('+')}。` : '')
+}
+
+// 布孔:用真实 drill.holes / feedback
+function drillDetailLine(drill = {}) {
+  const holes = drill?.holes || []
+  if (!holes.length) return null
+  const deep = holes.filter((h) => String(h.category || '').toLowerCase() === 'deep').length
+  const ore = (drill?.feedback || []).filter((fb) => /mineral|见矿|ore/i.test(String(fb.result || ''))).length
+  return `已设计 ${holes.length} 个钻孔${deep ? `(深孔 ${deep} 个)` : ''}${ore ? `, 岩芯反馈见矿 ${ore} 孔` : ''}; 建议沿主控构造走向、靶点叠合中心优先验证。`
+}
+
 export function buildProjectEvidenceFacts({ current, evidenceRows = [], selectedSources = [], model3d = {}, target = null, run = null }) {
   const model = MODELS[mineralKey(current)] || MODELS.gold
   const bbox = current?.aoi_bbox
@@ -550,10 +620,10 @@ export function buildProjectNarrative(input) {
       title: '证据链判读',
       weight: level === '较强' || level === '中等' ? 'strong' : level === '初步' ? 'normal' : 'risk',
       lines: [
-        `构造: ${structureFactLine(f.stru, f)}`,
-        evidenceReady(f.insar) ? `形变: ${structureFactLine(f.insar, f, 'insar')}` : null,
-        `蚀变: ${factLine(f.analyser)}${alterationHint && evidenceReady(f.analyser) ? ` ${alterationHint}` : ''}`,
-        `物化探: ${[factLine(f.geophys), factLine(f.geochem)].join(' ')}${geoHint && (evidenceReady(f.geophys) || evidenceReady(f.geochem)) ? ` ${geoHint}` : ''}`,
+        `构造: ${metricsClause(f.stru)}${structureFactLine(f.stru, f)}`.replace(/\s+/g, ' ').trim(),
+        evidenceReady(f.insar) ? `形变: ${metricsClause(f.insar)}${structureFactLine(f.insar, f, 'insar')}`.replace(/\s+/g, ' ').trim() : null,
+        `蚀变: ${metricsClause(f.analyser)}${factLine(f.analyser)}${alterationHint && evidenceReady(f.analyser) ? ` ${alterationHint}` : ''}`.replace(/\s+/g, ' ').trim(),
+        `物化探: ${metricsClause(f.geophys)}${metricsClause(f.geochem)}${[factLine(f.geophys), factLine(f.geochem)].join(' ')}${geoHint && (evidenceReady(f.geophys) || evidenceReady(f.geochem)) ? ` ${geoHint}` : ''}`.replace(/\s+/g, ' ').trim(),
         structureMetallogenyLine(f),
       ].filter(Boolean),
     },
@@ -563,10 +633,11 @@ export function buildProjectNarrative(input) {
       weight: level === '较强' || level === '中等' ? 'strong' : 'risk',
       lines: [
         `当前证据对靶区的支持程度为${level}; 判断依据不是单一图层, 而是构造位置、蚀变响应、物化探异常和三维结果之间是否形成同向叠合。`,
+        targetsDetailLine(f, input.model3d) || null,
         f.model.targetRule,
         modelDecisionLine || null,
         targetHint || null,
-        targetText,
+        targetsDetailLine(f, input.model3d) ? null : targetText,
         targetConfidenceLine(f),
       ].filter(Boolean),
     },
@@ -576,7 +647,7 @@ export function buildProjectNarrative(input) {
       weight: gaps.length ? 'normal' : 'strong',
       lines: [
         gaps[0] || '当前主要证据已闭合, 下一步应围绕三维靶点和钻孔/布孔方案进行空间验证。',
-        f.topTarget ? '优先核查首位靶点周边的构造-蚀变-物化探叠合关系, 再决定布孔深度和孔斜方向。' : '优先进入或刷新三维建模, 将二维证据转化为可检验的深度、评分和靶点位置。',
+        drillDetailLine(input.drill) || (f.topTarget ? '优先核查首位靶点周边的构造-蚀变-物化探叠合关系, 再决定布孔深度和孔斜方向。' : '优先进入或刷新三维建模, 将二维证据转化为可检验的深度、评分和靶点位置。'),
         productState.yes.length ? `已有产物可作为复核基础: ${productState.yes.slice(0, 5).join('、')}。` : null,
       ].filter(Boolean),
     },

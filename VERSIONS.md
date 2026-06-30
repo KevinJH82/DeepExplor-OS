@@ -32,20 +32,25 @@
 | `geo-exploration` | 勘查 web 应用（矿种引擎/慢变量检测） | 0.1.0 |
 | `geo-7slow` | 七要素慢变量子系统 | 0.1.0 |
 | `geo-Yaky` | 形变/位场扩展系统（fspef-vers-system） | 0.1.0 |
-| `geo-portal` | 统一门户 BFF + 前端（租户/RBAC/项目/运行主线） | 0.1.0 |
+| `geo-portal` | 统一门户 BFF + 前端（租户/RBAC/项目/运行主线） | 1.1.0 |
 
 ## 子系统
 
 | 子系统 | 隶属 | 角色 | 版本 |
 |---|---|---|---|
-| `geo-portal/backend` | geo-portal | FastAPI BFF（鉴权/反代/状态归一/血缘） | 0.1.0 |
-| `geo-portal/frontend` | geo-portal | React 门户前端 | 0.1.0 |
+| `geo-portal/backend` | geo-portal | FastAPI BFF（鉴权/反代/状态归一/血缘） | 1.1.0 |
+| `geo-portal/frontend` | geo-portal | React 门户前端 | 1.1.0 |
 | `geo-7slow/backend` | geo-7slow | 后端服务 | 0.1.0 |
 | `geo-7slow/frontend` | geo-7slow | 前端 | 0.1.0 |
 | `geo-Yaky/fspef-vers-system` | geo-Yaky | 形变/位场子系统 | 0.1.0 |
 | `geo-exploration/Python_Project` | geo-exploration | 勘查应用主代码 | 0.1.0 |
 
 ## 变更日志（monorepo 级）
+
+### v1.1.0 — 2026-06-30
+- `geo-portal` 系统及其 backend/frontend 子系统升至 **1.1.0**（其余系统保持 0.1.0）。
+- 证据链融合增强：门户证据链叙事/地质叙事/store 联动重构，后端 main 配套
+  （+247 行），新增设计文档 `geo-portal/docs/证据链融合方案.md`。
 
 ### v0.1.0 — 2026-06-29
 - 版本管理起点：为 17 个系统与 6 个子系统建立统一 0.1.0 基线。

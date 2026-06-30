@@ -194,6 +194,51 @@ def _adapter_thread(fn, *args):
             store.save_adapter_task(tid, _ADAPTER_TASKS.get(tid))
         except Exception:
             pass
+
+
+def _evidence_summary(service: str, meta: dict):
+    """从各证据服务的 manifest/metadata 提炼已有量化指标 → 归一 metrics(仅转发,不算法)。
+    供证据链叙事"事实层"挂真实数;字段缺失则省略,不编造。返回 {service, metrics} 或 None。"""
+    meta = meta or {}
+    m = {}
+    if service == "analyser":
+        res = meta.get("results") or []
+        # 仅用顶层聚合 anomaly_ratio(0-1 真分数);results 内的 anomaly_ratio 量纲不一致(可能>1),不做兜底以免误显
+        ar = meta.get("anomaly_ratio")
+        m["anomaly_ratio"] = ar if isinstance(ar, (int, float)) and 0 <= ar <= 1 else None
+        m["high_confidence_pixels"] = meta.get("high_confidence_total_pixels") or meta.get("high_confidence_pixels")
+        m["deposit_type"] = meta.get("deposit_type")
+        minerals = {r.get("mineral") for r in res if isinstance(r, dict) and r.get("mineral")}
+        m["n_minerals"] = len(minerals) or None
+    elif service == "stru":
+        ss = meta.get("structural_stats") or meta
+        for k in ("n_lineaments", "total_lineament_length_km", "lineament_density_mean",
+                  "dominant_strikes_deg", "elevation_range_m"):
+            m[k] = ss.get(k)
+    elif service == "geophys":
+        ms = meta.get("model_stats") or meta
+        eu = ms.get("euler") or {}
+        m["n_sources"] = eu.get("n_sources")
+        m["source_depth_km_min"] = eu.get("source_depth_km_min")
+        m["source_depth_km_max"] = eu.get("source_depth_km_max")
+        ig = ms.get("igrf") or {}
+        m["inclination_deg"] = ig.get("inclination_deg")
+        m["declination_deg"] = ig.get("declination_deg")
+        m["mineral_type"] = ms.get("mineral_type")
+    elif service == "insar":
+        st = meta.get("stats") or meta
+        for k in ("deformation_rate_abs_mean_mm_yr", "deformation_rate_abs_max_mm_yr",
+                  "deformation_rate_abs_p95_mm_yr", "coverage_ratio", "n_bursts"):
+            m[k] = st.get(k)
+    elif service == "geochem":
+        an = meta.get("anomaly_stats") or {}
+        for k in ("n_anomalies", "n_background", "n_transition", "median_ca_log_ratio"):
+            m[k] = an.get(k)
+        m["key_elements"] = meta.get("key_elements")
+    metrics = {k: v for k, v in m.items() if v is not None and v != []}
+    return {"service": service, "metrics": metrics} if metrics else None
+
+
 _MINERAL_ZH = {
     "copper": "铜", "gold": "金", "iron": "铁", "leadzinc": "铅锌",
     "silver": "银", "molybdenum": "钼", "tungsten": "钨", "tin": "锡",
@@ -544,6 +589,19 @@ def _run_analyser(task_id, kml_bytes, kml_name, mineral, tenant_id=None, deliver
             t["layer"] = {"kind": "file", "path": rt}
             t.update(status="completed", progress=100,
                      warning=f"项目交付数据缺失,已复用同区现成蚀变产物({rdir})")
+            # 复用分支同样采量化指标(读复用产物的 manifest),否则证据链/研判看不到蚀变数值
+            try:
+                for cand in (os.path.join(os.path.dirname(os.path.dirname(rt)), "manifest.json"),
+                             os.path.join(os.path.dirname(rt), "manifest.json")):
+                    if os.path.isfile(cand):
+                        summ = _evidence_summary("analyser", json.load(open(cand, encoding="utf-8")))
+                        if summ:
+                            summ["metrics"].setdefault("deposit_type", dep)
+                            summ["reused"] = True
+                            t["summary"] = summ
+                        break
+            except Exception:
+                pass
             return True
         return False
 
@@ -615,6 +673,16 @@ def _run_analyser(task_id, kml_bytes, kml_name, mineral, tenant_id=None, deliver
                 return 0
             if tifs:
                 t["layer"] = {"kind": "file", "path": sorted(tifs, key=_sc, reverse=True)[0]}
+            # 接通蚀变量化指标(manifest.json)供叙事事实层
+            try:
+                mf = os.path.join(run_dir, "manifest.json")
+                manifest = json.load(open(mf, encoding="utf-8")) if os.path.isfile(mf) else dict(rb)
+                summ = _evidence_summary("analyser", manifest)
+                if summ:
+                    summ["metrics"].setdefault("deposit_type", deposit_type)
+                    t["summary"] = summ
+            except Exception:
+                pass
         t.update(status="completed", progress=100)
     except Exception as e:
         t.update(status="failed", error=str(e))
@@ -680,6 +748,9 @@ def _run_stru(task_id, kml_bytes, kml_name, bbox=None, tenant_id=None, delivery_
                     rel = next((v for v in prods.values() if isinstance(v, str) and v.endswith(".tif")), None)
                 if rel:
                     t["layer"] = {"kind": "proxy", "service": "stru", "task": sid, "rel": rel}
+                summ = _evidence_summary("stru", meta)
+                if summ:
+                    t["summary"] = summ
             except Exception:
                 pass
         t.update(status="completed", progress=100)
@@ -783,6 +854,27 @@ def _safe_stem(name: str) -> str:
     return re.sub(r'[\\/:*?"<>|]+', "_", stem).strip()
 
 
+def _bbox_contains_pt(bbox, lon, lat, margin=0.02):
+    b = _as_bbox(bbox)
+    if not b or lon is None or lat is None:
+        return False
+    return (b[0] - margin) <= lon <= (b[2] + margin) and (b[1] - margin) <= lat <= (b[3] + margin)
+
+
+def _model3d_run_in_bbox(run_dir, bbox):
+    """该 model3d 产物的靶点是否落在项目 ROI 内(过半即算同区)。
+    用于名称不匹配时按 bbox 复用——避免误取相距上千 km 的别项目靶点。"""
+    try:
+        d = json.loads((run_dir / "targets_3d.json").read_text(encoding="utf-8"))
+        tg = d.get("targets", []) if isinstance(d, dict) else d
+    except Exception:
+        return False
+    if not tg:
+        return False
+    hits = sum(1 for t in tg if isinstance(t, dict) and _bbox_contains_pt(bbox, t.get("lon"), t.get("lat")))
+    return hits >= max(1, len(tg) // 2)
+
+
 def _find_existing_model3d(project: dict):
     """按项目 KML/aoi 名称发现最新 model3d 靶点产物。"""
     names = [_safe_stem(project.get("kml_name")), _safe_stem(project.get("name"))]
@@ -796,7 +888,10 @@ def _find_existing_model3d(project: dict):
           if mdir.is_dir():
               candidates.extend([d for d in mdir.iterdir() if d.is_dir()])
       if not candidates and project.get("aoi_bbox"):
-          candidates.extend(root.glob("*/model3d/*"))
+          # 名称不匹配 → 按 bbox 复用:仅取靶点真正落在本 ROI 内的产物(此前未过滤导致取到别区靶点)
+          bbox = project.get("aoi_bbox")
+          candidates.extend(d for d in root.glob("*/model3d/*")
+                            if d.is_dir() and _model3d_run_in_bbox(d, bbox))
       candidates = sorted([d for d in candidates if (d / "targets_3d.json").exists()],
                           key=lambda d: d.name, reverse=True)
       for run_dir in candidates:
@@ -818,6 +913,16 @@ def _find_existing_model3d(project: dict):
     return {"ok": False, "reason": "未发现三维靶点产物"}
 
 
+def _drill_run_in_bbox(run_dir, bbox):
+    """该布孔产物的钻孔是否落在项目 ROI 内(外包 bbox 与 ROI 相交即算同区)。"""
+    try:
+        gj = json.loads((run_dir / "planned_holes.geojson").read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    hb = _bbox_from_geojson(gj)
+    return bool(hb) and _bbox_cover_frac(hb, bbox) > 0
+
+
 def _latest_drill_run_dir(project: dict):
     """按项目 KML/aoi 名称定位最新 AI 布孔产物目录(含 planned_holes.geojson)。无则 None。"""
     names = [_safe_stem(project.get("kml_name")), _safe_stem(project.get("name"))]
@@ -830,7 +935,10 @@ def _latest_drill_run_dir(project: dict):
             if ddir.is_dir():
                 candidates.extend([d for d in ddir.iterdir() if d.is_dir()])
         if not candidates and project.get("aoi_bbox"):
-            candidates.extend(root.glob("*/drill/*"))
+            # 名称不匹配 → 按 bbox 复用:仅取钻孔落在本 ROI 内的产物(否则会取到别区钻孔)
+            bbox = project.get("aoi_bbox")
+            candidates.extend(d for d in root.glob("*/drill/*")
+                              if d.is_dir() and _drill_run_in_bbox(d, bbox))
         candidates = sorted([d for d in candidates if (d / "planned_holes.geojson").exists()],
                             key=lambda d: d.name, reverse=True)
         if candidates:
@@ -923,6 +1031,13 @@ def _run_geophys(task_id, kml_bytes, kml_name, mineral, tenant_id=None):
                 rel = _geophys_layer_rel(c, sid)
                 if rel:
                     t["layer"] = {"kind": "proxy", "service": "geophys", "task": sid, "rel": rel}
+                try:
+                    gmeta = c.get(f"{services.base_url('geophys')}/api/result/{sid}/metadata.json").json()
+                    summ = _evidence_summary("geophys", gmeta)
+                    if summ:
+                        t["summary"] = summ
+                except Exception:
+                    pass
                 t.update(status="completed", progress=100)
             else:
                 t.update(status="failed", error=(tk or {}).get("error") or "物探失败(补数据后仍无磁/重)")
@@ -994,8 +1109,14 @@ def _insar_download_roots():
     return _INSAR_DL_ROOTS
 
 
-def _find_insar_evidence_by_bbox(project, min_frac=0.7):
-    """名字匹配失败时,按 AOI bbox 复用同一区现成形变图(读 insar_metadata.json 的 aoi_bbox)。"""
+def _find_insar_evidence_by_bbox(project, min_frac=0.7, min_reverse=0.25):
+    """名字匹配失败时,按 AOI bbox 复用同一区现成形变图(读 insar_metadata.json 的 aoi_bbox)。
+
+    双向门控:
+    - forward(产物覆盖 ROI ≥ min_frac):产物足迹要盖住本 ROI;
+    - reverse(ROI 覆盖产物 ≥ min_reverse):产物足迹不能比 ROI 大太多(≈ ≤4× ROI 面积)。
+    避免拆分后的小子区(如铜钼)误复用横跨多块的合并区产物——那种 reverse≈0,
+    会被拒,从而逼出该 ROI 的独立 InSAR 处理(数据阶段),而非区域级复用。"""
     bbox = _as_bbox((project or {}).get("aoi_bbox"))
     if not bbox:
         return None, None
@@ -1011,9 +1132,11 @@ def _find_insar_evidence_by_bbox(project, min_frac=0.7):
                 ab = None
             if not ab:
                 continue
-            frac = _bbox_cover_frac(ab, bbox)
-            if frac >= min_frac and (best is None or frac > best[2]):
-                best = (str(tif), tif.parent.name, frac)
+            frac = _bbox_cover_frac(ab, bbox)        # 产物 → 盖住 ROI
+            rev = _bbox_cover_frac(bbox, ab)         # ROI → 盖住产物(产物是否过大/错位)
+            score = min(frac, rev)
+            if frac >= min_frac and rev >= min_reverse and (best is None or score > best[2]):
+                best = (str(tif), tif.parent.name, score)
     return (best[0], best[1]) if best else (None, None)
 
 
@@ -1401,6 +1524,13 @@ def _run_insar(task_id, kml_name, project=None, allow_trigger=False, data_task=N
         if path:
             t["layer"] = {"kind": "file", "path": path}
             t.update(status="completed", progress=100, warning=None, matched_aoi=matched)
+            try:
+                mp = os.path.join(os.path.dirname(path), "insar_metadata.json")
+                summ = _evidence_summary("insar", json.load(open(mp, encoding="utf-8"))) if os.path.isfile(mp) else None
+                if summ:
+                    t["summary"] = summ
+            except Exception:
+                pass
         elif _reuse_completed_insar_result(t, project):
             return
         elif not allow_trigger:
@@ -1409,7 +1539,8 @@ def _run_insar(task_id, kml_name, project=None, allow_trigger=False, data_task=N
                 raise RuntimeError("InSAR 数据尚未准备完成,请先完成数据阶段")
             if st == "failed":
                 raise RuntimeError((data_task or {}).get("error") or "InSAR 数据准备失败,请在数据阶段重试")
-            raise RuntimeError("InSAR 数据尚未准备,证据阶段不会触发 HyP3 下载")
+            raise RuntimeError("本 ROI 没有专属形变产物(同区只有覆盖范围差异过大的产物,已按 ROI 收紧匹配不复用);"
+                               "请在『数据准备』阶段为本项目单独发起 InSAR(Sentinel-1 + HyP3,数小时),完成后证据阶段会复用该专属产物。")
         else:
             _trigger_insar_processing(t, project)   # 发起真实 InSAR 处理(不阻塞,状态由 svcstatus 代理)
     except Exception as e:
@@ -1742,15 +1873,22 @@ class ProjectIn(BaseModel):
 def get_projects(user=Depends(auth.current_user)):
     projects = store.list_projects(user["tenant_id"], user["id"])
     for p in projects:
-        # 卡片进度取该项目【最远/最佳 run】(done 最多,并列再比 percent),反映"项目做到哪了";
-        # 新开的部分 run 不会让卡片看起来倒退。点卡片仍进当前在用的 run(current_run)。
-        runs = store.runs_for_project(p["id"]) if p.get("current_run") else []
-        best = None
-        for run in runs:
-            pr = summarize_progress(run.get("stages") or {})
-            if best is None or (pr["done"], pr["percent"]) > (best["done"], best["percent"]):
-                best = pr
-        p["progress"] = best
+        # 卡片进度=当前在用 run(current_run)的真实进度(=你正在做的这次);
+        # 若历史有更靠前的 run,附 best_percent/best_done 供前端标注"历史最远 N%"。
+        cr = p.get("current_run")
+        runs = store.runs_for_project(p["id"]) if cr else []
+        cur_run = next((r for r in runs if r.get("trace_id") == cr), None) or (runs[0] if runs else None)
+        prog = summarize_progress((cur_run or {}).get("stages") or {}) if cur_run else None
+        if prog:
+            best = prog
+            for run in runs:
+                q = summarize_progress(run.get("stages") or {})
+                if (q["done"], q["percent"]) > (best["done"], best["percent"]):
+                    best = q
+            if (best["done"], best["percent"]) > (prog["done"], prog["percent"]):
+                prog["best_percent"] = best["percent"]
+                prog["best_done"] = best["done"]
+        p["progress"] = prog
     return projects
 
 
@@ -2391,6 +2529,71 @@ def _reconcile_data_stage(trace_id: str, run: dict, service: str, result: dict) 
         pass  # 兜底逻辑不得影响 svcstatus 正常返回
 
 
+# ─── 证据链综合研判(LLM,复用 claude CLI;喂真实数据避免幻觉,按 run 缓存)──
+import shutil as _shutil
+_CLAUDE_BIN = _shutil.which("claude") or "/opt/homebrew/bin/claude"
+
+
+class SynthIn(BaseModel):
+    facts: dict = {}      # 前端组装的本 run 真实数据(证据 summary/靶点/钻孔/知识库/矿种模型)
+    refresh: bool = False
+
+
+def _synthesis_prompt(facts: dict) -> str:
+    return (
+        "你是资深矿产勘查地质专家。下面是某勘查项目【本次运行的真实数据】(JSON)。"
+        "请只基于这些真实数字做证据链综合研判,严禁编造数据中没有的数值/坐标/占比(如 metrics 缺失就不要写具体数)。"
+        "某证据 status=completed 但无 metrics 时,如实写'已完成,但本次未采到量化指标',不得臆造比例或元素;"
+        "不要把'证据已完成'与'是否进入三维融合层(fusion_layers)'混为一谈,二者分别陈述。"
+        "输出【纯 JSON】(不要任何解释/markdown 代码块),schema:\n"
+        '{"grade":"A|B|C|D(综合成矿置信)","summary":"3-5句中文综合研判,需引用真实数(构造条数/蚀变占比/靶点评分深度/形变速率等)并说明证据如何相互印证",'
+        '"dimensions":[{"name":"构造|蚀变|物探|化探|形变","level":"高|中|低|缺","evidence":"一句中文,引用该证据真实指标"}],'
+        '"target_assessment":[{"rank":1,"grade":"A|B|C|D","reason":"一句中文,说明该靶点由哪些证据叠合支撑、评分与深度"}]}\n'
+        "真实数据:\n" + json.dumps(facts, ensure_ascii=False)
+    )
+
+
+def _run_synthesis_llm(prompt: str):
+    try:
+        env = {**os.environ, "PATH": os.environ.get("PATH", "") + ":/opt/homebrew/bin:/usr/local/bin"}
+        r = subprocess.run([_CLAUDE_BIN, "-p", "--dangerously-skip-permissions", prompt],
+                           capture_output=True, text=True, timeout=240, env=env)
+        if r.returncode != 0:
+            return None
+        s = (r.stdout or "").strip()
+        mt = re.search(r"\{.*\}", s, re.S)
+        return json.loads(mt.group(0)) if mt else None
+    except Exception:
+        return None
+
+
+@app.post("/api/runs/{trace_id}/synthesis")
+def run_synthesis(trace_id: str, body: SynthIn, user=Depends(auth.current_user)):
+    run = store.get_run(trace_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="运行不存在")
+    auth.require_project_read(user, run["project_id"])
+    fp = hashlib.sha1(json.dumps(body.facts, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:16]
+    cache = None
+    try:
+        cache = store.get_adapter_task(f"synth_{trace_id}")
+    except Exception:
+        cache = None
+    if cache and cache.get("fingerprint") == fp and not body.refresh and cache.get("result"):
+        return cache["result"]
+    if not (os.path.exists(_CLAUDE_BIN) or _shutil.which("claude")):
+        return {"available": False, "reason": "未启用 LLM(claude CLI 不可用)"}
+    res = _run_synthesis_llm(_synthesis_prompt(body.facts))
+    if not res:
+        return {"available": False, "reason": "研判生成失败,可点刷新重试"}
+    out = {"available": True, **res}
+    try:
+        store.save_adapter_task(f"synth_{trace_id}", {"fingerprint": fp, "result": out})
+    except Exception:
+        pass
+    return out
+
+
 @app.get("/api/runs/{trace_id}/svcstatus")
 def service_status(trace_id: str, service: str, task_id: str, user=Depends(auth.current_user)):
     run = store.get_run(trace_id)
@@ -2423,6 +2626,7 @@ def service_status(trace_id: str, service: str, task_id: str, user=Depends(auth.
             "warning": t.get("warning"),
             "note": t.get("note"),
             "no_layer": t.get("no_layer"),
+            "summary": t.get("summary"),   # 证据量化指标(叙事事实层)
         }
     # 仍找不到且是适配器 id → BFF 重启时正在跑、未落库的孤儿任务 → 报 failed,前端给重试入口。
     if "_bff_" in task_id:
@@ -2439,6 +2643,15 @@ def service_status(trace_id: str, service: str, task_id: str, user=Depends(auth.
     try:
         with httpx.Client(timeout=30.0, headers=_internal_headers()) as c:
             res = _norm_status(c.get(url).json())
+            # geochem 非 adapter:完成时现读其 metadata 提炼量化指标(化探异常样/C-A 阈值/关键元素)
+            if service == "geochem" and res.get("status") == "completed":
+                try:
+                    gm = c.get(f"{services.base_url('geochem')}/api/result/{task_id}/metadata.json").json()
+                    summ = _evidence_summary("geochem", gm)
+                    if summ:
+                        res["summary"] = summ
+                except Exception:
+                    pass
         res["task_id"] = task_id   # 确保 task_id 落库,供重开后续接轮询
         _reconcile_data_stage(trace_id, run, service, res)   # 后端兜底:datacolle/preprocess 完成同理
         return res

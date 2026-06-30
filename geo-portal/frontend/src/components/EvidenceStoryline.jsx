@@ -19,10 +19,16 @@ export default function EvidenceStoryline() {
   const selectedEvidence = useWorkflow((s) => s.selectedEvidence)
   const selectedSources = useWorkflow((s) => s.selectedSources)
   const model3d = useWorkflow((s) => s.model3d)
+  const drill = useWorkflow((s) => s.drill)
+  const stages = useWorkflow((s) => s.stages)
   const run = useWorkflow((s) => s.run)
   const datacolle = useWorkflow((s) => s.datacolleEvidence)
   const current = useProject((s) => s.current)
+  const traceId = useProject((s) => s.traceId)
   const manualEvidence = useProject((s) => s.manualEvidence)
+  const synthesis = useWorkflow((s) => s.synthesis)
+  const synthesisLoading = useWorkflow((s) => s.synthesisLoading)
+  const loadSynthesis = useWorkflow((s) => s.loadSynthesis)
   const panelRef = useRef(null)
   const setStoryMode = (next) => {
     setMode(next)
@@ -46,10 +52,12 @@ export default function EvidenceStoryline() {
   if (!current || active === 'plan') return null
 
   const rows = buildEvidenceRows(evidences, selectedEvidence)
-  const narrativeInput = { current, evidenceRows: rows, selectedSources, model3d, run, datacolle }
+  const narrativeInput = { current, evidenceRows: rows, selectedSources, model3d, drill, run, datacolle }
   const sections = buildProjectNarrative(narrativeInput)
   const summary = buildProjectSummary(narrativeInput)
   const activeKeys = ACTIVE_BY_STAGE[active] || []
+  // 综合研判需在 3D 建模(证据整合出靶点)之后才有意义;此前置灰
+  const model3dReady = stages?.model3d?.status === 'completed' || (model3d?.targets?.length > 0)
   const lineLimit = (key) => {
     if (key === 'context' || key === 'logic') return 4
     if (key === 'chain' || key === 'target') return 6
@@ -94,6 +102,37 @@ export default function EvidenceStoryline() {
             ))}
           </div>
         )}
+      {mode === 'expanded' && (
+        <div className="story-synth">
+          <div className="ss-head">
+            <b>证据链综合研判 (AI)</b>
+            {synthesis?.available && synthesis.grade && <span className={`ss-grade g-${synthesis.grade}`}>{synthesis.grade} 级</span>}
+            <button disabled={synthesisLoading || !model3dReady}
+              title={model3dReady ? '' : '需先完成 3D 建模(证据整合)后再研判'}
+              onClick={() => loadSynthesis(traceId, !!synthesis?.available)}>
+              {synthesisLoading ? '研判中…' : synthesis ? '↻ 重新研判' : '▷ 生成研判'}
+            </button>
+          </div>
+          {synthesis?.available ? (
+            <>
+              {synthesis.summary && <p className="ss-sum">{synthesis.summary}</p>}
+              {(synthesis.dimensions || []).map((d, i) => (
+                <div key={i} className="ss-dim"><em>{d.name}</em><span className={`lv lv-${d.level}`}>{d.level}</span><span>{d.evidence}</span></div>
+              ))}
+              {(synthesis.target_assessment || []).length > 0 && <div className="ss-tg-h">靶点研判</div>}
+              {(synthesis.target_assessment || []).map((t, i) => (
+                <div key={i} className="ss-tg">#{t.rank} <b>{t.grade}</b> {t.reason}</div>
+              ))}
+            </>
+          ) : synthesis ? (
+            <p className="ss-na">{synthesis.reason || '未启用'}</p>
+          ) : !model3dReady ? (
+            <p className="ss-na">综合研判需在 3D 建模(证据整合出靶点)之后进行;当前证据尚未整合,暂不可研判。</p>
+          ) : (
+            <p className="ss-na">点「生成研判」,基于本项目真实数据产出 AI 综合研判(需 LLM)。</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -239,6 +239,10 @@ body{
 .storyline{position:fixed;left:50%;right:auto;bottom:120px;transform:translateX(-50%);
   width:min(70vw,980px);max-width:calc(100vw - 80px);z-index:23;padding:10px 12px}
 .storyline.compact{padding:8px 10px}
+/* 展开内容多时:封顶高度 + 纵向滚动(避免顶部被推出视口外被遮挡);表头吸顶 */
+.storyline.expanded{max-height:calc(100vh - 150px);overflow-y:auto;overscroll-behavior:contain}
+.storyline.expanded .storyline-head{position:sticky;top:0;z-index:2;
+  background:rgba(245,249,255,.96);backdrop-filter:blur(8px);margin:-2px 0 8px;padding:4px 0}
 .storyline-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .storyline.compact .storyline-head{margin-bottom:4px}
 .storyline-head b{color:#13324d;font-size:12px;white-space:nowrap}.storyline-head span{color:var(--mut);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -332,6 +336,22 @@ body{
 /* 证据链叙事:手工证据待融合标注 */
 .story-manual{font-size:11px;color:#8a641a;background:rgba(217,146,31,.1);border:1px solid rgba(217,146,31,.28);
   border-radius:6px;padding:4px 8px;margin:6px 0}
+/* 证据链综合研判(AI)卡 */
+.story-synth{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+.story-synth .ss-head{display:flex;align-items:center;gap:8px}
+.story-synth .ss-head b{color:#13324d;font-size:12.5px}
+.story-synth .ss-head button{margin-left:auto;font-size:11px;border:1px solid rgba(10,162,192,.4);
+  background:rgba(10,162,192,.1);color:#0a8aa3;border-radius:6px;padding:2px 8px;cursor:pointer}
+.story-synth .ss-head button:disabled{opacity:.5;cursor:not-allowed}
+.ss-grade{font-size:11px;font-weight:700;color:#fff;border-radius:5px;padding:1px 7px;background:#12b07a}
+.ss-grade.g-B{background:#1b6ee0}.ss-grade.g-C{background:#d9921f}.ss-grade.g-D{background:#e0556e}
+.ss-sum{font-size:11.5px;color:var(--txt);line-height:1.5;margin:6px 0}
+.ss-dim{display:flex;align-items:baseline;gap:6px;font-size:11px;margin:3px 0;color:var(--mut)}
+.ss-dim em{font-style:normal;color:#13324d;min-width:34px}
+.ss-dim .lv{font-weight:700;color:#12b07a}.ss-dim .lv-中{color:#d9921f}.ss-dim .lv-低{color:#e0556e}.ss-dim .lv-缺{color:#9fb1ca}
+.ss-tg-h{font-size:11px;color:var(--mut);margin:6px 0 2px;font-weight:700}
+.ss-tg{font-size:11px;color:var(--txt);margin:2px 0}.ss-tg b{color:#0a8aa3}
+.ss-na{font-size:11px;color:var(--mut);margin:6px 0}
 
 /* login —— 左卫星找矿配图 / 右深色登录 */
 .login-split{position:fixed;inset:0;display:flex;z-index:10;background:#070d18;overflow:hidden}

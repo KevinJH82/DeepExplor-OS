@@ -52,6 +52,9 @@ export const listRuns = (projectId) =>
   client.get(`/api/projects/${projectId}/runs`).then((r) => r.data)
 export const makeEvidencePlan = (traceId) =>
   client.post(`/api/runs/${traceId}/evidence-plan`).then((r) => r.data)
+// 证据链综合研判(LLM):前端把本 run 真实数据 POST 过去,BFF 调 claude 出研判
+export const runSynthesis = (traceId, facts, refresh = false) =>
+  client.post(`/api/runs/${traceId}/synthesis`, { facts, refresh }).then((r) => r.data)
 export const patchEvidencePlan = (traceId, evidencePlan) =>
   client.patch(`/api/runs/${traceId}/evidence-plan`, { evidence_plan: evidencePlan }).then((r) => r.data)
 export const executeEvidencePlan = (traceId) =>

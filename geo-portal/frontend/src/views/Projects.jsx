@@ -184,6 +184,10 @@ export default function Projects() {
                       <div className="pcur">
                         <span className={`dt ${t.cls}`} />
                         <span className={t.cls}>{t.text}</span>
+                        {p.progress.best_percent != null && (
+                          <span style={{ marginLeft: 6, color: 'var(--mut)', fontSize: 10 }}
+                            title="该项目历史 run 曾达到的最高进度">历史最远 {p.progress.best_percent}%</span>
+                        )}
                         <span style={{ marginLeft: 'auto', color: 'var(--mut)' }}>{p.progress.percent}%</span>
                       </div>
                     ) })()}
