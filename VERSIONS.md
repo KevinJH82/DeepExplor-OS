@@ -21,7 +21,7 @@
 | `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.2.0 |
 | `geo-preprocess` | 预处理（辐射/几何/大气校正、镶嵌、裁剪） | 0.1.0 |
 | `geo-insar` | InSAR 时序形变（相干/速度聚类/线性体） | 0.1.0 |
-| `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.2.0 |
+| `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.3.0 |
 | `geo-geochem` | 化探背景与异常 | 0.1.0 |
 | `geo-geophys` | 物探位场（磁/重力） | 0.1.0 |
 | `geo-stru` | 构造解译（坡向/曲率/活动断裂/InSAR 融合） | 0.1.0 |
@@ -46,6 +46,15 @@
 | `geo-exploration/Python_Project` | geo-exploration | 勘查应用主代码 | 0.1.0 |
 
 ## 变更日志（monorepo 级）
+
+### 2026-06-30 — geo-analyser 0.3.0（升级 v2 · P1 高光谱波形/吸收特征）
+- **P1-a SASP 光谱吸收特征**（书 §7.2.2，新增 `spectral_absorption.py`）：高光谱诊断窗口内提取
+  吸收位置 P(质心,种属判别核心)/深度 D/宽度 W(FWHM)/不对称 A(偏度),深度加权矩全向量化;
+  `sasp_index` = 深度×位置匹配权重。analyze_single 加 method="sasp"。
+- **P1-b SAM 光谱波形匹配**（书 §9.5.2，新增 `spectral_match.py`）：与 USGS splib07
+  (Kokaly2017, DOI:10.5066/F7RR1WDJ) 19 种关键蚀变矿物参考谱做光谱角匹配;参考库
+  `data/splib07_reflib.json`(splib07a ASD→0.40-2.50µm@10nm)。analyze_single 加 method="sam"。
+- app.py 高光谱块改为三法并跑 band_depth + sasp + sam。
 
 ### 2026-06-30 — geo-analyser 0.2.0 / geo-downloader 0.2.0（遥感蚀变升级 v2）
 基于《遥感图像处理技术及应用》(张晔2024) + 知网两篇文章(王生礼2023 综述 / 孙娅琴2017 WV-3 论文)的系统升级。

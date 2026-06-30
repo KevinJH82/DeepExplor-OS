@@ -915,53 +915,57 @@ def _run_hyperspectral_analysis(
             "enmap_feature":        feat,
             "band_depth_available": True,
         }
-        try:
-            res = analyze_single(
-                cube, sensor_key, target_spec, "band_depth",
-                roi_mask=roi_mask, threshold_method=threshold_method,
-                k=k, wavelengths_um=wavelengths_um,
-            )
-            if basemap_view is not None:
-                cell_b64 = _render_cell_on_basemap(
-                    basemap_view, res.anomaly_mask,
-                    transform, crs, roi_geojson, res, sensor_key, colormap,
+        # 高光谱三法: band_depth(吸收深度=丰度) + sasp(种属匹配吸收, P1-a) + sam(splib07波形匹配, P1-b)
+        for _hsm in ("band_depth", "sasp", "sam"):
+            try:
+                res = analyze_single(
+                    cube, sensor_key, target_spec, _hsm,
+                    roi_mask=roi_mask, threshold_method=threshold_method,
+                    k=k, wavelengths_um=wavelengths_um,
                 )
-            else:
-                cell_b64 = None
-            sensor_results["band_depth"] = {
-                "anomaly_ratio": round(res.anomaly_ratio * 100, 2),
-                "threshold":     None if not np.isfinite(res.threshold) else float(res.threshold),
-                "warning":       res.warning,
-                "overlay":       f"data:image/png;base64,{cell_b64}" if cell_b64 else None,
-                "ratio_expr":    res.ratio_expr,
-                "sign":          res.sign,
-                "feature_um":    feat.get("feature_um"),
-                "grade":         _grade_block(res),
-            }
-            masks[mineral] = res.anomaly_mask
-            save_sensors[sensor_key]["results"].append({
-                "mineral":          mineral,
-                "zone":             t["zone"],
-                "priority":         t["priority"],
-                "anomaly_type":     t["anomaly_type"],
-                "effective_sensor": sensor_key,
-                "data_status":      entry["data_status"],
-                "method":           "band_depth",
-                "anomaly_ratio":    round(res.anomaly_ratio * 100, 2),
-                "threshold":        None if not np.isfinite(res.threshold) else float(res.threshold),
-                "ratio_expr":       res.ratio_expr,
-                "pc_used":          None,
-                "sign":             res.sign,
-                "warning":          res.warning,
-                "index_map":        res.index_map,
-                "mask":             res.anomaly_mask,
-                "grade_map":        res.grade_map,
-                "grade":            _grade_block(res),
-                "preview_b64":      cell_b64,
-            })
-        except Exception as e:
-            app.logger.error(f"{sensor_key} band_depth {mineral} 失败: {e}", exc_info=True)
-            sensor_results["band_depth"] = {"error": str(e)}
+                if basemap_view is not None:
+                    cell_b64 = _render_cell_on_basemap(
+                        basemap_view, res.anomaly_mask,
+                        transform, crs, roi_geojson, res, sensor_key, colormap,
+                    )
+                else:
+                    cell_b64 = None
+                sensor_results[_hsm] = {
+                    "anomaly_ratio": round(res.anomaly_ratio * 100, 2),
+                    "threshold":     None if not np.isfinite(res.threshold) else float(res.threshold),
+                    "warning":       res.warning,
+                    "overlay":       f"data:image/png;base64,{cell_b64}" if cell_b64 else None,
+                    "ratio_expr":    res.ratio_expr,
+                    "sign":          res.sign,
+                    "feature_um":    feat.get("feature_um"),
+                    "grade":         _grade_block(res),
+                }
+                # 综合判断/评分仍以吸收深度(band_depth)为主掩膜,sasp 作种属佐证
+                if _hsm == "band_depth":
+                    masks[mineral] = res.anomaly_mask
+                save_sensors[sensor_key]["results"].append({
+                    "mineral":          mineral,
+                    "zone":             t["zone"],
+                    "priority":         t["priority"],
+                    "anomaly_type":     t["anomaly_type"],
+                    "effective_sensor": sensor_key,
+                    "data_status":      entry["data_status"],
+                    "method":           _hsm,
+                    "anomaly_ratio":    round(res.anomaly_ratio * 100, 2),
+                    "threshold":        None if not np.isfinite(res.threshold) else float(res.threshold),
+                    "ratio_expr":       res.ratio_expr,
+                    "pc_used":          None,
+                    "sign":             res.sign,
+                    "warning":          res.warning,
+                    "index_map":        res.index_map,
+                    "mask":             res.anomaly_mask,
+                    "grade_map":        res.grade_map,
+                    "grade":            _grade_block(res),
+                    "preview_b64":      cell_b64,
+                })
+            except Exception as e:
+                app.logger.error(f"{sensor_key} {_hsm} {mineral} 失败: {e}", exc_info=True)
+                sensor_results[_hsm] = {"error": str(e)}
 
     # 综合判断:多蚀变叠加(≥2 种异常重叠=高置信)+ 优先级加权评分
     high_pixels = 0

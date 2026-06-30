@@ -30,6 +30,9 @@ _REPO_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
 if _REPO_ROOT not in _sys.path:
     _sys.path.insert(0, _REPO_ROOT)
 from commons.spectral_indices import calc_ndvi, calc_ndre, calc_cire, calc_rep
+# 光谱吸收特征参数 SASP(P1-a) / 光谱波形匹配 SAM(P1-b),叶子模块,无循环依赖
+import spectral_absorption
+import spectral_match
 
 # ─────────────────────────────────────────────
 # 传感器波段配置 — JSON 中的 BN 编号 → image 数组通道索引
@@ -643,6 +646,7 @@ class AlterationResult:
     grade_thresholds: Optional[List[float]] = None  # 三级阈值(升序,对应 k 组)
     grade_k_levels: Optional[List[float]] = None    # 所用 k 组,如 [2.0,2.5,3.0]
     grade_family: Optional[str] = None              # "iron" | "hydroxyl"
+    sasp_maps: Optional[Dict[str, np.ndarray]] = None  # SASP 参数图 {position,depth,width,asymmetry}(method=sasp)
     # method 专属信息
     ratio_expr: Optional[str] = None
     pc_used: Optional[int] = None     # 1-based PC 编号
@@ -753,6 +757,49 @@ def analyze_single(
             grade_k_levels=fin["grade_k_levels"], grade_family=fin["grade_family"],
             ratio_expr=f"BD({feat['feature_um']}µm)",
             sign=feat_sign,
+        )
+
+    if method == "sasp":
+        # 光谱吸收特征参数(P1-a):种属匹配吸收指数 = 深度 × 位置匹配权重。需高光谱 + enmap_feature。
+        feat = target_spec.get("enmap_feature")
+        if not feat or not target_spec.get("band_depth_available"):
+            raise ValueError(f"传感器 {sensor_key} 不支持 {mineral} 的 SASP 法(需高光谱诊断特征)")
+        if wavelengths_um is None:
+            raise ValueError("sasp 方法需要 wavelengths_um(波段中心波长)")
+        index_map, sasp_maps = spectral_absorption.sasp_index(
+            image, wavelengths_um,
+            feature_um=float(feat["feature_um"]),
+            shoulder_um=tuple(feat["shoulder_um"]),
+            roi_mask=roi_mask,
+        )
+        fin = _finalize_anomaly(index_map, roi_mask, threshold_method, k, target_spec)
+        return AlterationResult(
+            mineral=mineral, method="sasp", sensor=sensor_key,
+            index_map=index_map, anomaly_mask=fin["anomaly"],
+            anomaly_ratio=fin["anomaly_ratio"], threshold=fin["thr"],
+            grade_map=fin["grade_map"], grade_thresholds=fin["grade_thresholds"],
+            grade_k_levels=fin["grade_k_levels"], grade_family=fin["grade_family"],
+            ratio_expr=f"SASP({feat['feature_um']}µm)",
+            sign=1, sasp_maps=sasp_maps,
+        )
+
+    if method == "sam":
+        # 光谱波形匹配(P1-b):与 USGS splib07 矿物参考谱的 SAM 相似度。需高光谱(波长)。
+        if wavelengths_um is None:
+            raise ValueError("sam 方法需要 wavelengths_um(波段中心波长)")
+        index_map, splib_key = spectral_match.sam_index(
+            image, wavelengths_um, mineral, roi_mask=roi_mask,
+        )
+        if splib_key is None:
+            raise ValueError(f"{mineral} 无 splib07 参考谱,SAM 不可用")
+        fin = _finalize_anomaly(index_map, roi_mask, threshold_method, k, target_spec)
+        return AlterationResult(
+            mineral=mineral, method="sam", sensor=sensor_key,
+            index_map=index_map, anomaly_mask=fin["anomaly"],
+            anomaly_ratio=fin["anomaly_ratio"], threshold=fin["thr"],
+            grade_map=fin["grade_map"], grade_thresholds=fin["grade_thresholds"],
+            grade_k_levels=fin["grade_k_levels"], grade_family=fin["grade_family"],
+            ratio_expr=f"SAM({splib_key})", sign=1,
         )
 
     if method == "veg_stress":
