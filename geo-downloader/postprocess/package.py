@@ -1591,8 +1591,28 @@ def _package_oneatlas(raw_dir: Path, season_dir: Path, folder_label: str = "SPOT
     return done
 
 
+def _split_multiband(src_file: Path, out_dir: Path, start_idx: int) -> List[Path]:
+    """把多波段 GeoTIFF 逐波段拆成 B{start_idx}.tif, B{start_idx+1}.tif …(单波段)。
+    供蚀变分析侧 load_sensor_data 按 B{n}.tif 文件名建动态 bn_map。返回写出的文件列表。"""
+    import rasterio as _rio
+    written = []
+    with _rio.open(src_file) as src:
+        prof = src.profile.copy()
+        prof.update(count=1, compress="deflate")
+        for i in range(1, src.count + 1):
+            bkey = f"B{start_idx + i - 1}"
+            dst = out_dir / f"{bkey}.tif"
+            with _rio.open(dst, "w", **prof) as out:
+                out.write(src.read(i), 1)
+            _write_statistics(dst)
+            written.append(dst)
+    return written
+
+
 def _package_worldview(raw_dir: Path, season_dir: Path, folder_label: str = "WorldView-2") -> List[Path]:
-    """WorldView-2/3 GeoTIFF → {folder_label}/PAN.tif + MS.tif"""
+    """WorldView-2/3 GeoTIFF → {folder_label}/B1.tif…(+ PAN.tif)。
+    波段契约(与 geo-analyser 一致): VNIR 多光谱 → B1..B8, SWIR → B9..B16。
+    产物文件名带 _ms / _swir 标签(见 worldview.py 下载阶段),据此落位;无标签时按波段数兜底。"""
     out_dir = season_dir / folder_label
     out_dir.mkdir(parents=True, exist_ok=True)
     done = []
@@ -1603,29 +1623,52 @@ def _package_worldview(raw_dir: Path, season_dir: Path, folder_label: str = "Wor
 
     season_is_summer = (_SEASON_SUMMER in str(season_dir))
 
+    pan_files, ms_files, swir_files = [], [], []
     try:
         import rasterio as _rio
-        pan_files, ms_files = [], []
         for f in tif_candidates:
+            nm = f.name.lower()
             try:
                 with _rio.open(f) as src:
-                    if src.count == 1:
-                        pan_files.append(f)
-                    else:
-                        ms_files.append(f)
+                    cnt = src.count
             except Exception:
-                pass
+                continue
+            if cnt == 1:
+                pan_files.append(f)
+            elif "swir" in nm:
+                swir_files.append(f)
+            elif "_ms" in nm or "multispectral" in nm:
+                ms_files.append(f)
+            else:
+                # 无产品标签:8 波段当 VNIR-MS,>8 波段当含 SWIR 的整体多光谱
+                (swir_files if cnt > 8 else ms_files).append(f)
     except ImportError:
-        pan_files = [f for f in tif_candidates if "pan" in f.name.lower() or "_p_" in f.name.lower()]
-        ms_files  = [f for f in tif_candidates if f not in pan_files]
-
-    for pool, name in ((pan_files, "PAN.tif"), (ms_files, "MS.tif")):
-        if pool:
-            best = _best_file(pool, prefer_summer=season_is_summer)
+        # 无 rasterio:仅按文件名标签分类,PAN/MS 整文件复制(不拆波段)
+        pan_files  = [f for f in tif_candidates if "pan" in f.name.lower()]
+        swir_files = [f for f in tif_candidates if "swir" in f.name.lower()]
+        ms_files   = [f for f in tif_candidates if f not in pan_files and f not in swir_files]
+        for pool, name in ((pan_files, "PAN.tif"), (ms_files, "MS.tif")):
+            best = _best_file(pool, prefer_summer=season_is_summer) if pool else None
             if best:
                 dst = out_dir / name
                 _copy(best, dst)
                 done.append(dst)
+        return done
+
+    # VNIR 多光谱 → B1..B8
+    best_ms = _best_file(ms_files, prefer_summer=season_is_summer) if ms_files else None
+    if best_ms:
+        done += _split_multiband(best_ms, out_dir, start_idx=1)
+    # SWIR → B9..B16
+    best_swir = _best_file(swir_files, prefer_summer=season_is_summer) if swir_files else None
+    if best_swir:
+        done += _split_multiband(best_swir, out_dir, start_idx=9)
+    # 全色保留(供后续全色锐化等用,蚀变分析不直接消费)
+    best_pan = _best_file(pan_files, prefer_summer=season_is_summer) if pan_files else None
+    if best_pan:
+        dst = out_dir / "PAN.tif"
+        _copy(best_pan, dst)
+        done.append(dst)
 
     return done
 

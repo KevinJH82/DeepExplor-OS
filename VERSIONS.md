@@ -18,10 +18,10 @@
 |---|---|---|
 | `commons` | 共享库：Broker、trace 决策血缘、光谱索引等 | 0.1.0 |
 | `geo-orchestrator` | 编排（P1，依矿种/ROI 生成技术执行方案，签发 trace_id） | 0.1.0 |
-| `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.1.0 |
+| `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.2.0 |
 | `geo-preprocess` | 预处理（辐射/几何/大气校正、镶嵌、裁剪） | 0.1.0 |
 | `geo-insar` | InSAR 时序形变（相干/速度聚类/线性体） | 0.1.0 |
-| `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.1.0 |
+| `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.2.0 |
 | `geo-geochem` | 化探背景与异常 | 0.1.0 |
 | `geo-geophys` | 物探位场（磁/重力） | 0.1.0 |
 | `geo-stru` | 构造解译（坡向/曲率/活动断裂/InSAR 融合） | 0.1.0 |
@@ -46,6 +46,16 @@
 | `geo-exploration/Python_Project` | geo-exploration | 勘查应用主代码 | 0.1.0 |
 
 ## 变更日志（monorepo 级）
+
+### 2026-06-30 — geo-analyser 0.2.0 / geo-downloader 0.2.0（遥感蚀变升级 v2）
+基于《遥感图像处理技术及应用》(张晔2024) + 知网两篇文章(王生礼2023 综述 / 孙娅琴2017 WV-3 论文)的系统升级。
+- **geo-analyser 0.2.0**：
+  - 异常分级（张玉君门限化 X̄+kδ，羟基 2/2.5/3·铁染 1.5/2/2.5）+ 3×3 中值滤波去噪；分级经 API 暴露。
+  - ASTER 矿物指数文献化（122 处）+ 修复碳酸盐 TIR(B13/B14) 比值算不出的 bug。
+  - WorldView-3 接入 analyser 侧：传感器注册 + `_build_pca_spec` WV3 自包含分支 + DB 122 ratio/122 PCA。
+  - **P0 解锁已下载数据**：金属矿床补 `enmap_feature`（122 处）→ EnMAP/PRISMA band_depth 对金属矿可用；
+    `load_sensor_data` 把非主分辨率组（ASTER TIR 90m/VNIR 15m）重采样并入而非丢弃 → TIR 硅化指数可算。
+- **geo-downloader 0.2.0**：WorldView-3 检索 VNIR+SWIR 两集合并按产物打标；打包 MS→B1..B8·SWIR→B9..B16 拆波段；schema 新增 wv3 16 波段条目。
 
 ### v1.1.0 — 2026-06-30
 - `geo-portal` 系统及其 backend/frontend 子系统升至 **1.1.0**（其余系统保持 0.1.0）。

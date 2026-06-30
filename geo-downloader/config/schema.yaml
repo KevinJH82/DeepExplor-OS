@@ -84,6 +84,29 @@ sensors:
   - B12.tif
   - B13.tif
   - B14.tif
+- id: wv3
+  label: WorldView 3
+  raw_dir: worldview
+  seasons:
+  - summer
+  - winter
+  files:
+  - B1.tif
+  - B2.tif
+  - B3.tif
+  - B4.tif
+  - B5.tif
+  - B6.tif
+  - B7.tif
+  - B8.tif
+  - B9.tif
+  - B10.tif
+  - B11.tif
+  - B12.tif
+  - B13.tif
+  - B14.tif
+  - B15.tif
+  - B16.tif
 - id: aster_l1t
   label: ASTER L1T
   raw_dir: aster_l1t

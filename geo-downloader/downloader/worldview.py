@@ -36,11 +36,18 @@ from .base import BaseDownloader
 _MAXAR_STAC    = "https://api.maxar.com/discovery/v1/search"
 _MAXAR_STREAM  = "https://api.maxar.com/streaming/v1/ogc/wms"
 
-# 产品集合
+# 产品集合。WV-3 = VNIR 多光谱 + SWIR 两个集合。
+# 注意:SWIR 受 NOAA 出口许可限制,需账户具备 SWIR 权限;SWIR 集合 id 以 Maxar Discovery
+# 当前目录为准(这里给常见默认值,可经 credentials.worldview.swir_collection 覆盖)。
 _COLLECTIONS = {
-    "wv2": "wv02",
-    "wv3": "wv03-multispectral",
+    "wv2": ["wv02"],
+    "wv3": ["wv03-multispectral", "wv03-swir"],
 }
+
+
+def _collection_product(collection: str) -> str:
+    """由集合 id 判定产品类型:swir / ms(VNIR 多光谱)。决定打包时波段落位(MS→B1..B8, SWIR→B9..B16)。"""
+    return "swir" if "swir" in collection.lower() else "ms"
 
 
 class WorldViewDownloader(BaseDownloader):
@@ -55,6 +62,14 @@ class WorldViewDownloader(BaseDownloader):
                  **kwargs):
         super().__init__(credentials=credentials, output_dir=output_dir)
         self._platform = platform
+
+    def _collections(self) -> List[str]:
+        """该平台要检索的集合列表。WV-3 含 VNIR+SWIR;SWIR 集合 id 可经 credentials 覆盖。"""
+        cols = list(_COLLECTIONS.get(self._platform, ["wv03-multispectral"]))
+        override = self.credentials.get("swir_collection")
+        if self._platform == "wv3" and override:
+            cols = [c for c in cols if "swir" not in c.lower()] + [override]
+        return cols
 
     def _check_deps(self):
         if not HAS_REQUESTS:
@@ -91,51 +106,55 @@ class WorldViewDownloader(BaseDownloader):
         self._check_deps()
 
         min_lon, min_lat, max_lon, max_lat = bbox
-        collection = _COLLECTIONS.get(self._platform, "wv03-multispectral")
+        collections = self._collections()
 
-        payload = {
-            "collections": [collection],
-            "bbox":        [min_lon, min_lat, max_lon, max_lat],
-            "datetime":    f"{start_date}T00:00:00Z/{end_date}T23:59:59Z",
-            "query": {
-                "eo:cloud_cover": {"lte": cloud_cover},
-            },
-            "limit": kwargs.get("count", 50),
-        }
-
-        try:
-            r = requests.post(
-                _MAXAR_STAC, json=payload,
-                headers=self._headers(), timeout=60,
-            )
-            r.raise_for_status()
-            data = r.json()
-        except Exception as e:
-            print(f"    [警告] WorldView 搜索失败: {e}")
-            return []
-
-        features = data.get("features", [])
         results = []
-        for feat in features:
-            props = feat.get("properties", {})
-            # 下载链接可能在 assets 中
-            assets = feat.get("assets", {})
-            download_url = ""
-            for asset_key in ("visual", "pan", "ms", "data"):
-                if asset_key in assets:
-                    download_url = assets[asset_key].get("href", "")
-                    break
+        for collection in collections:
+            product = _collection_product(collection)   # "ms" | "swir"
+            payload = {
+                "collections": [collection],
+                "bbox":        [min_lon, min_lat, max_lon, max_lat],
+                "datetime":    f"{start_date}T00:00:00Z/{end_date}T23:59:59Z",
+                "query": {
+                    "eo:cloud_cover": {"lte": cloud_cover},
+                },
+                "limit": kwargs.get("count", 50),
+            }
 
-            results.append({
-                "id":           feat.get("id", ""),
-                "name":         props.get("platform", "") + "_" + feat.get("id", "")[:16],
-                "date":         props.get("datetime", props.get("date", ""))[:10],
-                "cloud_cover":  props.get("eo:cloud_cover", 0),
-                "platform":     props.get("platform", collection),
-                "gsd":          props.get("gsd", ""),
-                "download_url": download_url,
-                "_raw":         feat,
-            })
+            try:
+                r = requests.post(
+                    _MAXAR_STAC, json=payload,
+                    headers=self._headers(), timeout=60,
+                )
+                r.raise_for_status()
+                data = r.json()
+            except Exception as e:
+                # SWIR 集合可能因许可/目录差异返回错误,跳过该集合而非整体失败
+                print(f"    [警告] WorldView 搜索失败(collection={collection}): {e}")
+                continue
+
+            for feat in data.get("features", []):
+                props = feat.get("properties", {})
+                # 下载链接可能在 assets 中
+                assets = feat.get("assets", {})
+                download_url = ""
+                for asset_key in ("visual", "pan", "ms", "data"):
+                    if asset_key in assets:
+                        download_url = assets[asset_key].get("href", "")
+                        break
+
+                results.append({
+                    "id":           feat.get("id", ""),
+                    "name":         props.get("platform", "") + "_" + feat.get("id", "")[:16],
+                    "date":         props.get("datetime", props.get("date", ""))[:10],
+                    "cloud_cover":  props.get("eo:cloud_cover", 0),
+                    "platform":     props.get("platform", collection),
+                    "collection":   collection,
+                    "product":      product,        # ms / swir → 打包落位依据
+                    "gsd":          props.get("gsd", ""),
+                    "download_url": download_url,
+                    "_raw":         feat,
+                })
 
         label = "WorldView-2" if self._platform == "wv2" else "WorldView-3"
         print(f"    找到 {len(results)} 景 {label}")
@@ -171,6 +190,7 @@ class WorldViewDownloader(BaseDownloader):
         for item in to_download:
             name        = item.get("name", item.get("id", "WV_unknown"))
             download_url = item.get("download_url", "")
+            product      = item.get("product", "ms")   # ms / swir
 
             if not download_url:
                 print(
@@ -180,7 +200,8 @@ class WorldViewDownloader(BaseDownloader):
                 )
                 continue
 
-            dest = save_dir / f"{name}.tif"
+            # 文件名带产品标签,供打包阶段区分 VNIR(→B1..B8) 与 SWIR(→B9..B16)
+            dest = save_dir / f"{name}_{product}.tif"
             if dest.exists():
                 print(f"    [已存在] {dest.name}")
                 downloaded.append(dest)
