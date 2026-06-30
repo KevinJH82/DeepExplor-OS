@@ -14,6 +14,7 @@ from __future__ import annotations
 import ast
 import re
 import numpy as np
+from scipy.ndimage import median_filter
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -48,6 +49,14 @@ SENTINEL2_BN_TO_IDX = {
 # ASTER SWIR (6 波段加载): B4..B9 → 索引 0..5
 ASTER_BN_TO_IDX = {f"B{i}": i - 4 for i in range(4, 10)}
 
+# WorldView-3 波段契约(16 波段, 波长升序; 对应论文孙娅琴2017 的 VNIR-1..8 / SWIR-1..8):
+#   VNIR  B1 Coastal0.427 B2 Blue0.482 B3 Green0.547 B4 Yellow0.604
+#         B5 Red0.660 B6 RedEdge0.722 B7 NIR1 0.824 B8 NIR2 0.914   → 索引 0..7
+#   SWIR  B9 1.209 B10 1.572 B11 1.661 B12 1.730
+#         B13 2.164 B14 2.202 B15 2.259 B16 2.329                    → 索引 8..15
+# 项目分析路径用 load_sensor_data 动态 bn_map(按磁盘 B{n}.tif 文件名建),此处仅为兜底默认。
+WORLDVIEW3_BN_TO_IDX = {f"B{i}": i - 1 for i in range(1, 17)}
+
 # 兼容旧代码命名
 LANDSAT_BANDS = {
     "coastal": 0, "blue": 1, "green": 2, "red": 3,
@@ -69,6 +78,8 @@ def _bn_map(sensor_key: str) -> Dict[str, int]:
         return SENTINEL2_BN_TO_IDX
     if sensor_key == "ASTER":
         return ASTER_BN_TO_IDX
+    if sensor_key == "WorldView3":
+        return WORLDVIEW3_BN_TO_IDX
     raise ValueError(f"不支持的传感器: {sensor_key}")
 
 
@@ -499,6 +510,122 @@ def _threshold_anomaly(
 
 
 # ─────────────────────────────────────────────
+# 异常分级 (张玉君门限化 X̄+kδ) + 中值滤波去噪
+# ─────────────────────────────────────────────
+# 张玉君(2003)门限化遥感异常分级:按 X̄+kδ 分三级。羟基类与铁染类用不同 k 组,
+# 因二者特征吸收所在谱段(SWIR vs VNIR)与背景噪声水平不同 — 这是国内蚀变制图通用约定。
+HYDROXYL_K_LEVELS = [2.0, 2.5, 3.0]   # 羟基/碳酸盐类 → 三级/二级/一级
+IRON_K_LEVELS = [1.5, 2.0, 2.5]       # 铁染类     → 三级/二级/一级
+# grade 取值: 0=背景, 1=三级(最弱), 2=二级, 3=一级(最强)。整数越大异常越强,便于评分/着色。
+GRADE_LABELS = {0: "背景", 1: "三级", 2: "二级", 3: "一级"}
+
+
+def _first_float(x: Any) -> Optional[float]:
+    """从 number / "2.20" / "2.16-2.21" 等取首个浮点数。"""
+    if x is None:
+        return None
+    if isinstance(x, (int, float)):
+        return float(x)
+    m = re.search(r"\d+\.?\d*", str(x))
+    return float(m.group()) if m else None
+
+
+def _alteration_family(target_spec: Optional[Dict[str, Any]]) -> str:
+    """判定蚀变族(决定分级 k 组)。以特征吸收波长为主依据(铁染在 VNIR<1.4µm),
+    无波长时按矿物名兜底。返回 "iron" | "hydroxyl"。"""
+    if not target_spec:
+        return "hydroxyl"
+    val = _first_float(target_spec.get("absorption_um"))
+    if val is not None:
+        return "iron" if val < 1.4 else "hydroxyl"
+    name = str(target_spec.get("mineral", ""))
+    if any(t in name for t in ("赤铁", "褐铁", "针铁", "磁铁", "黄钾铁矾", "铁帽", "gossan", "铁染", "氧化铁")):
+        return "iron"
+    return "hydroxyl"
+
+
+def _family_k_levels(target_spec: Optional[Dict[str, Any]]) -> Tuple[List[float], str]:
+    fam = _alteration_family(target_spec)
+    return (IRON_K_LEVELS if fam == "iron" else HYDROXYL_K_LEVELS), fam
+
+
+def _grade_anomaly(
+    index_map: np.ndarray,
+    roi_mask: Optional[np.ndarray],
+    method: str,
+    k_levels: List[float],
+) -> Tuple[np.ndarray, List[float]]:
+    """按 k_levels(升序)做多级门限化。grade = 超过的阈值个数(0..len)。
+    返回 (grade_map uint8, thresholds)。统计样本仅取 ROI 内有效像素。"""
+    stat_mask = (roi_mask & np.isfinite(index_map)) if roi_mask is not None else np.isfinite(index_map)
+    samples = index_map[stat_mask]
+    grade = np.zeros(index_map.shape, dtype=np.uint8)
+    if samples.size == 0:
+        return grade, [float("nan")] * len(k_levels)
+
+    if method == "median_mad":
+        med = float(np.median(samples))
+        mad = float(np.median(np.abs(samples - med)))
+        thrs = [med + kk * 1.4826 * mad for kk in k_levels]
+    elif method == "percentile":
+        # 百分位法与 k 无关,改用一组固定分位保证三级仍有区分度
+        thrs = [float(np.percentile(samples, p)) for p in (90.0, 95.0, 98.0)]
+    else:  # mean_std
+        mu = float(samples.mean())
+        sd = float(samples.std())
+        thrs = [mu + kk * sd for kk in k_levels]
+
+    finite = np.isfinite(index_map)
+    for thr in thrs:
+        if np.isfinite(thr):
+            grade[finite & (index_map > thr)] += 1
+    if roi_mask is not None:
+        grade = np.where(roi_mask, grade, 0).astype(np.uint8)
+    return grade, thrs
+
+
+def _median_denoise_mask(mask: np.ndarray, roi_mask: Optional[np.ndarray], size: int = 3) -> np.ndarray:
+    """3×3 中值滤波去孤立噪点(椒盐去除):孤立点被抹除、小孔被填充,异常套合更佳。"""
+    if mask is None:
+        return mask
+    cleaned = median_filter(mask.astype(np.uint8), size=size) > 0
+    if roi_mask is not None:
+        cleaned &= roi_mask
+    return cleaned
+
+
+def _median_denoise_grade(grade_map: np.ndarray, roi_mask: Optional[np.ndarray], size: int = 3) -> np.ndarray:
+    if grade_map is None:
+        return grade_map
+    cleaned = median_filter(grade_map.astype(np.uint8), size=size)
+    if roi_mask is not None:
+        cleaned = np.where(roi_mask, cleaned, 0).astype(np.uint8)
+    return cleaned
+
+
+def _finalize_anomaly(
+    index_map: np.ndarray,
+    roi_mask: Optional[np.ndarray],
+    threshold_method: str,
+    k: float,
+    target_spec: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """阈值化 + 分级 + 3×3 中值滤波去噪 的统一后处理。anomaly_ratio 在去噪后统计。"""
+    anomaly, thr = _threshold_anomaly(index_map, roi_mask, threshold_method, k)
+    k_levels, family = _family_k_levels(target_spec)
+    grade_map, grade_thr = _grade_anomaly(index_map, roi_mask, threshold_method, k_levels)
+    anomaly = _median_denoise_mask(anomaly, roi_mask)
+    grade_map = _median_denoise_grade(grade_map, roi_mask)
+    roi_size = int(roi_mask.sum()) if roi_mask is not None else int(np.isfinite(index_map).sum())
+    anomaly_ratio = float(anomaly.sum()) / max(roi_size, 1)
+    return dict(
+        anomaly=anomaly, thr=thr, anomaly_ratio=anomaly_ratio,
+        grade_map=grade_map, grade_thresholds=grade_thr,
+        grade_k_levels=k_levels, grade_family=family,
+    )
+
+
+# ─────────────────────────────────────────────
 # 结果数据结构 & 主入口
 # ─────────────────────────────────────────────
 
@@ -508,9 +635,14 @@ class AlterationResult:
     method: str                       # "ratio" | "pca"
     sensor: str
     index_map: np.ndarray             # (H,W) float32, ROI 外 NaN
-    anomaly_mask: np.ndarray          # (H,W) bool
+    anomaly_mask: np.ndarray          # (H,W) bool (已 3×3 中值滤波去噪)
     anomaly_ratio: float              # ROI 内异常占比 (0~1)
     threshold: float
+    # 异常分级(张玉君门限化): 0=背景 1=三级 2=二级 3=一级
+    grade_map: Optional[np.ndarray] = None          # (H,W) uint8, 已去噪
+    grade_thresholds: Optional[List[float]] = None  # 三级阈值(升序,对应 k 组)
+    grade_k_levels: Optional[List[float]] = None    # 所用 k 组,如 [2.0,2.5,3.0]
+    grade_family: Optional[str] = None              # "iron" | "hydroxyl"
     # method 专属信息
     ratio_expr: Optional[str] = None
     pc_used: Optional[int] = None     # 1-based PC 编号
@@ -566,13 +698,13 @@ def analyze_single(
         # ROI 外置 NaN
         if roi_mask is not None:
             index_map = np.where(roi_mask, index_map, np.nan).astype(np.float32)
-        anomaly, thr = _threshold_anomaly(index_map, roi_mask, threshold_method, k)
-        roi_size = int(roi_mask.sum()) if roi_mask is not None else int(np.isfinite(index_map).sum())
-        anomaly_ratio = float(anomaly.sum()) / max(roi_size, 1)
+        fin = _finalize_anomaly(index_map, roi_mask, threshold_method, k, target_spec)
         return AlterationResult(
             mineral=mineral, method="ratio", sensor=sensor_key,
-            index_map=index_map, anomaly_mask=anomaly,
-            anomaly_ratio=anomaly_ratio, threshold=thr,
+            index_map=index_map, anomaly_mask=fin["anomaly"],
+            anomaly_ratio=fin["anomaly_ratio"], threshold=fin["thr"],
+            grade_map=fin["grade_map"], grade_thresholds=fin["grade_thresholds"],
+            grade_k_levels=fin["grade_k_levels"], grade_family=fin["grade_family"],
             ratio_expr=expr,
         )
 
@@ -588,13 +720,13 @@ def analyze_single(
             roi_mask=roi_mask,
             bn_map=bn_map,
         )
-        anomaly, thr = _threshold_anomaly(index_map, roi_mask, threshold_method, k)
-        roi_size = int(roi_mask.sum()) if roi_mask is not None else int(np.isfinite(index_map).sum())
-        anomaly_ratio = float(anomaly.sum()) / max(roi_size, 1)
+        fin = _finalize_anomaly(index_map, roi_mask, threshold_method, k, target_spec)
         return AlterationResult(
             mineral=mineral, method="pca", sensor=sensor_key,
-            index_map=index_map, anomaly_mask=anomaly,
-            anomaly_ratio=anomaly_ratio, threshold=thr,
+            index_map=index_map, anomaly_mask=fin["anomaly"],
+            anomaly_ratio=fin["anomaly_ratio"], threshold=fin["thr"],
+            grade_map=fin["grade_map"], grade_thresholds=fin["grade_thresholds"],
+            grade_k_levels=fin["grade_k_levels"], grade_family=fin["grade_family"],
             pc_used=pc_idx + 1, sign=sign,
         )
 
@@ -612,13 +744,13 @@ def analyze_single(
             sign=feat_sign,
             roi_mask=roi_mask,
         )
-        anomaly, thr = _threshold_anomaly(index_map, roi_mask, threshold_method, k)
-        roi_size = int(roi_mask.sum()) if roi_mask is not None else int(np.isfinite(index_map).sum())
-        anomaly_ratio = float(anomaly.sum()) / max(roi_size, 1)
+        fin = _finalize_anomaly(index_map, roi_mask, threshold_method, k, target_spec)
         return AlterationResult(
             mineral=mineral, method="band_depth", sensor=sensor_key,
-            index_map=index_map, anomaly_mask=anomaly,
-            anomaly_ratio=anomaly_ratio, threshold=thr,
+            index_map=index_map, anomaly_mask=fin["anomaly"],
+            anomaly_ratio=fin["anomaly_ratio"], threshold=fin["thr"],
+            grade_map=fin["grade_map"], grade_thresholds=fin["grade_thresholds"],
+            grade_k_levels=fin["grade_k_levels"], grade_family=fin["grade_family"],
             ratio_expr=f"BD({feat['feature_um']}µm)",
             sign=feat_sign,
         )
@@ -634,13 +766,13 @@ def analyze_single(
             veg_floor=float(vspec.get("veg_floor", 0.30)),
             wavelengths_um=wavelengths_um,
         )
-        anomaly, thr = _threshold_anomaly(index_map, roi_mask, threshold_method, k)
-        roi_size = int(roi_mask.sum()) if roi_mask is not None else int(np.isfinite(index_map).sum())
-        anomaly_ratio = float(anomaly.sum()) / max(roi_size, 1)
+        fin = _finalize_anomaly(index_map, roi_mask, threshold_method, k, target_spec)
         return AlterationResult(
             mineral=mineral, method="veg_stress", sensor=sensor_key,
-            index_map=index_map, anomaly_mask=anomaly,
-            anomaly_ratio=anomaly_ratio, threshold=thr,
+            index_map=index_map, anomaly_mask=fin["anomaly"],
+            anomaly_ratio=fin["anomaly_ratio"], threshold=fin["thr"],
+            grade_map=fin["grade_map"], grade_thresholds=fin["grade_thresholds"],
+            grade_k_levels=fin["grade_k_levels"], grade_family=fin["grade_family"],
             ratio_expr=f"VEG_STRESS({vspec.get('index', 'ndre')})",
             sign=-1,
         )

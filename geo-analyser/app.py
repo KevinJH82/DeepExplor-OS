@@ -936,6 +936,7 @@ def _run_hyperspectral_analysis(
                 "ratio_expr":    res.ratio_expr,
                 "sign":          res.sign,
                 "feature_um":    feat.get("feature_um"),
+                "grade":         _grade_block(res),
             }
             masks[mineral] = res.anomaly_mask
             save_sensors[sensor_key]["results"].append({
@@ -954,6 +955,8 @@ def _run_hyperspectral_analysis(
                 "warning":          res.warning,
                 "index_map":        res.index_map,
                 "mask":             res.anomaly_mask,
+                "grade_map":        res.grade_map,
+                "grade":            _grade_block(res),
                 "preview_b64":      cell_b64,
             })
         except Exception as e:
@@ -1115,7 +1118,7 @@ def api_analyze_batch():
 
         # 2. fallback: 在 usable_sensors 中找首选之外的、且对该矿物有方法的传感器
         if effective is None:
-            for s in ("ASTER", "Sentinel2", "Landsat8"):
+            for s in ("ASTER", "Sentinel2", "Landsat8", "WorldView3"):
                 if s in usable_sensors:
                     ps = t["per_sensor"].get(s, {})
                     if ps.get("ratio_available") or ps.get("pca_available"):
@@ -1294,6 +1297,7 @@ def api_analyze_batch():
                         "ratio_expr":    res.ratio_expr,
                         "pc_used":       res.pc_used,
                         "sign":          res.sign,
+                        "grade":         _grade_block(res),
                     }
                     sensor_masks[mineral][m] = res.anomaly_mask
                     if m == "veg_stress":
@@ -1314,6 +1318,8 @@ def api_analyze_batch():
                         "warning":          res.warning,
                         "index_map":        res.index_map,
                         "mask":             res.anomaly_mask,
+                        "grade_map":        res.grade_map,
+                        "grade":            _grade_block(res),
                         "preview_b64":      cell_b64,
                     })
                 except Exception as e:
@@ -1853,6 +1859,26 @@ def _render_composite_view(image: np.ndarray, batch, colormap: str = "hot") -> D
         app.logger.error(f"composite score 失败: {e}", exc_info=True)
 
     return out
+
+
+def _grade_block(res) -> Optional[Dict[str, Any]]:
+    """把 AlterationResult 的异常分级(张玉君门限化)摘要成可序列化 dict。
+    grade_map: 0=背景 1=三级 2=二级 3=一级。"""
+    gm = getattr(res, "grade_map", None)
+    if gm is None:
+        return None
+    thr = res.grade_thresholds or []
+    return {
+        "family":     res.grade_family,                 # iron | hydroxyl
+        "k_levels":   res.grade_k_levels,               # 如 [2.0,2.5,3.0]
+        "thresholds": [None if not np.isfinite(t) else round(float(t), 6) for t in thr],
+        "level_pixels": {
+            "一级": int((gm == 3).sum()),
+            "二级": int((gm == 2).sum()),
+            "三级": int((gm == 1).sum()),
+        },
+        "graded_pixels": int((gm > 0).sum()),
+    }
 
 
 def _render_cell_thumbnail_dyn(

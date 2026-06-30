@@ -22,12 +22,16 @@ _DB_PATH = Path(__file__).parent / "alteration_deposit_db.json"
 # 前端传感器字符串 → JSON 中的 sensor key 映射
 # 前端会先去掉 _L2 后缀,这里映射规范化后的形式
 _SENSOR_MAP = {
-    "Landsat8/9": "Landsat8",
-    "Landsat8":   "Landsat8",
-    "Sentinel2":  "Sentinel2",
-    "ASTER":      "ASTER",
-    "EnMAP":      "EnMAP",
-    "PRISMA":     "PRISMA",
+    "Landsat8/9":   "Landsat8",
+    "Landsat8":     "Landsat8",
+    "Sentinel2":    "Sentinel2",
+    "ASTER":        "ASTER",
+    "EnMAP":        "EnMAP",
+    "PRISMA":       "PRISMA",
+    "WorldView3":   "WorldView3",
+    "WorldView-3":  "WorldView3",
+    "WorldView 3":  "WorldView3",
+    "WV3":          "WorldView3",
 }
 
 
@@ -356,6 +360,28 @@ def _build_pca_spec(crosta: Optional[Dict[str, Any]], sensor_key: str) -> Option
     if not crosta or not isinstance(crosta, dict):
         return None
 
+    # WorldView3: 用自包含的 worldview3 块(bands + 专属 criterion),因 WV3 波段记号(B1..B16)
+    # 与 ASTER 不同,不能共用 ASTER 的 pc_criterion。波段契约见 alteration_analysis 注释:
+    # VNIR→B1..B8, SWIR→B9..B16(对应论文孙娅琴2017 的 VNIR-1..8 / SWIR-1..8)。
+    if sensor_key == "WorldView3":
+        wv = crosta.get("worldview3")
+        if not wv or not isinstance(wv, dict):
+            return None
+        bands = wv.get("input_bands")
+        if not bands or not isinstance(bands, list):
+            return None
+        pos = wv.get("positive_bands") or []
+        neg = wv.get("negative_bands") or []
+        if not pos and not neg:
+            return None
+        return {
+            "input_bands":      list(bands),
+            "positive_bands":   list(pos),
+            "negative_bands":   list(neg),
+            "typical_pc_index": wv.get("typical_pc_index", "PC4"),
+            "anomaly_color":    wv.get("anomaly_color", ""),
+        }
+
     # 选 input_bands: 默认 input_bands(通常是 ASTER 波段),如果是 Landsat8 优先用 landsat8_bands
     bands = None
     if sensor_key == "Landsat8" and crosta.get("landsat8_bands"):
@@ -436,7 +462,7 @@ def get_recommended_targets(deposit_type_name: str, sensor: str) -> List[Dict[st
     return results
 
 
-_ALL_SENSORS = ("ASTER", "Landsat8", "Sentinel2")
+_ALL_SENSORS = ("ASTER", "Landsat8", "Sentinel2", "WorldView3")
 
 # ─────────────────────────────────────────────
 # 丛林模式:通用地植物学胁迫探测目标

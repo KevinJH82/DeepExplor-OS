@@ -44,9 +44,10 @@
               "absorption_um": 2.2,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
+                "ASTER": "(B5+B7)/B6",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B11/B12"
+                "Sentinel2": "B11/B12",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -72,7 +73,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -83,9 +109,10 @@
               "absorption_um": 2.33,
               "reflectance_peak_um": 2.25,
               "sensor_ratio": {
-                "ASTER": "B6/B8",
+                "ASTER": "(B6+B9)/(B7+B8)",
                 "Landsat8": null,
-                "Sentinel2": "B12/B8A"
+                "Sentinel2": "B12/B8A",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -104,7 +131,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -115,7 +168,8 @@
               "absorption_um": 2.25,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B7/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -134,7 +188,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -145,7 +225,8 @@
               "absorption_um": 2.17,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B4/B5"
+                "ASTER": "(B4+B6)/B5",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -171,7 +252,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.165,
+                "shoulder_um": [
+                  2.1,
+                  2.22
+                ],
+                "sign": 1
               }
             },
             {
@@ -182,9 +288,10 @@
               "absorption_um": 2.16,
               "reflectance_peak_um": 2.14,
               "sensor_ratio": {
-                "ASTER": "B4/B6",
+                "ASTER": "(B4+B6)/B5",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B8A/B12"
+                "Sentinel2": "B8A/B12",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -210,7 +317,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -412,7 +544,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.25,
               "sensor_ratio": {
-                "ASTER": "B7/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -431,7 +564,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -441,7 +600,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.31,
               "sensor_ratio": {
-                "ASTER": "B7/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -460,7 +620,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -556,8 +742,9 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.2,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
-                "Landsat8": "B6/B7"
+                "ASTER": "(B5+B7)/B6",
+                "Landsat8": "B6/B7",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -583,7 +770,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -593,7 +805,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.33,
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -612,7 +825,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -652,7 +891,8 @@
               "sensor_ratio": {
                 "ASTER": "B2/B1",
                 "Landsat8": "B4/B2",
-                "Sentinel2": "B4/B2"
+                "Sentinel2": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -677,7 +917,31 @@
                   ],
                   "typical_pc_index": "PC2或PC3",
                   "anomaly_color": "亮色=铁氧化物富集"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             }
           ],
@@ -760,7 +1024,8 @@
               "sensor_ratio": {
                 "ASTER": "B3/B1",
                 "Landsat8": "B4/B2",
-                "Sentinel2": "B4/B2"
+                "Sentinel2": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -791,7 +1056,31 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=铁染蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             },
             {
@@ -801,7 +1090,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.33,
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -820,7 +1110,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -830,7 +1146,8 @@
               "anomaly_type": "CO₃²⁻",
               "absorption_um": 2.34,
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6+B8)/B9",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -850,7 +1167,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -889,7 +1231,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.2,
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -915,7 +1258,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -1049,7 +1417,8 @@
               "sensor_ratio": {
                 "ASTER": "B3/B1",
                 "Landsat8": "B4/B2",
-                "Sentinel2": "B4/B2"
+                "Sentinel2": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -1074,7 +1443,31 @@
                   ],
                   "typical_pc_index": "PC2或PC3",
                   "anomaly_color": "亮色=铁氧化物富集"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             },
             {
@@ -1085,9 +1478,10 @@
               "absorption_um": 2.2,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
+                "ASTER": "(B5+B7)/B6",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B11/B12"
+                "Sentinel2": "B11/B12",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -1113,7 +1507,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -1123,7 +1542,8 @@
               "anomaly_type": "CO₃²⁻",
               "absorption_um": 2.34,
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6/B8)*(B9/B8)",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -1143,7 +1563,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -1154,9 +1599,10 @@
               "absorption_um": 2.16,
               "reflectance_peak_um": 2.14,
               "sensor_ratio": {
-                "ASTER": "B4/B6",
+                "ASTER": "(B4+B6)/B5",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B8A/B12"
+                "Sentinel2": "B8A/B12",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -1182,7 +1628,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -1298,7 +1769,8 @@
               "anomaly_type": "CO₃²⁻",
               "absorption_um": 2.32,
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6+B8)/B9",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -1318,7 +1790,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -1357,7 +1854,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.16,
               "sensor_ratio": {
-                "ASTER": "B4/B6"
+                "ASTER": "(B4+B6)/B5",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -1383,7 +1881,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             }
           ],
@@ -1493,7 +2016,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.2,
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -1519,7 +2043,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -1557,7 +2106,8 @@
               "priority": 3,
               "anomaly_type": "CO₃²⁻",
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6+B8)/B9",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -1577,7 +2127,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -1696,7 +2271,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.25,
               "sensor_ratio": {
-                "ASTER": "B7/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -1715,7 +2291,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -1781,9 +2383,10 @@
               "absorption_um": 2.2,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
+                "ASTER": "(B5+B7)/B6",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B11/B12"
+                "Sentinel2": "B11/B12",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -1809,7 +2412,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -1848,7 +2476,8 @@
               "anomaly_type": "CO₃²⁻",
               "absorption_um": 2.34,
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6/B8)*(B9/B8)",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -1868,7 +2497,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -1879,8 +2533,9 @@
               "absorption_um": 2.33,
               "reflectance_peak_um": 2.25,
               "sensor_ratio": {
-                "ASTER": "B6/B8",
-                "Sentinel2": "B12/B8A"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "Sentinel2": "B12/B8A",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -1899,7 +2554,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -1910,7 +2591,8 @@
               "sensor_ratio": {
                 "ASTER": "B3/B1",
                 "Landsat8": "B4/B2",
-                "Sentinel2": "B4/B2"
+                "Sentinel2": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -1935,7 +2617,31 @@
                   ],
                   "typical_pc_index": "PC2或PC3",
                   "anomaly_color": "亮色=铁氧化物富集"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             }
           ],
@@ -2035,10 +2741,11 @@
               "absorption_um": 2.2,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
+                "ASTER": "(B5+B7)/B6",
                 "Landsat8": "B6/B7",
                 "Sentinel2": "B11/B12",
-                "PRISMA": "R(2.10)/R(2.20)"
+                "PRISMA": "R(2.10)/R(2.20)",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -2064,7 +2771,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -2131,7 +2863,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.2,
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -2157,7 +2890,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -2167,7 +2925,8 @@
               "anomaly_type": "CO₃²⁻",
               "absorption_um": 2.34,
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6+B8)/B9",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -2187,7 +2946,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -2281,8 +3065,9 @@
               "absorption_um": 2.17,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B4/B5",
-                "PRISMA": "R(2.10)/R(2.17)"
+                "ASTER": "(B4+B6)/B5",
+                "PRISMA": "R(2.10)/R(2.17)",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -2302,7 +3087,32 @@
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=明矾石蚀变",
                   "note": "B4（反射峰2.10μm）和B5（吸收谷2.17μm）符号相反"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.165,
+                "shoulder_um": [
+                  2.1,
+                  2.22
+                ],
+                "sign": 1
               }
             },
             {
@@ -2315,8 +3125,9 @@
                 2.2
               ],
               "sensor_ratio": {
-                "ASTER": "B4/B6",
-                "Landsat8": "B6/B7"
+                "ASTER": "(B4+B6)/B5",
+                "Landsat8": "B6/B7",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -2342,7 +3153,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -2352,7 +3188,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.17,
               "sensor_ratio": {
-                "ASTER": "B4/B5"
+                "ASTER": "(B4+B6)/B5",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -2378,7 +3215,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -2388,7 +3250,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.16,
               "sensor_ratio": {
-                "ASTER": "B4/B6"
+                "ASTER": "(B4+B6)/B5",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -2414,7 +3277,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.165,
+                "shoulder_um": [
+                  2.1,
+                  2.22
+                ],
+                "sign": 1
               }
             },
             {
@@ -2522,8 +3410,9 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.2,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
-                "Landsat8": "B6/B7"
+                "ASTER": "(B5+B7)/B6",
+                "Landsat8": "B6/B7",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -2549,7 +3438,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -2559,7 +3473,8 @@
               "anomaly_type": "CO₃²⁻",
               "absorption_um": 2.34,
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6+B8)/B9",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -2579,7 +3494,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -2589,7 +3529,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.33,
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -2608,7 +3549,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -2618,7 +3585,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.25,
               "sensor_ratio": {
-                "ASTER": "B7/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -2637,7 +3605,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -2791,7 +3785,8 @@
                 2.2
               ],
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -2817,7 +3812,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -2827,7 +3847,8 @@
               "anomaly_type": "CO₃²⁻负异常",
               "note": "碳酸盐指数低值——方解石被酸性流体溶蚀带走",
               "sensor_ratio": {
-                "ASTER": "B13/B14（取低值）"
+                "ASTER": "(B6/B8)*(B9/B8)",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -2848,7 +3869,32 @@
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "暗色=碳酸盐负异常（去碳酸盐化）",
                   "note": "卡林型金矿关键标志：CO₃²⁻取负异常（暗色），与硅化（亮色）互补"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -2979,7 +4025,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.2,
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3005,7 +4052,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -3015,7 +4087,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.33,
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3034,7 +4107,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -3044,7 +4143,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.25,
               "sensor_ratio": {
-                "ASTER": "B7/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3063,7 +4163,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -3072,7 +4198,8 @@
               "priority": 2,
               "anomaly_type": "Fe³⁺",
               "sensor_ratio": {
-                "Landsat8": "B4/B2"
+                "Landsat8": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3103,7 +4230,31 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=铁染蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             }
           ],
@@ -3213,9 +4364,10 @@
               "absorption_um": 2.2,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
+                "ASTER": "(B5+B7)/B6",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B11/B12"
+                "Sentinel2": "B11/B12",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3241,7 +4393,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -3252,7 +4429,8 @@
               "sensor_ratio": {
                 "ASTER": "B3/B1",
                 "Landsat8": "B4/B2",
-                "Sentinel2": "B4/B2"
+                "Sentinel2": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3277,7 +4455,31 @@
                   ],
                   "typical_pc_index": "PC2或PC3",
                   "anomaly_color": "亮色=铁氧化物富集"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             },
             {
@@ -3288,8 +4490,9 @@
               "absorption_um": 2.33,
               "reflectance_peak_um": 2.25,
               "sensor_ratio": {
-                "ASTER": "B6/B8",
-                "Sentinel2": "B12/B8A"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "Sentinel2": "B12/B8A",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3308,7 +4511,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -3318,7 +4547,8 @@
               "anomaly_type": "CO₃²⁻",
               "absorption_um": 2.34,
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6/B8)*(B9/B8)",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3338,7 +4568,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -3419,9 +4674,10 @@
               "absorption_um": 2.2,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
+                "ASTER": "(B5+B7)/B6",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B11/B12"
+                "Sentinel2": "B11/B12",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3447,7 +4703,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -3487,7 +4768,8 @@
               "sensor_ratio": {
                 "ASTER": "B3/B1",
                 "Landsat8": "B4/B2",
-                "Sentinel2": "B4/B2"
+                "Sentinel2": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3512,7 +4794,31 @@
                   ],
                   "typical_pc_index": "PC2或PC3",
                   "anomaly_color": "亮色=铁氧化物富集"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             },
             {
@@ -3523,8 +4829,9 @@
               "absorption_um": 2.33,
               "reflectance_peak_um": 2.25,
               "sensor_ratio": {
-                "ASTER": "B6/B8",
-                "Sentinel2": "B12/B8A"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "Sentinel2": "B12/B8A",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3543,7 +4850,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -3652,7 +4985,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.2,
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3678,7 +5012,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -3887,9 +5246,10 @@
               "absorption_um": 2.2,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
+                "ASTER": "(B5+B7)/B6",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B11/B12"
+                "Sentinel2": "B11/B12",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3915,7 +5275,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -3926,8 +5311,9 @@
               "absorption_um": 2.33,
               "reflectance_peak_um": 2.25,
               "sensor_ratio": {
-                "ASTER": "B6/B8",
-                "Sentinel2": "B12/B8A"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "Sentinel2": "B12/B8A",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3946,7 +5332,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -3956,7 +5368,8 @@
               "anomaly_type": "CO₃²⁻",
               "absorption_um": 2.34,
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6/B8)*(B9/B8)",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -3976,7 +5389,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -3987,7 +5425,8 @@
               "sensor_ratio": {
                 "ASTER": "B3/B1",
                 "Landsat8": "B4/B2",
-                "Sentinel2": "B4/B2"
+                "Sentinel2": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4012,7 +5451,31 @@
                   ],
                   "typical_pc_index": "PC2或PC3",
                   "anomaly_color": "亮色=铁氧化物富集"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             }
           ],
@@ -4114,7 +5577,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.32,
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "B6/B8",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4133,7 +5597,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -4143,7 +5633,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.31,
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "B6/B8",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4162,7 +5653,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -4171,7 +5688,8 @@
               "priority": 2,
               "anomaly_type": "Mg-OH",
               "sensor_ratio": {
-                "ASTER": "B7/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4190,7 +5708,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -4247,7 +5791,8 @@
               "sensor_ratio": {
                 "Landsat8": "B4/B2",
                 "Sentinel2": "B4/B2",
-                "ASTER": "B3/B1"
+                "ASTER": "B3/B1",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4278,7 +5823,31 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=铁染蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             },
             {
@@ -4316,7 +5885,8 @@
               "priority": 3,
               "anomaly_type": "Mg-OH",
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4335,7 +5905,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -4470,7 +6066,8 @@
               "priority": 2,
               "anomaly_type": "Mg-OH",
               "sensor_ratio": {
-                "ASTER": "B7/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4489,7 +6086,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -4498,7 +6121,8 @@
               "priority": 2,
               "anomaly_type": "Mg-OH",
               "sensor_ratio": {
-                "ASTER": "B7/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4517,7 +6141,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -4526,7 +6176,8 @@
               "priority": 1,
               "anomaly_type": "Fe³⁺",
               "sensor_ratio": {
-                "Landsat8": "B4/B2"
+                "Landsat8": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4557,7 +6208,31 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=铁染蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             }
           ],
@@ -4637,7 +6312,8 @@
               "sensor_ratio": {
                 "ASTER": "B3/B1",
                 "Landsat8": "B4/B2",
-                "Sentinel2": "B4/B2"
+                "Sentinel2": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4662,7 +6338,31 @@
                   ],
                   "typical_pc_index": "PC2或PC3",
                   "anomaly_color": "亮色=铁氧化物富集"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             },
             {
@@ -4673,8 +6373,9 @@
               "absorption_um": 2.33,
               "reflectance_peak_um": 2.25,
               "sensor_ratio": {
-                "ASTER": "B6/B8",
-                "Sentinel2": "B12/B8A"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "Sentinel2": "B12/B8A",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4693,7 +6394,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -4704,9 +6431,10 @@
               "absorption_um": 2.2,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
+                "ASTER": "(B5+B7)/B6",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B11/B12"
+                "Sentinel2": "B11/B12",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4732,7 +6460,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -4743,9 +6496,10 @@
               "absorption_um": 2.16,
               "reflectance_peak_um": 2.14,
               "sensor_ratio": {
-                "ASTER": "B4/B6",
+                "ASTER": "(B4+B6)/B5",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B8A/B12"
+                "Sentinel2": "B8A/B12",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4771,7 +6525,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -4956,7 +6735,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.2,
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -4982,7 +6762,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             }
           ],
@@ -5060,7 +6865,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.2,
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -5086,7 +6892,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -5123,7 +6954,8 @@
               "priority": 2,
               "anomaly_type": "Mg-OH",
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -5142,7 +6974,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -5251,9 +7109,10 @@
               "absorption_um": 2.2,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
+                "ASTER": "(B5+B7)/B6",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B11/B12"
+                "Sentinel2": "B11/B12",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -5279,7 +7138,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -5300,8 +7184,9 @@
               "absorption_um": 2.33,
               "reflectance_peak_um": 2.25,
               "sensor_ratio": {
-                "ASTER": "B6/B8",
-                "Sentinel2": "B12/B8A"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "Sentinel2": "B12/B8A",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -5320,7 +7205,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -5331,7 +7242,8 @@
               "sensor_ratio": {
                 "ASTER": "B3/B1",
                 "Landsat8": "B4/B2",
-                "Sentinel2": "B4/B2"
+                "Sentinel2": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -5356,7 +7268,31 @@
                   ],
                   "typical_pc_index": "PC2或PC3",
                   "anomaly_color": "亮色=铁氧化物富集"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             }
           ],
@@ -5470,7 +7406,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.2,
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -5496,7 +7433,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -5531,7 +7493,8 @@
               "priority": 2,
               "anomaly_type": "Mg-OH",
               "sensor_ratio": {
-                "ASTER": "B7/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -5550,7 +7513,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -5642,8 +7631,9 @@
               "absorption_um": 2.2,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
-                "PRISMA": "R(2.10)/R(2.20)"
+                "ASTER": "(B5+B7)/B6",
+                "PRISMA": "R(2.10)/R(2.20)",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -5669,7 +7659,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -5879,9 +7894,10 @@
               "absorption_um": 2.2,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
+                "ASTER": "(B5+B7)/B6",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B11/B12"
+                "Sentinel2": "B11/B12",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -5907,7 +7923,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -5918,9 +7959,10 @@
               "absorption_um": 2.2,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
+                "ASTER": "(B5+B7)/B6",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B11/B12"
+                "Sentinel2": "B11/B12",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -5946,7 +7988,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -5957,8 +8024,9 @@
               "absorption_um": 2.33,
               "reflectance_peak_um": 2.25,
               "sensor_ratio": {
-                "ASTER": "B6/B8",
-                "Sentinel2": "B12/B8A"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "Sentinel2": "B12/B8A",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -5977,7 +8045,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -5994,7 +8088,8 @@
               "sensor_ratio": {
                 "ASTER": "B3/B1",
                 "Landsat8": "B4/B2",
-                "Sentinel2": "B4/B2"
+                "Sentinel2": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -6019,7 +8114,31 @@
                   ],
                   "typical_pc_index": "PC2或PC3",
                   "anomaly_color": "亮色=铁氧化物富集"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             }
           ],
@@ -6103,7 +8222,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.2,
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -6129,7 +8249,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -6275,7 +8420,8 @@
               "reflectance_peak_um": 2.25,
               "sensor_ratio": {
                 "ASTER": "B6/B8",
-                "PRISMA": "R(2.25)/R(2.32)"
+                "PRISMA": "R(2.25)/R(2.32)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -6294,7 +8440,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -6304,7 +8476,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.31,
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "B6/B8",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -6323,7 +8496,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -6332,7 +8531,8 @@
               "priority": 3,
               "anomaly_type": "Mg-OH",
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -6351,7 +8551,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -6401,7 +8627,8 @@
               "priority": 1,
               "anomaly_type": "Mg-OH",
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "B6/B8",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -6420,7 +8647,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -6430,7 +8683,8 @@
               "anomaly_type": "Fe³⁺",
               "absorption_um": 0.87,
               "sensor_ratio": {
-                "Landsat8": "B4/B2"
+                "Landsat8": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -6461,7 +8715,31 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=铁染蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             },
             {
@@ -6470,7 +8748,8 @@
               "priority": 2,
               "anomaly_type": "Al-OH",
               "sensor_ratio": {
-                "ASTER": "B4/B6"
+                "ASTER": "(B4+B6)/B5",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -6496,7 +8775,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -6505,9 +8809,10 @@
               "priority": 2,
               "anomaly_type": "Al-OH 2.16/2.20μm 双峰",
               "sensor_ratio": {
-                "ASTER": "B4/B6",
+                "ASTER": "(B4+B6)/B5",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B11/B12"
+                "Sentinel2": "B11/B12",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -6533,7 +8838,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=黏土化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             }
           ],
@@ -6644,7 +8974,8 @@
               "priority": 2,
               "anomaly_type": "CO₃²⁻",
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6+B8)/B9",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -6664,7 +8995,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -6673,7 +9029,8 @@
               "priority": 3,
               "anomaly_type": "Al-OH",
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -6699,7 +9056,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             }
           ],
@@ -6773,7 +9155,8 @@
               "priority": 1,
               "anomaly_type": "Fe³⁺",
               "sensor_ratio": {
-                "Landsat8": "B4/B2"
+                "Landsat8": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -6804,7 +9187,31 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=铁染蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             },
             {
@@ -6954,7 +9361,8 @@
               "priority": 3,
               "anomaly_type": "Mg-OH",
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -6973,7 +9381,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -7038,7 +9472,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.32,
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "B6/B8",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -7057,7 +9492,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -7117,8 +9578,9 @@
               "absorption_um": 2.34,
               "reflectance_peak_um": 2.28,
               "sensor_ratio": {
-                "ASTER": "B13/B14",
-                "PRISMA": "R(2.28)/R(2.34)"
+                "ASTER": "(B6/B8)*(B9/B8)",
+                "PRISMA": "R(2.28)/R(2.34)",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -7138,7 +9600,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -7148,7 +9635,8 @@
               "anomaly_type": "Fe³⁺",
               "absorption_um": 0.87,
               "sensor_ratio": {
-                "Landsat8": "B4/B2"
+                "Landsat8": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -7179,7 +9667,31 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=铁染蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             },
             {
@@ -7311,7 +9823,8 @@
                 2.2
               ],
               "sensor_ratio": {
-                "ASTER": "B4/B6"
+                "ASTER": "(B4+B6)/B5",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -7337,7 +9850,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -7346,7 +9884,8 @@
               "priority": 2,
               "anomaly_type": "Al-OH",
               "sensor_ratio": {
-                "ASTER": "B4/B6"
+                "ASTER": "(B4+B6)/B5",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -7372,7 +9911,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -7381,7 +9945,8 @@
               "priority": 3,
               "anomaly_type": "Fe³⁺",
               "sensor_ratio": {
-                "Landsat8": "B4/B2"
+                "Landsat8": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -7412,7 +9977,31 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=铁染蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             }
           ],
@@ -7481,7 +10070,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.2,
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -7507,7 +10097,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -7701,7 +10316,8 @@
               "priority": 1,
               "anomaly_type": "Al-OH",
               "sensor_ratio": {
-                "ASTER": "B4/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -7727,7 +10343,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             }
           ],
@@ -7787,7 +10428,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.33,
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -7806,7 +10448,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -7816,7 +10484,8 @@
               "anomaly_type": "Al-OH",
               "absorption_um": 2.2,
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -7842,7 +10511,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -7880,7 +10574,8 @@
               "priority": 1,
               "anomaly_type": "Fe³⁺",
               "sensor_ratio": {
-                "Landsat8": "B4/B2"
+                "Landsat8": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -7911,7 +10606,31 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=铁染蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             }
           ],
@@ -8002,7 +10721,8 @@
               "priority": 1,
               "anomaly_type": "Fe³⁺",
               "sensor_ratio": {
-                "Landsat8": "B4/B2"
+                "Landsat8": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8033,7 +10753,31 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=铁染蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             },
             {
@@ -8042,7 +10786,8 @@
               "priority": 2,
               "anomaly_type": "Al-OH",
               "sensor_ratio": {
-                "ASTER": "B4/B6"
+                "ASTER": "(B4+B6)/B5",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8068,7 +10813,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -8077,7 +10847,8 @@
               "priority": 3,
               "anomaly_type": "CO₃²⁻",
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6+B8)/B9",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8097,7 +10868,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -8214,7 +11010,8 @@
               "priority": 2,
               "anomaly_type": "Mg-OH",
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8233,7 +11030,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -8242,7 +11065,8 @@
               "priority": 3,
               "anomaly_type": "CO₃²⁻",
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6+B8)/B9",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8262,7 +11086,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -8341,7 +11190,8 @@
               "sensor_ratio": {
                 "ASTER": "B3/B1",
                 "Landsat8": "B4/B2",
-                "Sentinel2": "B4/B2"
+                "Sentinel2": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8366,7 +11216,31 @@
                   ],
                   "typical_pc_index": "PC2或PC3",
                   "anomaly_color": "亮色=铁氧化物富集"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             },
             {
@@ -8377,9 +11251,10 @@
               "absorption_um": 2.2,
               "reflectance_peak_um": 2.1,
               "sensor_ratio": {
-                "ASTER": "B5/B6",
+                "ASTER": "(B5+B7)/B6",
                 "Landsat8": "B6/B7",
-                "Sentinel2": "B11/B12"
+                "Sentinel2": "B11/B12",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8405,7 +11280,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -8416,8 +11316,9 @@
               "absorption_um": 2.33,
               "reflectance_peak_um": 2.25,
               "sensor_ratio": {
-                "ASTER": "B6/B8",
-                "Sentinel2": "B12/B8A"
+                "ASTER": "(B6+B9)/(B7+B8)",
+                "Sentinel2": "B12/B8A",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8436,7 +11337,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -8570,8 +11497,9 @@
                 2.26
               ],
               "sensor_ratio": {
-                "ASTER": "B4/B6",
-                "PRISMA": "R(2.14)/R(2.20)"
+                "ASTER": "(B4+B6)/B5",
+                "PRISMA": "R(2.14)/R(2.20)",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8597,7 +11525,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -8606,7 +11559,8 @@
               "priority": 2,
               "anomaly_type": "Al-OH",
               "sensor_ratio": {
-                "ASTER": "B4/B6"
+                "ASTER": "(B4+B6)/B5",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8632,7 +11586,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             },
             {
@@ -8641,7 +11620,8 @@
               "priority": 1,
               "anomaly_type": "Fe³⁺",
               "sensor_ratio": {
-                "Landsat8": "B4/B2"
+                "Landsat8": "B4/B2",
+                "WorldView3": "B5/B2"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8672,7 +11652,31 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=铁染蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B3",
+                    "B6",
+                    "B9",
+                    "B11"
+                  ],
+                  "positive_bands": [
+                    "B3"
+                  ],
+                  "negative_bands": [
+                    "B6"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 0.9,
+                "shoulder_um": [
+                  0.76,
+                  1.05
+                ],
+                "sign": 1
               }
             }
           ],
@@ -8774,7 +11778,8 @@
               "priority": 2,
               "anomaly_type": "CO₃²⁻",
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6+B8)/B9",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8794,7 +11799,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -8803,7 +11833,8 @@
               "priority": 3,
               "anomaly_type": "Al-OH",
               "sensor_ratio": {
-                "ASTER": "B4/B6"
+                "ASTER": "(B4+B6)/B5",
+                "WorldView3": "B11/B13"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8829,7 +11860,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.205,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             }
           ],
@@ -8940,7 +11996,8 @@
               "priority": 2,
               "anomaly_type": "CO₃²⁻",
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6+B8)/B9",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -8960,7 +12017,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -9121,7 +12203,8 @@
               "anomaly_type": "Mg-OH",
               "absorption_um": 2.32,
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "B6/B8",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -9140,7 +12223,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -9149,7 +12258,8 @@
               "priority": 1,
               "anomaly_type": "CO₃²⁻",
               "sensor_ratio": {
-                "ASTER": "B13/B14"
+                "ASTER": "(B6+B8)/B9",
+                "WorldView3": "B15/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -9169,7 +12279,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=碳酸盐化"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B13"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B13"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.335,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             },
             {
@@ -9178,7 +12313,8 @@
               "priority": 2,
               "anomaly_type": "Mg-OH",
               "sensor_ratio": {
-                "ASTER": "B6/B8"
+                "ASTER": "B6/B8",
+                "WorldView3": "B11/B16"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -9197,7 +12333,33 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=Mg-OH蚀变"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B16"
+                  ],
+                  "positive_bands": [
+                    "B7",
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B1",
+                    "B16"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.33,
+                "shoulder_um": [
+                  2.26,
+                  2.4
+                ],
+                "sign": 1
               }
             }
           ],
@@ -9389,7 +12551,8 @@
               "priority": 3,
               "anomaly_type": "Al-OH",
               "sensor_ratio": {
-                "ASTER": "B5/B6"
+                "ASTER": "(B5+B7)/B6",
+                "WorldView3": "B11/B14"
               },
               "crosta_pca": {
                 "sensor": "ASTER",
@@ -9415,7 +12578,32 @@
                   ],
                   "typical_pc_index": "PC3或PC4",
                   "anomaly_color": "亮色=蚀变（若正负反号则暗色=蚀变，等效）"
+                },
+                "worldview3": {
+                  "input_bands": [
+                    "B1",
+                    "B7",
+                    "B11",
+                    "B14"
+                  ],
+                  "positive_bands": [
+                    "B11"
+                  ],
+                  "negative_bands": [
+                    "B7",
+                    "B14"
+                  ],
+                  "typical_pc_index": "PC4",
+                  "anomaly_color": "亮(异常高值)"
                 }
+              },
+              "enmap_feature": {
+                "feature_um": 2.2,
+                "shoulder_um": [
+                  2.13,
+                  2.25
+                ],
+                "sign": 1
               }
             }
           ],
@@ -10027,7 +13215,7 @@
         "PRISMA"
       ],
       "sensor_ratios": {
-        "ASTER": "B13/B14 或 (B13+B14)/B12",
+        "ASTER": "(B6/B8)*(B9/B8)",
         "PRISMA": "R(2.28)/R(2.34)"
       },
       "associated_deposits": [

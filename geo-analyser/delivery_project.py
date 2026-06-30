@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import rasterio
+from rasterio.enums import Resampling
 
 
 DELIVERY_ROOT = Path(os.environ.get(
@@ -42,22 +43,24 @@ WINTER_SUBDIR = "data-矿权-冬季（11-3月）"
 
 # JSON 数据库里用的传感器 key → 项目内子目录"规范名"(仅用于展示/找不到实际目录时的兜底)
 SENSOR_DIR_MAP = {
-    "ASTER":     "ASTER L2",
-    "Sentinel2": "Sentinel 2 L2",
-    "Landsat8":  "Landsat 8 L2",
-    "Landsat9":  "Landsat 9 L2",
+    "ASTER":      "ASTER L2",
+    "Sentinel2":  "Sentinel 2 L2",
+    "Landsat8":   "Landsat 8 L2",
+    "Landsat9":   "Landsat 9 L2",
+    "WorldView3": "WorldView 3",
 }
 
 # 传感器 key → 目录名前缀(匹配时大小写/分隔符不敏感,且忽略处理级别后缀)。
 # 不同交付批次的子目录命名会变,如 "Sentinel 2 L2" / "Sentinel 2 L2A" / "Landsat 8 L2A",
 # 这里用前缀匹配避免漏认。Landsat 8 与 Landsat 9 因前缀不同不会互相误配。
 SENSOR_DIR_PREFIXES = {
-    "ASTER":     ["aster"],
-    "Sentinel2": ["sentinel 2", "sentinel2"],
-    "Landsat8":  ["landsat 8", "landsat8"],
-    "Landsat9":  ["landsat 9", "landsat9"],
-    "EnMAP":     ["enmap"],
-    "PRISMA":    ["prisma"],
+    "ASTER":      ["aster"],
+    "Sentinel2":  ["sentinel 2", "sentinel2"],
+    "Landsat8":   ["landsat 8", "landsat8"],
+    "Landsat9":   ["landsat 9", "landsat9"],
+    "EnMAP":      ["enmap"],
+    "PRISMA":     ["prisma"],
+    "WorldView3": ["worldview 3", "worldview3", "wv3", "worldview-3"],
 }
 
 # EnMAP(高光谱)是单文件多波段:一个 SPECTRAL_IMAGE.tif(224 波段)+ METADATA.XML,
@@ -523,34 +526,41 @@ def load_sensor_data(project_dir: Path, sensor_key: str) -> Tuple[np.ndarray, Di
     if not band_files:
         raise FileNotFoundError(f"{sub} 中未找到波段文件")
 
-    # 按像元分辨率分组,取主分辨率
+    # 按像元分辨率分组。主分辨率组(波段数最多)定义"参考格网";
+    # 其余分辨率组(如 ASTER TIR 90m、VNIR 15m)重采样并入参考格网,而非丢弃 ——
+    # 这样 TIR 硅化指数、VNIR 铁染等非主组波段也能进入分析。
+    # 注:此为"同景同范围"的近似对齐(out_shape 重采样),严格像元级配准见路线图 P2-c。
     res_groups: Dict[int, List[Path]] = {}
     for bf in band_files:
         with rasterio.open(bf) as src:
             res = round(abs(src.res[0]))
         res_groups.setdefault(res, []).append(bf)
     dominant = max(res_groups, key=lambda r: len(res_groups[r]))
-    band_files = res_groups[dominant]
+    dominant_set = set(res_groups[dominant])
 
-    # 最小公共尺寸
-    shapes = {}
-    for bf in band_files:
+    # 参考格网 = 主分辨率组的最小公共尺寸
+    min_h = min_w = None
+    for bf in res_groups[dominant]:
         with rasterio.open(bf) as src:
-            shapes[bf] = (src.height, src.width)
-    min_h = min(s[0] for s in shapes.values())
-    min_w = min(s[1] for s in shapes.values())
+            min_h = src.height if min_h is None else min(min_h, src.height)
+            min_w = src.width if min_w is None else min(min_w, src.width)
 
     bands = []
     bn_map: Dict[str, int] = {}
     profile = None
-    for i, bf in enumerate(band_files):
+    for bf in band_files:   # 全部波段,主组原生裁剪,非主组重采样到参考格网
         bn = _normalize_bn(bf.name)
         if bn is None:
             continue
         with rasterio.open(bf) as src:
-            arr = src.read(1)[:min_h, :min_w].astype(np.float32)
-            if profile is None:
-                profile = src.profile.copy()
+            if bf in dominant_set:
+                arr = src.read(1)[:min_h, :min_w].astype(np.float32)
+                if profile is None:
+                    profile = src.profile.copy()   # 参考 profile 取自主分辨率组
+            else:
+                arr = src.read(
+                    1, out_shape=(min_h, min_w), resampling=Resampling.bilinear,
+                ).astype(np.float32)
         bands.append(arr)
         bn_map[bn] = len(bands) - 1
         # Sentinel-2 容错: 同时注册带前导 0 的别名(如 'B01' → 同 'B1')
