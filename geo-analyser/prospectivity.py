@@ -34,6 +34,36 @@ DEFAULT_WEIGHTS: Dict[str, float] = {
 }
 
 
+# ─────────────────────────────────────────────
+# 融合层次形式化 (P2-e, 书 §10.5.1: 像元级 / 特征级 / 决策级)
+# ─────────────────────────────────────────────
+# 书把多源融合分三个层次,本系统当前与未来的定位:
+#   - 像元级 (pixel)   : 原始/校正反射率直接运算(波段比值、Crosta PCA、band_depth)。
+#                        产物=单蚀变索引图,发生在 alteration_analysis 内,是"特征"的输入。
+#   - 特征级 (feature) : 把像元级产物提炼成"地物特征"再融合 —— SASP 吸收参数、SAM 波形相似度、
+#                        RX 多变量异常、TES 硅化指数、各蚀变 score。这些是带地质含义的特征层。
+#   - 决策级 (decision): 对特征层归一后加权/模糊融合给出最终判断 —— **本模块 fuse_evidence 即决策级**
+#                        (weighted_sum / fuzzy_gamma)。
+# 现状: fuse_evidence 工作在决策级(各证据层先各自归一再加权)。特征级融合(在归一前于特征空间
+# 联合建模,如多特征马氏/特征堆叠分类)目前未做,留作接口扩展点(见 fuse_evidence 的 layers 入口)。
+FUSION_LEVELS: Dict[str, str] = {
+    # 像元级算子(产出单索引图,作为特征级输入)
+    "band_ratio": "pixel", "crosta_pca": "pixel", "band_depth": "pixel",
+    # 特征级证据(带地质含义,喂入决策级融合)
+    "sasp": "feature", "sam": "feature", "rx": "feature", "tir_silica": "feature",
+    "alteration": "feature", "veg_stress": "feature", "structure": "feature",
+    "deformation": "feature", "terrain": "feature",
+    # 决策级 = fuse_evidence 本身
+}
+
+
+def classify_fusion_level(name: str) -> str:
+    """返回某证据/算子在三级融合体系中的层次:pixel|feature|decision。未知按 feature 兜底。"""
+    if name in ("weighted_sum", "fuzzy_gamma", "fuse_evidence", "decision"):
+        return "decision"
+    return FUSION_LEVELS.get(name, "feature")
+
+
 def normalize_layer(arr: np.ndarray, p_lo: float = 2.0, p_hi: float = 98.0) -> np.ndarray:
     """
     percentile 截断归一到 [0,1]。全 NaN / 常数层返回全 0(等价于"无信息")。

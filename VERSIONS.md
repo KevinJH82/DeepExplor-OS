@@ -21,7 +21,7 @@
 | `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.2.0 |
 | `geo-preprocess` | 预处理（辐射/几何/大气校正、镶嵌、裁剪） | 0.1.0 |
 | `geo-insar` | InSAR 时序形变（相干/速度聚类/线性体） | 0.1.0 |
-| `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.4.0 |
+| `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.5.0 |
 | `geo-geochem` | 化探背景与异常 | 0.1.0 |
 | `geo-geophys` | 物探位场（磁/重力） | 0.1.0 |
 | `geo-stru` | 构造解译（坡向/曲率/活动断裂/InSAR 融合） | 0.1.0 |
@@ -46,6 +46,13 @@
 | `geo-exploration/Python_Project` | geo-exploration | 勘查应用主代码 | 0.1.0 |
 
 ## 变更日志（monorepo 级）
+
+### 2026-06-30 — geo-analyser 0.5.0（升级 v2 · P2-b ASTER-TES 硅化 + P2-e 融合层次）
+- **P2-b ASTER-TES 硅化指数**（书 §10.2.3，`thermal_emissivity.py`）：发射率归一化 + 石英指数
+  QI=B11²/(B10·B12) + SiO₂% 回归 2.76·log10[6.56·B13·B14/(B10·B12)] + 碳酸盐 TIR 指数 B13/B14。
+  analyze_single 加 method="tir_silica"(需 P0-b 加载的 TIR 波段)。硅化=斑岩/浅成低温金核心向量。
+- **P2-e 融合层次形式化**（书 §10.5.1，`prospectivity.py`）：文档化 像元/特征/决策 三级,
+  `FUSION_LEVELS`+`classify_fusion_level`,把 SASP/SAM/RX/TES 定位为特征级、fuse_evidence 为决策级。
 
 ### 2026-06-30 — geo-analyser 0.4.0（升级 v2 · P2-a RX 多变量异常）
 - **P2-a RX/马氏异常**（书 §9.2.1，`calc_rx` + analyze_single method="rx"）：对整幅多波段图算

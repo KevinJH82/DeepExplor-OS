@@ -30,9 +30,10 @@ _REPO_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
 if _REPO_ROOT not in _sys.path:
     _sys.path.insert(0, _REPO_ROOT)
 from commons.spectral_indices import calc_ndvi, calc_ndre, calc_cire, calc_rep
-# 光谱吸收特征参数 SASP(P1-a) / 光谱波形匹配 SAM(P1-b),叶子模块,无循环依赖
+# 光谱吸收特征 SASP(P1-a) / 光谱波形匹配 SAM(P1-b) / 热红外硅化 TES(P2-b),叶子模块,无循环依赖
 import spectral_absorption
 import spectral_match
+import thermal_emissivity
 
 # ─────────────────────────────────────────────
 # 传感器波段配置 — JSON 中的 BN 编号 → image 数组通道索引
@@ -844,6 +845,20 @@ def analyze_single(
             grade_map=fin["grade_map"], grade_thresholds=fin["grade_thresholds"],
             grade_k_levels=fin["grade_k_levels"], grade_family=fin["grade_family"],
             ratio_expr="RX(马氏距离)", sign=1,
+        )
+
+    if method == "tir_silica":
+        # ASTER-TES 硅化指数(P2-b, 书§10.2.3): 石英指数 QI=B11²/(B10·B12)。需 TIR 波段(P0-b 加载)。
+        bnm = bn_map if bn_map is not None else _bn_map(sensor_key)
+        index_map = thermal_emissivity.calc_silica_index(image, bnm, roi_mask=roi_mask)
+        fin = _finalize_anomaly(index_map, roi_mask, threshold_method, k, target_spec)
+        return AlterationResult(
+            mineral=mineral, method="tir_silica", sensor=sensor_key,
+            index_map=index_map, anomaly_mask=fin["anomaly"],
+            anomaly_ratio=fin["anomaly_ratio"], threshold=fin["thr"],
+            grade_map=fin["grade_map"], grade_thresholds=fin["grade_thresholds"],
+            grade_k_levels=fin["grade_k_levels"], grade_family=fin["grade_family"],
+            ratio_expr="QI=B11²/(B10·B12)", sign=1,
         )
 
     if method == "veg_stress":
