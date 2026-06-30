@@ -19,7 +19,7 @@
 | `commons` | 共享库：Broker、trace 决策血缘、光谱索引等 | 0.1.0 |
 | `geo-orchestrator` | 编排（P1，依矿种/ROI 生成技术执行方案，签发 trace_id） | 0.1.0 |
 | `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.2.0 |
-| `geo-preprocess` | 预处理（辐射/几何/大气校正、镶嵌、裁剪） | 0.1.0 |
+| `geo-preprocess` | 预处理（辐射/几何/大气校正、镶嵌、裁剪、多源配准、全色融合） | 0.3.0 |
 | `geo-insar` | InSAR 时序形变（相干/速度聚类/线性体） | 0.1.0 |
 | `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.5.0 |
 | `geo-geochem` | 化探背景与异常 | 0.1.0 |
@@ -46,6 +46,14 @@
 | `geo-exploration/Python_Project` | geo-exploration | 勘查应用主代码 | 0.1.0 |
 
 ## 变更日志（monorepo 级）
+
+### 2026-06-30 — geo-preprocess 0.3.0（升级 v2 · P2-c 多源配准 + P2-d 全色融合）
+- **P2-c 多源像元级配准**（书 §10.5.2，`core/coregistration.py`）：把不同分辨率/来源栅格重采样到
+  统一参考格网 + 相位相关(FFT)估计并校正残余整数像元错位。融合定量正确性前置(合成验证:
+  配准前 corr 0.45→配准后 1.00)。
+- **P2-d PCA 全色融合**（书 §10.5.3，`core/pansharpen.py`）：多光谱 PCA→PC1 用直方图匹配的
+  全色替换→逆变换,空间分辨率提升到全色级(Landsat B8 / WV3 PAN)。合成验证(pan 为同场景高分版):
+  光谱保真相关 0.87、细节注入 1.00。
 
 ### 2026-06-30 — geo-analyser 0.5.0（升级 v2 · P2-b ASTER-TES 硅化 + P2-e 融合层次）
 - **P2-b ASTER-TES 硅化指数**（书 §10.2.3，`thermal_emissivity.py`）：发射率归一化 + 石英指数
