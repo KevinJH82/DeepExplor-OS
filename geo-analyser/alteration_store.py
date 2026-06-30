@@ -226,6 +226,7 @@ def save_batch_run(
                 "pc_used":          r.get("pc_used"),
                 "sign":             r.get("sign"),
                 "warning":          r.get("warning"),
+                "grade":            r.get("grade"),   # 异常分级(张玉君门限化): family/k_levels/level_pixels
                 "index_tif":        None,
                 "mask_tif":         None,
                 "preview_png":      None,

@@ -844,6 +844,24 @@ def fetch_datacolle_literature(min_lon, min_lat, max_lon, max_lat) -> str:
     return (entry.get("sections") or {}).get("literature", "") or ""
 
 
+# 分析方法 → 报告可读中文名(让 method 原始串显示为规范术语)
+_METHOD_CN = {
+    "ratio": "波段比值", "pca": "主成分(Crosta)", "band_depth": "高光谱吸收深度",
+    "sasp": "光谱吸收特征(SASP)", "sam": "光谱波形匹配(SAM/splib07)",
+    "rx": "RX 多变量光谱异常", "tir_silica": "热红外硅化指数(ASTER-TES)",
+    "veg_stress": "地植物学胁迫",
+}
+
+
+def _grade_phrase(grade) -> str:
+    """把 grade 摘要(张玉君门限化分级)渲染成 '一级X/二级Y/三级Z 像元' 措辞;无则空串。"""
+    if not isinstance(grade, dict):
+        return ""
+    lv = grade.get("level_pixels") or {}
+    parts = [f"{k}{lv[k]}" for k in ("一级", "二级", "三级") if lv.get(k)]
+    return ("，分级 " + "/".join(parts) + " 像元") if parts else ""
+
+
 def fetch_alteration_local(min_lon, min_lat, max_lon, max_lat) -> List[str]:
     """从 geo-analyser 读取与本研究区相交的蚀变分析结果，转中文叙述文本。"""
     _import_commons()
@@ -856,10 +874,12 @@ def fetch_alteration_local(min_lon, min_lat, max_lon, max_lat) -> List[str]:
         lines = [f"【本地蚀变分析 - AOI: {entry.get('aoi_name')}，成矿类型: {entry.get('deposit_type','')}】"
                  f"(来源: geo-analyser 标准输出，优先于 Web)"]
         for r in entry.get("results", []):
+            _m = r.get("method", "")
+            _mcn = _METHOD_CN.get(_m, _m)
             lines.append(
                 f"- 蚀变矿物「{r.get('mineral','')}」({r.get('anomaly_type','')})："
-                f"{r.get('sensor','')}/{r.get('method','')} 法，异常占比 {r.get('anomaly_ratio','?')}%，"
-                f"阈值 {r.get('threshold','?')}"
+                f"{r.get('sensor','')}/{_mcn} 法，异常占比 {r.get('anomaly_ratio','?')}%，"
+                f"阈值 {r.get('threshold','?')}{_grade_phrase(r.get('grade'))}"
             )
         st = entry.get("structural", {})
         if st and st.get("association_by_mineral"):

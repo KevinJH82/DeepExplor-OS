@@ -1330,6 +1330,55 @@ def api_analyze_batch():
                     app.logger.error(f"analyze {mineral}/{m}/{sensor_key} 失败: {e}", exc_info=True)
                     sensor_results[m] = {"error": str(e)}
 
+        # ── 整景级证据层(与具体矿物无关,每传感器跑一次): RX 多变量异常 + ASTER-TES 硅化 ──
+        # 纯证据行(不计入 score_map),随 results[] 落盘 → 报告自动展示。
+        for _sm, _slabel, _szone in (
+            ("rx", "RX 多变量光谱异常", "全区光谱协方差异常"),
+            ("tir_silica", "硅化(石英·TIR)", "硅化蚀变带"),
+        ):
+            try:
+                res = analyze_single(
+                    image, sensor_key, {"mineral": _slabel}, _sm, roi_mask=roi_mask,
+                    threshold_method=threshold_method, k=k, bn_map=bn_map,
+                )
+            except Exception as e:
+                # tir_silica 在无 TIR 波段的传感器上会报错 → 跳过(正常,非 ASTER 或未加载 TIR)
+                app.logger.info(f"{sensor_key} 整景级 {_sm} 跳过: {e}")
+                continue
+            cell_b64 = (
+                _render_cell_on_basemap(
+                    basemap_view, res.anomaly_mask, profile.get("transform"),
+                    profile.get("crs"), roi_geojson, res, sensor_key, colormap)
+                if basemap_view is not None else None)
+            sensor_results[_sm] = {
+                "anomaly_ratio": round(res.anomaly_ratio * 100, 2),
+                "threshold":     None if not np.isfinite(res.threshold) else float(res.threshold),
+                "warning":       res.warning,
+                "overlay":       f"data:image/png;base64,{cell_b64}" if cell_b64 else None,
+                "ratio_expr":    res.ratio_expr,
+                "grade":         _grade_block(res),
+            }
+            save_sensors[sensor_key]["results"].append({
+                "mineral":          _slabel,
+                "zone":             _szone,
+                "priority":         2,
+                "anomaly_type":     _slabel,
+                "effective_sensor": sensor_key,
+                "data_status":      "scene_level",
+                "method":           _sm,
+                "anomaly_ratio":    round(res.anomaly_ratio * 100, 2),
+                "threshold":        None if not np.isfinite(res.threshold) else float(res.threshold),
+                "ratio_expr":       res.ratio_expr,
+                "pc_used":          None,
+                "sign":             res.sign,
+                "warning":          res.warning,
+                "index_map":        res.index_map,
+                "mask":             res.anomaly_mask,
+                "grade_map":        res.grade_map,
+                "grade":            _grade_block(res),
+                "preview_b64":      cell_b64,
+            })
+
         # 该传感器的综合判断
         overall_inter = np.zeros((H, W), dtype=bool)
         score_map = np.zeros((H, W), dtype=np.float32)

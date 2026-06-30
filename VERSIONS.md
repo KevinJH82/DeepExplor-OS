@@ -21,14 +21,14 @@
 | `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.2.0 |
 | `geo-preprocess` | 预处理（辐射/几何/大气校正、镶嵌、裁剪、多源配准、全色融合） | 0.3.0 |
 | `geo-insar` | InSAR 时序形变（相干/速度聚类/线性体） | 0.1.0 |
-| `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.6.0 |
+| `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.7.0 |
 | `geo-geochem` | 化探背景与异常 | 0.1.0 |
 | `geo-geophys` | 物探位场（磁/重力） | 0.1.0 |
 | `geo-stru` | 构造解译（坡向/曲率/活动断裂/InSAR 融合） | 0.1.0 |
 | `data-colle` | 数据汇集与成矿/文献先验（best_model/pathfinder/papers） | 0.1.0 |
 | `geo-model3d` | 二维证据→三维地质体，深度切片成矿有利度，靶点 | 0.1.0 |
 | `geo-drill` | 验证工程（布孔）与岩芯回灌 | 0.1.0 |
-| `geo-reporter` | 证据链叙事 + 综合勘查报告（DOCX/PPTX） | 0.1.0 |
+| `geo-reporter` | 证据链叙事 + 综合勘查报告（DOCX/PPTX） | 0.2.0 |
 | `geo-exploration` | 勘查 web 应用（矿种引擎/慢变量检测） | 0.1.0 |
 | `geo-7slow` | 七要素慢变量子系统 | 0.1.0 |
 | `geo-Yaky` | 形变/位场扩展系统（fspef-vers-system） | 0.1.0 |
@@ -46,6 +46,18 @@
 | `geo-exploration/Python_Project` | geo-exploration | 勘查应用主代码 | 0.1.0 |
 
 ## 变更日志（monorepo 级）
+
+### 2026-06-30 — geo-analyser 0.7.0 / geo-reporter 0.2.0（升级 v2 · UI/编排最后一公里）
+把已实现的新分析法接进分析路由与 Word 报告展示:
+- **geo-analyser**：`/api/analyze_batch` 多光谱 sensor 块新增**整景级证据层** RX(多变量异常) +
+  tir_silica(ASTER-TES 硅化),每传感器跑一次、随 results[] 落盘(纯证据行,不改评分);
+  高光谱块的 sasp/sam 早已并入 results。`alteration_store` 的 manifest result entry 写出 `grade`
+  (异常分级)字段。
+- **geo-reporter**：`data_sources.fetch_alteration_local` 加方法名中文映射(rx→RX多变量异常 /
+  sam→光谱波形匹配 / tir_silica→热红外硅化指数 等)+ 渲染分级措辞(一/二/三级像元),
+  报告自动展示新方法行与分级 —— 此前分级在报告里完全不可见。
+- 端元(VCA/N-FINDR)为就绪能力(linear_unmix endmember_method 参数),当前路由无 unmix 生产调用方,
+  待高光谱矿物解混被调用时启用。
 
 ### 2026-06-30 — geo-analyser 0.6.0（升级 v2 · P3-a N-FINDR/VCA 端元提取）
 - **P3-a 端元自动提取**（书 §9.3.2，`endmember_extraction.py`）：VCA(Nascimento&Dias2005) +
