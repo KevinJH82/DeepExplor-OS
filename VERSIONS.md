@@ -18,7 +18,7 @@
 |---|---|---|
 | `commons` | 共享库：Broker、trace 决策血缘、光谱索引等 | 0.1.0 |
 | `geo-orchestrator` | 编排（P1，依矿种/ROI 生成技术执行方案，签发 trace_id） | 0.1.0 |
-| `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.2.1 |
+| `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.3.0 |
 | `geo-preprocess` | 预处理（辐射/几何/大气校正、镶嵌、裁剪、多源配准、全色融合） | 0.3.0 |
 | `geo-insar` | InSAR 时序形变（相干/速度聚类/线性体） | 0.1.0 |
 | `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.7.0 |
@@ -46,6 +46,16 @@
 | `geo-exploration/Python_Project` | geo-exploration | 勘查应用主代码 | 0.1.0 |
 
 ## 变更日志（monorepo 级）
+
+### 2026-06-30 — geo-downloader 0.3.0（Web 服务稳健化：gunicorn + gevent 跑 SSE）
+根治 SSE 长连接抖动(原 Werkzeug 开发服务器每连接占一线程,并发下重置/刷屏):
+- 新增 `web/wsgi.py`(gevent monkey.patch_all 后再导入 app + 调 bootstrap)、`web/gunicorn_conf.py`
+  (**workers=1**——任务状态在进程内存,多 worker 会不一致;`worker_class=gevent` 协程承载并发 SSE;
+  preload_app=False 让后台线程/子进程在 worker 内启动)、`run_web.sh`(PORT 可配,默认 8080)。
+- app.py 把任务恢复 + 后台守护线程抽成幂等 `bootstrap()`(dev __main__ 与 gunicorn 共用,因 gunicorn
+  不走 __main__);端口改 PORT 环境变量。requirements 加 gunicorn/gevent。
+- 验证: gunicorn gevent worker 启动正常,SSE 初始数据瞬时 flush 并保持长连接(对比 dev server 3s 0 字节)。
+- 部署: 线上 `pip install -r requirements.txt` 后改用 `PORT=8090 ./run_web.sh` 启动(替代 python web/app.py)。
 
 ### 2026-06-30 — geo-downloader 0.2.1（修复 SSE 重连刷屏 WARN）
 - Web UI 运行日志反复出现 "SSE 连接异常，将自动重连…" WARN：根因是 `index.html` 的

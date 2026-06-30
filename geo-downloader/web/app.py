@@ -2339,17 +2339,35 @@ def package_status():
 # 启动
 # ═══════════════════════════════════════════════════════════════
 
-if __name__ == "__main__":
-    print("=" * 50)
-    print("  geo-downloader Web UI")
-    print("=" * 50)
-    print(f"  项目根目录  : {ROOT}")
-    print(f"  配置文件    : {CONFIG_PATH}")
-    print(f"  访问地址    : http://localhost:8080")
-    print("=" * 50)
-    _restore_tasks()   # 恢复上次 Flask 重启前的任务列表
+_bootstrapped = False
+_bootstrap_lock = threading.Lock()
+
+
+def bootstrap():
+    """启动初始化:恢复任务/通知列表 + 拉起后台守护线程。幂等。
+    dev(__main__)与 gunicorn(wsgi.py)共用 —— gunicorn 不走 __main__,必须显式调用本函数,
+    否则任务恢复与 _daily_gc/_async_pending/_delivery_sweep 后台循环不会运行。"""
+    global _bootstrapped
+    with _bootstrap_lock:
+        if _bootstrapped:
+            return
+        _bootstrapped = True
+    _restore_tasks()           # 恢复上次重启前的任务列表
     _restore_notifications()
     threading.Thread(target=_daily_gc, daemon=True, name="daily-gc").start()
     threading.Thread(target=_async_pending_loop, daemon=True, name="async-pending").start()
     threading.Thread(target=_delivery_sweep_loop, daemon=True, name="delivery-sweep").start()
-    app.run(host="0.0.0.0", port=8080, debug=False, threaded=True)
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", "8080"))
+    print("=" * 50)
+    print("  geo-downloader Web UI (开发服务器)")
+    print("=" * 50)
+    print(f"  项目根目录  : {ROOT}")
+    print(f"  配置文件    : {CONFIG_PATH}")
+    print(f"  访问地址    : http://localhost:{port}")
+    print("  注: 生产请用 gunicorn+gevent 启动(./run_web.sh),开发服务器不适合长连接 SSE")
+    print("=" * 50)
+    bootstrap()
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
