@@ -1195,7 +1195,12 @@
                 appendLog(detectLevel(raw), raw);
             };
             es.onerror = () => {
-                appendLog('WARN', 'SSE 连接异常，将自动重连…');
+                // EventSource 在"正常自动重连"期间也会反复触发 onerror(readyState=CONNECTING),
+                // 此时浏览器会自动重连,不应刷 WARN(否则长连接抖动/dev server 重置时刷屏)。
+                // 仅当连接被彻底关闭(CLOSED,终止重连,如 task 404/内容类型错误)时才告警。
+                if (es.readyState === EventSource.CLOSED) {
+                    appendLog('WARN', 'SSE 连接已断开(不再重连)，可刷新页面或重新打开任务日志');
+                }
             };
         }
 

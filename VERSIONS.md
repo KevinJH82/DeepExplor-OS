@@ -18,7 +18,7 @@
 |---|---|---|
 | `commons` | 共享库：Broker、trace 决策血缘、光谱索引等 | 0.1.0 |
 | `geo-orchestrator` | 编排（P1，依矿种/ROI 生成技术执行方案，签发 trace_id） | 0.1.0 |
-| `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.2.0 |
+| `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.2.1 |
 | `geo-preprocess` | 预处理（辐射/几何/大气校正、镶嵌、裁剪、多源配准、全色融合） | 0.3.0 |
 | `geo-insar` | InSAR 时序形变（相干/速度聚类/线性体） | 0.1.0 |
 | `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.7.0 |
@@ -46,6 +46,13 @@
 | `geo-exploration/Python_Project` | geo-exploration | 勘查应用主代码 | 0.1.0 |
 
 ## 变更日志（monorepo 级）
+
+### 2026-06-30 — geo-downloader 0.2.1（修复 SSE 重连刷屏 WARN）
+- Web UI 运行日志反复出现 "SSE 连接异常，将自动重连…" WARN：根因是 `index.html` 的
+  `EventSource.onerror` 无条件告警,而浏览器在**正常自动重连**期间(readyState=CONNECTING)也会
+  反复触发 onerror(叠加 Werkzeug dev server 长连接抖动 → 刷屏)。修复:仅当连接彻底关闭
+  (readyState===CLOSED,终止重连)时才告警,正常重连静默(恢复老版本已有、现版本丢失的守卫)。
+  下载本身不受影响(任务跑在独立子进程,SSE 仅日志推送通道)。
 
 ### 2026-06-30 — geo-portal 1.2.0 / geo-reporter 0.3.0（门户证据链增强 + 报告 v2）
 - **geo-portal 1.2.0**（系统 + backend/frontend 子系统）：证据链/地质叙事增强 —— 后端 main.py/db.py +
