@@ -28,24 +28,30 @@
 | `data-colle` | 数据汇集与成矿/文献先验（best_model/pathfinder/papers） | 0.1.0 |
 | `geo-model3d` | 二维证据→三维地质体，深度切片成矿有利度，靶点 | 0.1.0 |
 | `geo-drill` | 验证工程（布孔）与岩芯回灌 | 0.1.0 |
-| `geo-reporter` | 证据链叙事 + 综合勘查报告（DOCX/PPTX） | 0.2.0 |
+| `geo-reporter` | 证据链叙事 + 综合勘查报告（DOCX/PPTX） | 0.3.0 |
 | `geo-exploration` | 勘查 web 应用（矿种引擎/慢变量检测） | 0.1.0 |
 | `geo-7slow` | 七要素慢变量子系统 | 0.1.0 |
 | `geo-Yaky` | 形变/位场扩展系统（fspef-vers-system） | 0.1.0 |
-| `geo-portal` | 统一门户 BFF + 前端（租户/RBAC/项目/运行主线） | 1.1.0 |
+| `geo-portal` | 统一门户 BFF + 前端（租户/RBAC/项目/运行主线） | 1.2.0 |
 
 ## 子系统
 
 | 子系统 | 隶属 | 角色 | 版本 |
 |---|---|---|---|
-| `geo-portal/backend` | geo-portal | FastAPI BFF（鉴权/反代/状态归一/血缘） | 1.1.0 |
-| `geo-portal/frontend` | geo-portal | React 门户前端 | 1.1.0 |
+| `geo-portal/backend` | geo-portal | FastAPI BFF（鉴权/反代/状态归一/血缘） | 1.2.0 |
+| `geo-portal/frontend` | geo-portal | React 门户前端 | 1.2.0 |
 | `geo-7slow/backend` | geo-7slow | 后端服务 | 0.1.0 |
 | `geo-7slow/frontend` | geo-7slow | 前端 | 0.1.0 |
 | `geo-Yaky/fspef-vers-system` | geo-Yaky | 形变/位场子系统 | 0.1.0 |
 | `geo-exploration/Python_Project` | geo-exploration | 勘查应用主代码 | 0.1.0 |
 
 ## 变更日志（monorepo 级）
+
+### 2026-06-30 — geo-portal 1.2.0 / geo-reporter 0.3.0（门户证据链增强 + 报告 v2）
+- **geo-portal 1.2.0**（系统 + backend/frontend 子系统）：证据链/地质叙事增强 —— 后端 main.py/db.py +
+  前端 Panels/evidenceChain/geologyNarrative/store/EvidenceStoryline/portal.js 联动。
+- **geo-reporter 0.3.0**：报告 v2 构建器(`report_builder_v2.py`/`pptx_builder_v2.py`) + 价值评估
+  模块(`value_assessment.py`) + pptx_builder/report_builder/web 配套。
 
 ### 2026-06-30 — geo-analyser 0.7.0 / geo-reporter 0.2.0（升级 v2 · UI/编排最后一公里）
 把已实现的新分析法接进分析路由与 Word 报告展示:
