@@ -10,11 +10,14 @@ app 端口 **8086**，前面有 8090 反向代理 → 8086）。本目录的 `co
 cd /opt/deproject/geo-downloader
 git pull                              # 拉到 run_web.sh / wsgi.py / gunicorn_conf.py / deploy/
 
-# 1) 装 gunicorn + gevent(该机无 venv,装进系统 python3)
-python3 -m pip install -r requirements.txt
-#   若报 "externally-managed-environment"(Homebrew python 的 PEP668 限制),二选一:
+# 1) 只装新增的 gunicorn + gevent(其余依赖该机已装;别跑整个 requirements.txt —— 会触发
+#    rasterio 从源码重编译、报 gdal-config not found)。装进系统 python3(该机无 venv)。
+python3 -m pip install gunicorn gevent
+#   若报 "externally-managed-environment"(Homebrew python 的 PEP668 限制):
 #     python3 -m pip install --break-system-packages gunicorn gevent
-#   或(更干净)建 venv: python3 -m venv venv && venv/bin/pip install -r requirements.txt
+#   若 gevent 在很新的 python(如 3.14)上无 wheel 而源码编译失败: 改用该机的 python3.11
+#     (8090 代理即 3.11 跑)装并起: python3.11 -m pip install gunicorn gevent,
+#      并把 run_web.sh 里的 python3 换成 python3.11(或建 3.11 venv,run_web.sh 会自动优先用 venv)。
 #   —— run_web.sh 会自动优先用 venv/bin/python,没有才用系统 python3。
 
 # 2) 停掉临时手动起的旧进程(之前 nohup python3 web/app.py)
