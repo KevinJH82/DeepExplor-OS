@@ -39,8 +39,10 @@ python3 -c "import gunicorn, gevent" || { echo "  gunicorn/gevent 未装成功, 
 echo "  校验通过 ✓"
 
 echo "[5/6] 停老服务(:$PORT) + 备份老目录 + 切软链到 monorepo"
-lsof -ti tcp:$PORT | xargs kill 2>/dev/null || true
-sleep 2
+# 杀占用 $PORT 的老进程: lsof 可能不在 PATH(用全路径), 再用进程名兜底(注意实际是 python3.14 web/app.py)
+{ /usr/sbin/lsof -ti tcp:$PORT 2>/dev/null || lsof -ti tcp:$PORT 2>/dev/null || true; } | xargs kill 2>/dev/null || true
+pkill -f "web/app.py" 2>/dev/null || true
+sleep 3
 [ -L "$OLD" ] || mv "$OLD" "$OLD.old.$(date +%s)"
 ln -sfn "$NEW" "$OLD"
 
