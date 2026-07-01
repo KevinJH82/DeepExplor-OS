@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  geo-downloader Web UI 的 macOS launchd 托管(LaunchAgent) —— 开机自启 + 崩溃自动重拉。
+
+  为什么用 LaunchAgent(用户级)而非 LaunchDaemon(系统级):
+    下载产物写到用户挂载的外接盘(/Volumes/大硬盘可劲用/...),LaunchAgent 在用户会话内运行,
+    能看到该盘;LaunchDaemon 在开机早期以 root 运行,可能盘还没挂、也无该用户环境。
+    (前提: 该 Mac 需开启 jiahao 用户自动登录,LaunchAgent 才会开机自启。)
+
+  路径/端口按 192.168.112.57 部署实况写死: /opt/deproject/geo-downloader, PORT=8086。
+  换机部署改这两处即可。安装见同目录 README.md。
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.deepexplor.geodownloader.web</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/deproject/geo-downloader/run_web.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/opt/deproject/geo-downloader</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PORT</key>
+    <string>8086</string>
+    <!-- 让 python3/gunicorn(Homebrew)在 PATH 上 -->
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+
+  <!-- 加载时即启动 + 退出(崩溃或正常)后一律重拉 = 常驻自愈 -->
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <!-- 崩溃循环时最小重启间隔,避免疯狂重启 -->
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/geodl_web.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/geodl_web.err.log</string>
+</dict>
+</plist>

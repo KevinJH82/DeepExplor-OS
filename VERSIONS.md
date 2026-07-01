@@ -18,7 +18,7 @@
 |---|---|---|
 | `commons` | 共享库：Broker、trace 决策血缘、光谱索引等 | 0.1.0 |
 | `geo-orchestrator` | 编排（P1，依矿种/ROI 生成技术执行方案，签发 trace_id） | 0.1.0 |
-| `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.3.0 |
+| `geo-downloader` | 多源数据获取（40+ 传感器：光学/高光谱/热红外/全色） | 0.3.1 |
 | `geo-preprocess` | 预处理（辐射/几何/大气校正、镶嵌、裁剪、多源配准、全色融合） | 0.3.0 |
 | `geo-insar` | InSAR 时序形变（相干/速度聚类/线性体） | 0.1.0 |
 | `geo-analyser` | 遥感证据解译（蚀变/构造加权/解混/异常） | 0.7.0 |
@@ -46,6 +46,13 @@
 | `geo-exploration/Python_Project` | geo-exploration | 勘查应用主代码 | 0.1.0 |
 
 ## 变更日志（monorepo 级）
+
+### 2026-07-01 — geo-downloader 0.3.1（launchd 托管：开机自启 + 崩溃自愈）
+- 新增 `deploy/com.deepexplor.geodownloader.web.plist`(macOS LaunchAgent,RunAtLoad+KeepAlive) +
+  `deploy/README.md`(安装/运维步骤)。根治"进程停了没人拉起来 → 8090 代理 502"。
+- `run_web.sh` 增强:无 venv 时自动用系统 python3,且用 `python -m gunicorn` 避免 PATH 找不到。
+- 记录线上事实:192.168.112.57 部署路径 /opt/deproject/geo-downloader、app 端口 8086
+  (8090 是反向代理→8086)、该机无 venv 用 Homebrew python3。
 
 ### 2026-06-30 — geo-downloader 0.3.0（Web 服务稳健化：gunicorn + gevent 跑 SSE）
 根治 SSE 长连接抖动(原 Werkzeug 开发服务器每连接占一线程,并发下重置/刷屏):
